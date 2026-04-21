@@ -7,109 +7,142 @@
   <link rel="stylesheet" href="/static/css/main.css" />
 </head>
 <body>
-<div class="auth-wrapper">
-  <div class="auth-card">
 
-    <div class="auth-logo">
-      <h1>🏥 ClinicOS</h1>
-      <p>14-day free trial · No credit card needed</p>
+<div class="auth-page">
+
+  <!-- ── Left: Branding ── -->
+  <div class="auth-brand">
+    <div class="brand-content">
+      <p class="brand-eyebrow">14-day free trial</p>
+      <h1 class="brand-title">Clinic<br>OS</h1>
+      <p class="brand-tagline">
+        Replace your paper register with a smart clinic system.
+        No credit card needed to get started.
+      </p>
+      <div class="brand-divider"></div>
+      <div class="brand-features">
+        <div class="brand-feature">
+          <span class="brand-feature-dot"></span>
+          <span>Full access for 14 days, free</span>
+        </div>
+        <div class="brand-feature">
+          <span class="brand-feature-dot"></span>
+          <span>Set up in under 5 minutes</span>
+        </div>
+        <div class="brand-feature">
+          <span class="brand-feature-dot"></span>
+          <span>Your patients get WhatsApp reminders</span>
+        </div>
+        <div class="brand-feature">
+          <span class="brand-feature-dot"></span>
+          <span>Works on any phone, no app needed</span>
+        </div>
+      </div>
     </div>
-
-    <h2>Create your account</h2>
-
-    {% if error %}
-    <div class="alert alert-error">{{ error }}</div>
-    {% endif %}
-
-    <form method="POST" action="/register">
-
-      <div class="form-group">
-        <label for="name">Full name *</label>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          placeholder="Dr. Rajesh Mehta"
-          required
-        />
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="email">Email *</label>
-          <input
-            type="email"
-            id="email"
-            name="email"
-            placeholder="doctor@example.com"
-            required
-            autocomplete="email"
-          />
-        </div>
-        <div class="form-group">
-          <label for="phone">Phone *</label>
-          <input
-            type="tel"
-            id="phone"
-            name="phone"
-            placeholder="9876543210"
-            required
-          />
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="specialization">Specialization</label>
-          <input
-            type="text"
-            id="specialization"
-            name="specialization"
-            placeholder="General Physician"
-          />
-        </div>
-        <div class="form-group">
-          <label for="city">City</label>
-          <input
-            type="text"
-            id="city"
-            name="city"
-            placeholder="Nashik"
-          />
-        </div>
-      </div>
-
-      <div class="form-group">
-        <label for="clinic_name">Clinic name</label>
-        <input
-          type="text"
-          id="clinic_name"
-          name="clinic_name"
-          placeholder="Mehta Clinic"
-        />
-      </div>
-
-      <div class="form-group">
-        <label for="password">Password *</label>
-        <input
-          type="password"
-          id="password"
-          name="password"
-          placeholder="At least 8 characters"
-          required
-          minlength="8"
-          autocomplete="new-password"
-        />
-      </div>
-
-      <button type="submit" class="btn btn-primary">Start free trial</button>
-    </form>
-
-    <div class="auth-footer">
-      Already have an account? <a href="/login">Log in</a>
-    </div>
-
   </div>
+
+  <!-- ── Right: Register Card ── -->
+  <div class="auth-panel">
+    <div class="auth-card">
+
+      <h2 class="auth-card-title">Create your account</h2>
+      <p class="auth-card-sub">No credit card required</p>
+
+      {% if error %}
+      <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="/register">
+
+        <div class="form-group">
+          <label for="name">Full name *</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            placeholder="Dr. Rajesh Mehta"
+            required
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">Email *</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="doctor@example.com"
+              required
+              autocomplete="email"
+            />
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone *</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              placeholder="9876543210"
+              required
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="specialization">Specialization</label>
+            <input
+              type="text"
+              id="specialization"
+              name="specialization"
+              placeholder="General Physician"
+            />
+          </div>
+          <div class="form-group">
+            <label for="city">City</label>
+            <input
+              type="text"
+              id="city"
+              name="city"
+              placeholder="Nashik"
+            />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="clinic_name">Clinic name</label>
+          <input
+            type="text"
+            id="clinic_name"
+            name="clinic_name"
+            placeholder="Mehta Clinic"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password *</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="At least 8 characters"
+            required
+            minlength="8"
+            autocomplete="new-password"
+          />
+        </div>
+
+        <button type="submit" class="btn btn-primary">Start free trial</button>
+      </form>
+
+      <div class="auth-footer">
+        Already have an account? <a href="/login">Log in</a>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 </body>
 </html>
