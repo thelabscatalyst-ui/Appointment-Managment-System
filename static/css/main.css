@@ -704,6 +704,235 @@ a:hover { color: var(--text); }
 .quick-label { font-size: 13px; color: var(--text-muted); font-weight: 500; }
 
 /* ------------------------------------------------------------------ */
+/*  Settings Page                                                       */
+/* ------------------------------------------------------------------ */
+.settings-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 16px;
+  box-shadow: var(--glow);
+  transition: box-shadow 0.22s ease;
+}
+
+.settings-card:hover {
+  box-shadow: var(--glow-hover);
+}
+
+.settings-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.settings-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+
+.settings-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---- Schedule Grid ---- */
+.schedule-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.schedule-header {
+  display: grid;
+  grid-template-columns: 110px 56px 1fr 1fr 110px 110px;
+  gap: 12px;
+  padding: 0 12px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns: 110px 56px 1fr 1fr 110px 110px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  border: 1px solid transparent;
+  transition: border-color 0.15s, opacity 0.2s;
+}
+
+.schedule-row:hover { border-color: var(--border); }
+
+.schedule-row--off {
+  opacity: 0.38;
+}
+
+.schedule-day {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* ---- Toggle Switch ---- */
+.toggle {
+  position: relative;
+  display: inline-flex;
+  cursor: pointer;
+}
+
+.toggle input { display: none; }
+
+.toggle-track {
+  width: 36px;
+  height: 20px;
+  background: var(--border-light);
+  border-radius: 100px;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: var(--text-dim);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.toggle input:checked + .toggle-track {
+  background: rgba(255,255,255,0.18);
+}
+
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(16px);
+  background: var(--text);
+}
+
+/* ---- Small inline inputs ---- */
+.input-sm {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input-sm:focus { border-color: #444; }
+.input-sm:disabled { opacity: 0.3; cursor: not-allowed; }
+.input-sm option { background: var(--bg-2); }
+
+/* ---- Clinic Profile grid ---- */
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ---- Blocked Dates ---- */
+.blocked-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 20px;
+}
+
+.blocked-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--bg-3);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.blocked-row:hover { border-color: var(--border); }
+
+.blocked-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.blocked-date {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.blocked-reason {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.btn-icon-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn-icon-remove:hover {
+  background: rgba(248,113,113,0.1);
+  color: var(--danger);
+  border-color: rgba(248,113,113,0.3);
+}
+
+.blocked-add-form { margin-top: 16px; }
+
+.blocked-add-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  padding: 16px 0;
+}
+
+/* ---- Booking Link Box ---- */
+.booking-link-box {
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+  color: var(--text-muted);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  letter-spacing: 0.3px;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Mobile Responsive                                                   */
 /* ------------------------------------------------------------------ */
 @media (max-width: 900px) {
@@ -726,8 +955,11 @@ a:hover { color: var(--text); }
     padding: 32px 24px 48px;
   }
 
-  .stats-row     { grid-template-columns: 1fr 1fr; }
-  .quick-actions { grid-template-columns: 1fr 1fr; }
+  .stats-row        { grid-template-columns: 1fr 1fr; }
+  .quick-actions    { grid-template-columns: 1fr 1fr; }
+  .settings-form-grid { grid-template-columns: 1fr; }
+  .schedule-header  { display: none; }
+  .schedule-row     { grid-template-columns: 90px 44px 1fr 1fr 80px 80px; gap: 8px; }
 }
 
 @media (max-width: 480px) {

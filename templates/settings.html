@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Settings — ClinicOS{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1 class="page-title">Settings</h1>
+</div>
+
+{% if saved %}
+<div class="alert alert-success" style="margin-bottom:24px;">Changes saved successfully.</div>
+{% endif %}
+
+<!-- ───────────────────────────────────────────────────── -->
+<!--  1. Working Hours                                      -->
+<!-- ───────────────────────────────────────────────────── -->
+<form method="POST" action="/doctors/settings/schedule">
+  <div class="settings-card">
+    <div class="settings-card-header">
+      <div>
+        <div class="settings-card-title">Working Hours</div>
+        <div class="settings-card-sub">Set the days and times your clinic is open</div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Save Hours</button>
+    </div>
+
+    <div class="schedule-grid">
+      <!-- Header -->
+      <div class="schedule-header">
+        <span>Day</span>
+        <span>Open</span>
+        <span>Start</span>
+        <span>End</span>
+        <span>Slot (min)</span>
+        <span>Max patients</span>
+      </div>
+
+      <!-- One row per day -->
+      {% for day in days_data %}
+      <div class="schedule-row {% if not day.is_active %}schedule-row--off{% endif %}" id="row-{{ day.index }}">
+        <span class="schedule-day">{{ day.name }}</span>
+
+        <label class="toggle">
+          <input
+            type="checkbox"
+            name="active_{{ day.index }}"
+            {% if day.is_active %}checked{% endif %}
+            onchange="toggleRow({{ day.index }}, this.checked)"
+          />
+          <span class="toggle-track"></span>
+        </label>
+
+        <input
+          type="time"
+          name="start_{{ day.index }}"
+          value="{{ day.start_time }}"
+          class="input-sm"
+          {% if not day.is_active %}disabled{% endif %}
+        />
+        <input
+          type="time"
+          name="end_{{ day.index }}"
+          value="{{ day.end_time }}"
+          class="input-sm"
+          {% if not day.is_active %}disabled{% endif %}
+        />
+        <select name="slot_{{ day.index }}" class="input-sm" {% if not day.is_active %}disabled{% endif %}>
+          {% for mins in [10, 15, 20, 30, 45, 60] %}
+          <option value="{{ mins }}" {% if day.slot_duration == mins %}selected{% endif %}>{{ mins }}</option>
+          {% endfor %}
+        </select>
+        <input
+          type="number"
+          name="max_{{ day.index }}"
+          value="{{ day.max_patients }}"
+          min="1"
+          max="200"
+          class="input-sm"
+          {% if not day.is_active %}disabled{% endif %}
+        />
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</form>
+
+<!-- ───────────────────────────────────────────────────── -->
+<!--  2. Clinic Profile                                     -->
+<!-- ───────────────────────────────────────────────────── -->
+<form method="POST" action="/doctors/settings/profile">
+  <div class="settings-card">
+    <div class="settings-card-header">
+      <div>
+        <div class="settings-card-title">Clinic Profile</div>
+        <div class="settings-card-sub">This information appears on your public booking page</div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Save Profile</button>
+    </div>
+
+    <div class="settings-form-grid">
+      <div class="form-group">
+        <label for="clinic_name">Clinic name</label>
+        <input type="text" id="clinic_name" name="clinic_name"
+          value="{{ doctor.clinic_name or '' }}" placeholder="Mehta Clinic" />
+      </div>
+      <div class="form-group">
+        <label for="city">City</label>
+        <input type="text" id="city" name="city"
+          value="{{ doctor.city or '' }}" placeholder="Nashik" />
+      </div>
+      <div class="form-group">
+        <label for="specialization">Specialization</label>
+        <input type="text" id="specialization" name="specialization"
+          value="{{ doctor.specialization or '' }}" placeholder="General Physician" />
+      </div>
+      <div class="form-group">
+        <label for="languages">Languages spoken</label>
+        <input type="text" id="languages" name="languages"
+          value="{{ doctor.languages or '' }}" placeholder="Hindi, Marathi, English" />
+      </div>
+      <div class="form-group" style="grid-column: 1 / -1;">
+        <label for="clinic_address">Clinic address</label>
+        <input type="text" id="clinic_address" name="clinic_address"
+          value="{{ doctor.clinic_address or '' }}" placeholder="123, Main Road, Nashik" />
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- ───────────────────────────────────────────────────── -->
+<!--  3. Blocked Dates                                      -->
+<!-- ───────────────────────────────────────────────────── -->
+<div class="settings-card">
+  <div class="settings-card-header">
+    <div>
+      <div class="settings-card-title">Blocked Dates</div>
+      <div class="settings-card-sub">Holidays and leaves — patients cannot book on these days</div>
+    </div>
+  </div>
+
+  {% if blocked_dates %}
+  <div class="blocked-list">
+    {% for b in blocked_dates %}
+    <div class="blocked-row">
+      <div class="blocked-info">
+        <span class="blocked-date">{{ b.blocked_date.strftime("%d %b %Y") }}</span>
+        {% if b.reason %}<span class="blocked-reason">{{ b.reason }}</span>{% endif %}
+      </div>
+      <form method="POST" action="/doctors/settings/unblock/{{ b.id }}" style="margin:0;">
+        <button type="submit" class="btn-icon-remove" title="Remove">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="settings-empty">No blocked dates yet.</p>
+  {% endif %}
+
+  <div class="blocked-add-form">
+    <form method="POST" action="/doctors/settings/block" class="blocked-add-row">
+      <div class="form-group" style="margin:0; flex:1;">
+        <input type="date" name="blocked_date" required class="input-sm" />
+      </div>
+      <div class="form-group" style="margin:0; flex:2;">
+        <input type="text" name="reason" placeholder="Reason (optional)" class="input-sm" />
+      </div>
+      <button type="submit" class="btn btn-secondary btn-sm">Add</button>
+    </form>
+  </div>
+</div>
+
+<!-- ───────────────────────────────────────────────────── -->
+<!--  4. Booking Link                                       -->
+<!-- ───────────────────────────────────────────────────── -->
+{% if doctor.slug %}
+<div class="settings-card">
+  <div class="settings-card-header">
+    <div>
+      <div class="settings-card-title">Your Booking Link</div>
+      <div class="settings-card-sub">Share this link with patients to let them book online</div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="copyLink()">Copy Link</button>
+  </div>
+  <div class="booking-link-box" id="bookingLink">
+    /book/{{ doctor.slug }}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleRow(index, isActive) {
+  const row = document.getElementById('row-' + index);
+  const inputs = row.querySelectorAll('input[type=time], input[type=number], select');
+  inputs.forEach(el => el.disabled = !isActive);
+  row.classList.toggle('schedule-row--off', !isActive);
+}
+
+function copyLink() {
+  const text = document.getElementById('bookingLink').textContent.trim();
+  const full = window.location.origin + text;
+  navigator.clipboard.writeText(full).then(() => {
+    alert('Copied!\n' + full);
+  });
+}
+</script>
+{% endblock %}
