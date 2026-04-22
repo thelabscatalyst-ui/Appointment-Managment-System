@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Calendar — ClinicOS{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+  <h1 class="page-title">
+    Calendar
+    <span class="page-date">· {{ month_name }}</span>
+  </h1>
+  <a href="/appointments/new" class="btn btn-primary btn-sm">+ New</a>
+</div>
+
+<!-- Month Navigation -->
+<div class="cal-nav">
+  <div class="cal-nav-buttons">
+    <a href="/calendar?month={{ prev_month }}" class="btn btn-secondary btn-sm">← Previous</a>
+    {% if not viewing_current %}
+    <a href="/calendar" class="btn btn-secondary btn-sm">This Month</a>
+    {% endif %}
+    <a href="/calendar?month={{ next_month }}" class="btn btn-secondary btn-sm">Next →</a>
+  </div>
+</div>
+
+<!-- Calendar Grid -->
+<div class="calendar-wrap">
+
+  <!-- Day Headers -->
+  <div class="cal-header">
+    {% for day_name in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] %}
+    <div class="cal-header-cell">{{ day_name }}</div>
+    {% endfor %}
+  </div>
+
+  <!-- Weeks -->
+  <div class="cal-body">
+    {% for week in cal_data %}
+    <div class="cal-week">
+      {% for day in week %}
+
+      {% if day is none %}
+      <!-- Padding cell -->
+      <div class="cal-day cal-day--empty"></div>
+
+      {% else %}
+      <a href="/appointments?filter_date={{ day.date_str }}"
+         class="cal-day
+           {% if day.is_today %}cal-day--today{% endif %}
+           {% if day.is_blocked %}cal-day--blocked{% endif %}
+           {% if day.is_past and not day.is_today %}cal-day--past{% endif %}
+           {% if day.total > 0 %}cal-day--has-appts{% endif %}">
+
+        <div class="cal-day-num">{{ day.num }}</div>
+
+        {% if day.is_blocked %}
+        <div class="cal-blocked-label">Blocked</div>
+        {% endif %}
+
+        {% if day.total > 0 %}
+        <div class="cal-dots">
+          {% if day.scheduled > 0 %}
+          <span class="cal-dot cal-dot--scheduled" title="{{ day.scheduled }} scheduled"></span>
+          {% endif %}
+          {% if day.completed > 0 %}
+          <span class="cal-dot cal-dot--completed" title="{{ day.completed }} completed"></span>
+          {% endif %}
+          {% if day.no_show > 0 %}
+          <span class="cal-dot cal-dot--noshow" title="{{ day.no_show }} no-show"></span>
+          {% endif %}
+        </div>
+        <div class="cal-count">{{ day.total }} appt{{ 's' if day.total != 1 else '' }}</div>
+        {% endif %}
+
+      </a>
+      {% endif %}
+
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+<!-- Legend -->
+<div class="cal-legend">
+  <span class="cal-legend-item"><span class="cal-dot cal-dot--scheduled"></span> Scheduled</span>
+  <span class="cal-legend-item"><span class="cal-dot cal-dot--completed"></span> Completed</span>
+  <span class="cal-legend-item"><span class="cal-dot cal-dot--noshow"></span> No-show</span>
+</div>
+
+{% endblock %}

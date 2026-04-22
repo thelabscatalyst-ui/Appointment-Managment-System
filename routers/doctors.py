@@ -1,5 +1,6 @@
+import calendar as cal_module
 from datetime import date, datetime, time as dtime
-from fastapi import APIRouter, Request, Depends, Form
+from fastapi import APIRouter, Request, Depends, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -245,3 +246,105 @@ def remove_blocked_date(
         db.delete(record)
         db.commit()
     return RedirectResponse(url="/doctors/settings", status_code=303)
+
+
+# ------------------------------------------------------------------ #
+#  Calendar                                                            #
+# ------------------------------------------------------------------ #
+
+@router.get("/calendar", response_class=HTMLResponse)
+def calendar_view(
+    request: Request,
+    month: str = Query(default=""),
+    doctor: Doctor = Depends(get_current_doctor),
+    db: Session = Depends(get_db),
+):
+    today = date.today()
+
+    # Parse ?month=YYYY-MM, fall back to current month
+    try:
+        year, mon = map(int, month.split("-")) if month else (today.year, today.month)
+        if not (1 <= mon <= 12):
+            raise ValueError
+    except (ValueError, AttributeError):
+        year, mon = today.year, today.month
+
+    first_day = date(year, mon, 1)
+    last_day  = date(year, mon, cal_module.monthrange(year, mon)[1])
+
+    # Prev / next month strings
+    if mon == 1:
+        prev_month = f"{year - 1}-12"
+    else:
+        prev_month = f"{year}-{mon - 1:02d}"
+    if mon == 12:
+        next_month = f"{year + 1}-01"
+    else:
+        next_month = f"{year}-{mon + 1:02d}"
+
+    # Appointments for this month (non-cancelled)
+    month_appts = (
+        db.query(Appointment)
+        .filter(
+            Appointment.doctor_id == doctor.id,
+            Appointment.appointment_date >= first_day,
+            Appointment.appointment_date <= last_day,
+            Appointment.status != AppointmentStatus.cancelled,
+        )
+        .all()
+    )
+
+    # Group by ISO date string
+    appt_by_date: dict = {}
+    for a in month_appts:
+        key = a.appointment_date.isoformat()
+        appt_by_date.setdefault(key, []).append(a)
+
+    # Blocked dates for this month
+    blocked = db.query(BlockedDate).filter(
+        BlockedDate.doctor_id == doctor.id,
+        BlockedDate.blocked_date >= first_day,
+        BlockedDate.blocked_date <= last_day,
+    ).all()
+    blocked_set = {b.blocked_date.isoformat() for b in blocked}
+
+    # Build cal_data: list of weeks → list of day-dicts (None = padding cell)
+    cal_data = []
+    for week in cal_module.monthcalendar(year, mon):
+        week_data = []
+        for day_num in week:
+            if day_num == 0:
+                week_data.append(None)
+            else:
+                d   = date(year, mon, day_num)
+                key = d.isoformat()
+                day_appts = appt_by_date.get(key, [])
+                week_data.append({
+                    "num":       day_num,
+                    "date_str":  key,
+                    "total":     len(day_appts),
+                    "scheduled": sum(1 for a in day_appts if a.status == AppointmentStatus.scheduled),
+                    "completed": sum(1 for a in day_appts if a.status == AppointmentStatus.completed),
+                    "no_show":   sum(1 for a in day_appts if a.status == AppointmentStatus.no_show),
+                    "is_today":  d == today,
+                    "is_blocked": key in blocked_set,
+                    "is_past":   d < today,
+                })
+        cal_data.append(week_data)
+
+    current_month = f"{today.year}-{today.month:02d}"
+    viewing_current = (year == today.year and mon == today.month)
+
+    return templates.TemplateResponse(request, "calendar.html", {
+        "doctor":          doctor,
+        "today":           today,
+        "year":            year,
+        "mon":             mon,
+        "month_name":      first_day.strftime("%B %Y"),
+        "cal_data":        cal_data,
+        "prev_month":      prev_month,
+        "next_month":      next_month,
+        "current_month":   current_month,
+        "viewing_current": viewing_current,
+        "active":          "calendar",
+    })
