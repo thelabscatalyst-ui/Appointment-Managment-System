@@ -61,23 +61,132 @@
   </div>
 </div>
 
-<!-- Notes Card -->
+<!-- ── Notes Card ──────────────────────────────────────────────────────── -->
 <div class="settings-card">
-  <div class="settings-card-header">
+  <div class="settings-card-header" style="margin-bottom:20px;">
     <div>
       <div class="settings-card-title">Doctor's Notes</div>
-      <div class="settings-card-sub">Private notes visible only to you</div>
+      <div class="settings-card-sub">Private records — visible only to you</div>
     </div>
   </div>
-  <form method="post" action="/patients/{{ patient.id }}/notes">
-    <div class="form-group" style="margin-bottom:12px;">
-      <textarea name="notes" rows="3" style="resize:vertical;width:100%;box-sizing:border-box;"
-                placeholder="Allergies, chronic conditions, medication, personal notes…">{{ patient.notes or '' }}</textarea>
+
+  <!-- Saved notes timeline -->
+  <div class="note-timeline" id="noteTimeline">
+
+    {% if notes_data %}
+      {% for note in notes_data %}
+      <div class="note-entry" id="note-{{ note.id }}">
+        <div class="note-entry-date">
+          <span>{{ note.date_label }}</span>
+        </div>
+        <div class="note-entry-body">
+          <p class="note-entry-text">{{ note.text }}</p>
+          {% if note.files %}
+          <div class="note-entry-files">
+            {% for f in note.files %}
+            <a href="/patients/{{ patient.id }}/files/{{ f.id }}"
+               class="note-file-chip" target="_blank" rel="noopener">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19
+                         a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+              </svg>
+              <span class="note-file-chip-name">{{ f.name }}</span>
+              {% if f.size %}<span class="note-file-chip-size">{{ f.size }}</span>{% endif %}
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <button type="button" class="note-entry-delete"
+                  onclick="deleteNote({{ note.id }}, this)"
+                  title="Delete this note">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6"/>
+              <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="note-empty-state" id="noteEmptyState">
+        No notes yet — add your first note below.
+      </div>
+    {% endif %}
+
+  </div><!-- /note-timeline -->
+
+  <!-- Compose new note -->
+  <div class="note-compose">
+    <textarea id="noteTextarea"
+              placeholder="Allergies, chronic conditions, medication, personal notes…"
+              rows="3"></textarea>
+
+    <!-- Queued files preview strip -->
+    <div class="note-file-queue" id="noteFileQueue" style="display:none;"></div>
+
+    <div class="note-compose-actions">
+      <span class="note-save-error" id="noteSaveError"></span>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="openFileModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-1px;">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19
+                   a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+        </svg>Attach Files
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" id="saveNoteBtn" onclick="saveNote()">
+        Save Note
+      </button>
     </div>
-    <div style="display:flex;justify-content:flex-end;">
-      <button type="submit" class="btn btn-secondary btn-sm">Save Notes</button>
+  </div>
+</div>
+
+<!-- ── File Upload Modal ───────────────────────────────────────────────── -->
+<div class="file-modal-overlay" id="fileModal" style="display:none;" onclick="fileModalOverlayClick(event)">
+  <div class="file-modal">
+    <div class="file-modal-header">
+      <span class="file-modal-title">Attach Files</span>
+      <button type="button" class="file-modal-close" onclick="closeFileModal()">×</button>
     </div>
-  </form>
+    <div class="file-modal-body">
+      <!-- Drop zone -->
+      <div class="file-drop-zone" id="dropZone"
+           onclick="document.getElementById('fileInput').click()"
+           ondragover="onDragOver(event)"
+           ondragleave="onDragLeave(event)"
+           ondrop="onDrop(event)">
+        <div class="file-drop-zone-icon">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.4"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+        </div>
+        <p class="file-drop-zone-label">Drag &amp; drop files here</p>
+        <p class="file-drop-zone-sub">or click to browse from your computer</p>
+        <input type="file" id="fileInput" multiple style="display:none"
+               onchange="handleFileSelect(this.files)">
+        <p class="file-drop-limit">Max 10 MB per file · Any file type accepted</p>
+      </div>
+
+      <!-- Selected files list inside modal -->
+      <div class="file-modal-queue" id="modalFileQueue"></div>
+    </div>
+
+    <div class="file-modal-footer">
+      <span id="modalFileError" style="font-size:12px;color:var(--danger);margin-right:auto;display:none;"></span>
+      <button type="button" class="btn btn-secondary btn-sm" onclick="closeFileModal()">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" onclick="attachFiles()">Attach</button>
+    </div>
+  </div>
 </div>
 
 <!-- Appointment History -->
@@ -112,7 +221,6 @@
   </div>
   {% endfor %}
 </div>
-
 {% else %}
 <div class="empty-state" style="padding:40px 24px;">
   <div class="empty-title">No appointments yet</div>
@@ -123,7 +231,9 @@
 <!-- Remove Patient -->
 <div style="margin-top:32px;padding-top:24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
   <form method="post" action="/patients/{{ patient.id }}/delete" id="deletePatientForm">
-    <button type="button" class="btn btn-sm" style="background:rgba(220,38,38,0.12);color:#ef4444;border:1px solid rgba(220,38,38,0.3);" onclick="confirmDelete()">Remove Patient</button>
+    <button type="button" class="btn btn-sm"
+            style="background:rgba(220,38,38,0.12);color:#ef4444;border:1px solid rgba(220,38,38,0.3);"
+            onclick="confirmDelete()">Remove Patient</button>
   </form>
 </div>
 
@@ -131,6 +241,17 @@
 
 {% block scripts %}
 <script>
+/* ── Constants ──────────────────────────────────────────────────── */
+const PATIENT_ID   = {{ patient.id }};
+const ADD_NOTE_URL = `/patients/${PATIENT_ID}/notes/add`;
+const DEL_NOTE_URL = (id) => `/patients/${PATIENT_ID}/notes/${id}/delete`;
+const FILE_URL     = (id) => `/patients/${PATIENT_ID}/files/${id}`;
+
+/* ── State ──────────────────────────────────────────────────────── */
+let pendingFiles  = [];   // files staged in the modal (before Attach)
+let queuedFiles   = [];   // files confirmed (after Attach), ready to save with note
+
+/* ── Edit / Delete patient modals ───────────────────────────────── */
 function openEditModal() {
   const m = document.getElementById('editPatientModal');
   m.style.display = 'flex';
@@ -146,5 +267,264 @@ function confirmDelete() {
     document.getElementById('deletePatientForm').submit();
   }
 }
+
+/* ── Ordinal date helper (mirrors Python _date_label) ───────────── */
+function ordinal(n) {
+  const v = n % 100;
+  const s = ['th','st','nd','rd'];
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+function formatNoteDate(isoStr) {
+  const d = isoStr ? new Date(isoStr) : new Date();
+  return `${ordinal(d.getDate())} ${MONTHS[d.getMonth()]}, ${d.getFullYear()}`;
+}
+
+function fmtSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024*1024) return `${(bytes/1024).toFixed(1)} KB`;
+  return `${(bytes/(1024*1024)).toFixed(1)} MB`;
+}
+
+/* ── Build HTML for a newly saved note block ─────────────────────── */
+function buildNoteHTML(note) {
+  // note = { note_id, date_label, text, files: [{id, name, size}] }
+  const dateLabel = note.date_label || formatNoteDate(null);
+  const noteId    = note.note_id;
+  const text      = (note.text || '').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  let filesHTML = '';
+  if (note.files && note.files.length) {
+    const chips = note.files.map(f => {
+      const sizeSpan = f.size ? `<span class="note-file-chip-size">${f.size}</span>` : '';
+      return `
+        <a href="${FILE_URL(f.id)}" class="note-file-chip" target="_blank" rel="noopener">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19
+                     a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+          </svg>
+          <span class="note-file-chip-name">${f.name}</span>
+          ${sizeSpan}
+        </a>`;
+    }).join('');
+    filesHTML = `<div class="note-entry-files">${chips}</div>`;
+  }
+
+  return `
+    <div class="note-entry" id="note-${noteId}">
+      <div class="note-entry-date"><span>${dateLabel}</span></div>
+      <div class="note-entry-body">
+        <p class="note-entry-text">${text}</p>
+        ${filesHTML}
+        <button type="button" class="note-entry-delete"
+                onclick="deleteNote(${noteId}, this)" title="Delete this note">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+            <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+}
+
+/* ── Save note ──────────────────────────────────────────────────── */
+async function saveNote() {
+  const textarea = document.getElementById('noteTextarea');
+  const btn      = document.getElementById('saveNoteBtn');
+  const errEl    = document.getElementById('noteSaveError');
+  const text     = textarea.value.trim();
+
+  errEl.style.display = 'none';
+
+  if (!text && queuedFiles.length === 0) {
+    errEl.textContent = 'Please write a note or attach at least one file.';
+    errEl.style.display = 'inline';
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = 'Saving…';
+
+  const fd = new FormData();
+  fd.append('note_text', text);
+  queuedFiles.forEach(f => fd.append('files', f));
+
+  try {
+    const res  = await fetch(ADD_NOTE_URL, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || 'Server error');
+    }
+
+    // Prepend new note block to timeline
+    const timeline = document.getElementById('noteTimeline');
+    const emptyEl  = document.getElementById('noteEmptyState');
+    if (emptyEl) emptyEl.remove();
+
+    timeline.insertAdjacentHTML('afterbegin', buildNoteHTML(data));
+
+    // Animate in
+    const newEl = timeline.firstElementChild;
+    newEl.style.opacity = '0';
+    newEl.style.transform = 'translateY(-8px)';
+    requestAnimationFrame(() => {
+      newEl.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      newEl.style.opacity    = '1';
+      newEl.style.transform  = 'translateY(0)';
+    });
+
+    // Clear compose area
+    textarea.value = '';
+    queuedFiles    = [];
+    renderQueueChips();
+
+  } catch (err) {
+    errEl.textContent    = err.message || 'Failed to save note. Please try again.';
+    errEl.style.display  = 'inline';
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Save Note';
+  }
+}
+
+/* ── Delete note ─────────────────────────────────────────────────── */
+async function deleteNote(noteId, btn) {
+  if (!confirm('Delete this note and all its attachments? This cannot be undone.')) return;
+  try {
+    const res = await fetch(DEL_NOTE_URL(noteId), { method: 'POST' });
+    if (!res.ok) throw new Error();
+    const entry = document.getElementById(`note-${noteId}`);
+    if (entry) {
+      entry.style.transition = 'opacity 0.25s, transform 0.25s';
+      entry.style.opacity    = '0';
+      entry.style.transform  = 'translateY(-6px)';
+      setTimeout(() => {
+        entry.remove();
+        const timeline = document.getElementById('noteTimeline');
+        if (timeline && !timeline.querySelector('.note-entry')) {
+          timeline.insertAdjacentHTML('afterbegin',
+            '<div class="note-empty-state" id="noteEmptyState">No notes yet — add your first note below.</div>'
+          );
+        }
+      }, 260);
+    }
+  } catch (_) {
+    alert('Could not delete note. Please try again.');
+  }
+}
+
+/* ── File modal ──────────────────────────────────────────────────── */
+function openFileModal() {
+  pendingFiles = [...queuedFiles];   // pre-populate with already-queued files
+  renderModalQueue();
+  document.getElementById('fileModal').style.display = 'flex';
+}
+function closeFileModal() {
+  document.getElementById('fileModal').style.display = 'none';
+  pendingFiles = [];
+  document.getElementById('fileInput').value = '';
+}
+function fileModalOverlayClick(e) {
+  if (e.target === document.getElementById('fileModal')) closeFileModal();
+}
+
+function attachFiles() {
+  queuedFiles = [...pendingFiles];
+  renderQueueChips();
+  closeFileModal();
+}
+
+/* ── File selection ──────────────────────────────────────────────── */
+function handleFileSelect(fileList) {
+  const MAX = 10 * 1024 * 1024;
+  let errMsg = '';
+  Array.from(fileList).forEach(f => {
+    if (f.size > MAX) { errMsg = `"${f.name}" exceeds 10 MB and was skipped.`; return; }
+    if (!pendingFiles.find(p => p.name === f.name && p.size === f.size)) {
+      pendingFiles.push(f);
+    }
+  });
+  const errEl = document.getElementById('modalFileError');
+  if (errMsg) { errEl.textContent = errMsg; errEl.style.display = 'inline'; }
+  else         { errEl.style.display = 'none'; }
+  renderModalQueue();
+}
+
+function removePending(idx) {
+  pendingFiles.splice(idx, 1);
+  renderModalQueue();
+}
+
+function renderModalQueue() {
+  const q = document.getElementById('modalFileQueue');
+  if (!pendingFiles.length) { q.innerHTML = ''; return; }
+  q.innerHTML = pendingFiles.map((f, i) => `
+    <div class="file-modal-queue-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z"/>
+        <polyline points="13 2 13 9 20 9"/>
+      </svg>
+      <span class="file-modal-queue-name">${f.name}</span>
+      <span class="file-modal-queue-size">${fmtSize(f.size)}</span>
+      <button type="button" class="file-modal-queue-remove"
+              onclick="removePending(${i})" title="Remove">×</button>
+    </div>`).join('');
+}
+
+/* ── Queue chips (below textarea) ────────────────────────────────── */
+function renderQueueChips() {
+  const el = document.getElementById('noteFileQueue');
+  if (!queuedFiles.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  el.innerHTML = queuedFiles.map((f, i) => `
+    <div class="note-file-queue-chip">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19
+                 a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+      </svg>
+      <span class="note-file-queue-chip-name">${f.name}</span>
+      <button type="button" onclick="removeQueued(${i})" title="Remove">×</button>
+    </div>`).join('');
+}
+
+function removeQueued(idx) {
+  queuedFiles.splice(idx, 1);
+  renderQueueChips();
+}
+
+/* ── Drag & drop ─────────────────────────────────────────────────── */
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('drag-over');
+}
+function onDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  handleFileSelect(e.dataTransfer.files);
+}
+
+/* ── Ctrl/Cmd+Enter to save note ────────────────────────────────── */
+document.getElementById('noteTextarea').addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    saveNote();
+  }
+});
 </script>
 {% endblock %}

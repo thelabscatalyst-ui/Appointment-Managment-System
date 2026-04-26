@@ -110,3 +110,25 @@ def _run_migrations():
                 "WHERE doctor_id = :did AND clinic_id IS NULL"
             ), {"cid": clinic_id, "did": doctor_id})
             conn.commit()
+
+        # ── Phase 3: Patient notes & file attachments ────────────────────────
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS patient_notes ("
+            "  id         INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "  patient_id INTEGER NOT NULL REFERENCES patients(id), "
+            "  doctor_id  INTEGER NOT NULL REFERENCES doctors(id), "
+            "  note_text  TEXT    NOT NULL, "
+            "  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        ))
+        conn.execute(text(
+            "CREATE TABLE IF NOT EXISTS note_files ("
+            "  id            INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "  note_id       INTEGER NOT NULL REFERENCES patient_notes(id), "
+            "  original_name VARCHAR(255) NOT NULL, "
+            "  stored_name   VARCHAR(255) NOT NULL, "
+            "  file_size     INTEGER, "
+            "  uploaded_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+            ")"
+        ))
+        conn.commit()

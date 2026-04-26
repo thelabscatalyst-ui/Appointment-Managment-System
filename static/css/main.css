@@ -2955,6 +2955,350 @@ html.light .data-table tbody tr:hover td {
   border-color: transparent;
 }
 
+/* ── Patient Note Timeline ──────────────────────────────────────── */
+.note-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 8px;
+}
+
+.note-entry {
+  position: relative;
+  padding-bottom: 24px;
+}
+.note-entry:last-child { padding-bottom: 0; }
+
+.note-entry-date {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.note-entry-date::before,
+.note-entry-date::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.note-entry-body {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  position: relative;
+  transition: border-color 0.2s;
+}
+.note-entry-body:hover { border-color: var(--border-light); }
+
+.note-entry-text {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+
+.note-entry-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.note-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 9px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: var(--transition-pop);
+  max-width: 220px;
+}
+.note-file-chip:hover {
+  color: var(--text);
+  border-color: var(--border-light);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: var(--glow-hover);
+}
+.note-file-chip svg { flex-shrink: 0; }
+.note-file-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-file-chip-size {
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.note-entry-delete {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s, background 0.15s;
+  z-index: 1;
+}
+.note-entry-delete:hover {
+  color: var(--danger);
+  background: rgba(248,113,113,0.1);
+}
+
+.note-empty-state {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+  padding: 24px 0 16px;
+  font-style: italic;
+}
+
+/* Compose area */
+.note-compose {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+  margin-top: 20px;
+}
+
+.note-compose textarea {
+  width: 100%;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.65;
+  padding: 12px 14px;
+  resize: vertical;
+  min-height: 88px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+}
+.note-compose textarea:focus {
+  outline: none;
+  border-color: var(--border-light);
+  box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+}
+
+.note-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.note-file-queue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.note-file-queue-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 9px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-muted);
+  max-width: 200px;
+}
+.note-file-queue-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.note-file-queue-chip button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.note-file-queue-chip button:hover { color: var(--danger); }
+
+/* Save feedback */
+.note-save-error {
+  font-size: 12px;
+  color: var(--danger);
+  margin-right: auto;
+  display: none;
+}
+
+/* File upload modal */
+.file-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  width: 100%;
+  max-width: 460px;
+  margin: 0 24px;
+  overflow: hidden;
+}
+
+.file-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.file-modal-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+.file-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 22px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.file-modal-close:hover {
+  color: var(--text);
+  background: var(--bg-3);
+}
+
+.file-modal-body { padding: 20px 24px; }
+
+.file-drop-zone {
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 28px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  user-select: none;
+}
+.file-drop-zone:hover,
+.file-drop-zone.drag-over {
+  border-color: var(--text-muted);
+  background: rgba(255,255,255,0.02);
+}
+.file-drop-zone-icon {
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+.file-drop-zone-label {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.file-drop-zone-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+.file-drop-limit {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 10px;
+}
+
+.file-modal-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.file-modal-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.file-modal-queue-item svg { flex-shrink: 0; color: var(--text-muted); }
+.file-modal-queue-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.file-modal-queue-size {
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.file-modal-queue-remove {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.file-modal-queue-remove:hover { color: var(--danger); }
+
+.file-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--border);
+}
+
 /* ── Page slide transitions ─────────────────────────────────────── */
 @keyframes pageSlideInRight {
   from { transform: translateX(52px); opacity: 0; }

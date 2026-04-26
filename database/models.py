@@ -189,8 +189,43 @@ class Patient(Base):
     last_visit = Column(Date, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    doctor = relationship("Doctor", back_populates="patients")
+    doctor       = relationship("Doctor", back_populates="patients")
     appointments = relationship("Appointment", back_populates="patient", cascade="all, delete-orphan")
+    note_entries = relationship(
+        "PatientNote", back_populates="patient",
+        cascade="all, delete-orphan",
+        order_by="PatientNote.created_at.desc()",
+    )
+
+
+# --------------------------------------------------------------------------- #
+#  Patient Notes & File Attachments                                             #
+# --------------------------------------------------------------------------- #
+
+class PatientNote(Base):
+    __tablename__ = "patient_notes"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
+    doctor_id  = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
+    note_text  = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    patient = relationship("Patient", back_populates="note_entries")
+    files   = relationship("NoteFile", back_populates="note", cascade="all, delete-orphan")
+
+
+class NoteFile(Base):
+    __tablename__ = "note_files"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    note_id       = Column(Integer, ForeignKey("patient_notes.id"), nullable=False, index=True)
+    original_name = Column(String(255), nullable=False)
+    stored_name   = Column(String(255), nullable=False)
+    file_size     = Column(Integer, nullable=True)   # bytes
+    uploaded_at   = Column(DateTime, default=datetime.utcnow)
+
+    note = relationship("PatientNote", back_populates="files")
 
 
 # --------------------------------------------------------------------------- #

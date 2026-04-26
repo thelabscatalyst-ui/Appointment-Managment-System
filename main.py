@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from database.connection import create_tables
 from routers import auth, appointments, doctors, patients, public, admin, clinic
@@ -13,6 +14,8 @@ from services.auth_service import PlanExpired, PinRequired
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure file-upload directory exists
+    Path("uploads/patients").mkdir(parents=True, exist_ok=True)
     create_tables()
     start_scheduler()
     yield
