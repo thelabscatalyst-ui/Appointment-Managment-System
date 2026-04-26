@@ -260,12 +260,13 @@ async def add_note(
 # --------------------------------------------------------------------------- #
 
 @router.get("/{patient_id}/files/{file_id}")
-def download_file(
+def view_file(
     patient_id: int,
     file_id: int,
     doctor: Doctor = Depends(get_paying_doctor),
     db: Session = Depends(get_db),
 ):
+    import mimetypes
     nf = db.query(NoteFile).join(PatientNote).filter(
         NoteFile.id == file_id,
         PatientNote.doctor_id == doctor.id,
@@ -278,10 +279,23 @@ def download_file(
     if not path.exists():
         return JSONResponse({"error": "File missing on disk."}, status_code=404)
 
+    mime_type, _ = mimetypes.guess_type(nf.original_name)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    # Browser-previewable types get inline; everything else forces download
+    previewable = (
+        mime_type.startswith("image/") or
+        mime_type.startswith("text/")  or
+        mime_type == "application/pdf"
+    )
+    disposition = "inline" if previewable else "attachment"
+
+    safe_name = nf.original_name.replace('"', '')
     return FileResponse(
         path=str(path),
-        filename=nf.original_name,
-        media_type="application/octet-stream",
+        media_type=mime_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{safe_name}"'},
     )
 
 
