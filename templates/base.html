@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}ClinicOS{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=20" />
+  <link rel="stylesheet" href="/static/css/main.css?v=21" />
   {% block head %}{% endblock %}
   <script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');</script>
 </head>
@@ -115,66 +115,28 @@ document.addEventListener('DOMContentLoaded', function() {
 {% block scripts %}{% endblock %}
 
 <script>
-/* ── Page slide animations ── */
+/* ── Page transition — fade + lift ── */
 (function () {
-  var TOP_LEVEL = new Set([
-    '/dashboard', '/patients', '/appointments', '/calendar',
-    '/reports', '/doctors/settings', '/billing', '/admin',
-    '/clinic/admin', '/clinic/reception'
-  ]);
-
-  function depth(p) { return p.split('/').filter(Boolean).length; }
-
-  function isBack(from, to) {
-    if (from === to) return false;
-    // Going to a top-level page from a deeper page
-    if (TOP_LEVEL.has(to) && depth(from) > depth(to)) return true;
-    // Going to a shallower path
-    if (depth(to) < depth(from)) return true;
-    return false;
-  }
-
   document.addEventListener('DOMContentLoaded', function () {
     var main = document.querySelector('.main-content');
     if (!main) return;
 
-    /* ── Apply entrance animation ── */
     var navEntry = performance.getEntriesByType('navigation')[0];
-    var isBrowserBack = navEntry && navEntry.type === 'back_forward';
-    var stored = sessionStorage.getItem('nav_dir');
-    sessionStorage.removeItem('nav_dir');
 
-    // Skip on very first load (no stored hint and no back-button)
-    if (!stored && !isBrowserBack) {
-      var sameOriginRef = document.referrer &&
-        document.referrer.indexOf(window.location.origin) === 0;
-      if (!sameOriginRef) return;
-    }
+    // Skip on reload — animating after F5 feels wrong
+    if (navEntry && navEntry.type === 'reload') return;
 
-    var dir = isBrowserBack ? 'back' : (stored || 'forward');
-    var cls = dir === 'back' ? 'page-slide-left' : 'page-slide-right';
-    main.classList.add(cls);
+    // Only animate when genuinely navigating within the app
+    var fromSameOrigin = document.referrer &&
+      document.referrer.indexOf(window.location.origin) === 0;
+    var isBackForward  = navEntry && navEntry.type === 'back_forward';
+
+    if (!fromSameOrigin && !isBackForward) return;
+
+    main.classList.add('page-enter');
     main.addEventListener('animationend', function () {
-      main.classList.remove(cls);
+      main.classList.remove('page-enter');
     }, { once: true });
-
-    /* ── Intercept link clicks to set direction hint ── */
-    document.addEventListener('click', function (e) {
-      var link = e.target.closest('a[href]');
-      if (!link || link.target === '_blank') return;
-      var href = link.getAttribute('href');
-      if (!href || href.charAt(0) === '#' ||
-          href.indexOf('javascript:') === 0 ||
-          href.indexOf('mailto:') === 0) return;
-      try {
-        var url = new URL(href, window.location.origin);
-        if (url.origin !== window.location.origin) return;
-        var from = window.location.pathname;
-        var to   = url.pathname;
-        if (from === to) return;
-        sessionStorage.setItem('nav_dir', isBack(from, to) ? 'back' : 'forward');
-      } catch (_) {}
-    });
   });
 })();
 </script>

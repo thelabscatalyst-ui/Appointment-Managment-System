@@ -3405,18 +3405,11 @@ html.light .data-table tbody tr:hover td {
   border-top: 1px solid var(--border);
 }
 
-/* ── Page slide transitions ─────────────────────────────────────── */
-@keyframes pageSlideInRight {
-  from { transform: translateX(52px); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
+/* ── Page transition — fade + lift ──────────────────────────────── */
+@keyframes pageFadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes pageSlideInLeft {
-  from { transform: translateX(-52px); opacity: 0; }
-  to   { transform: translateX(0);     opacity: 1; }
-}
-.page-slide-right {
-  animation: pageSlideInRight 0.27s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-}
-.page-slide-left {
-  animation: pageSlideInLeft 0.27s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+.page-enter {
+  animation: pageFadeUp 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
