@@ -58,6 +58,9 @@
       <div class="form-group">
         <label for="appointment_type">Visit Type</label>
         <select id="appointment_type" name="appointment_type">
+          {% if appt.appointment_type.value == 'emergency' %}
+          <option value="emergency" selected>Emergency</option>
+          {% endif %}
           {% for t in appointment_types %}
           <option value="{{ t }}"
             {% if appt.appointment_type.value == t %}selected{% endif %}>
