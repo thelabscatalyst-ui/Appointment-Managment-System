@@ -9,7 +9,7 @@ from database.models import (
     Doctor, Patient, Appointment, AppointmentStatus, AppointmentType, BookedBy,
     ClinicDoctor, Clinic,
 )
-from services.auth_service import get_paying_doctor
+from services.auth_service import get_paying_doctor, get_appt_doctor
 from services.appointment_service import (
     get_available_slots, is_slot_available, is_slot_available_for_edit,
     get_or_create_patient, has_open_appointment_on_date,
@@ -373,7 +373,7 @@ async def create_walkin(
 def appointment_detail(
     appt_id: int,
     request: Request,
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(get_appt_doctor),
     db: Session = Depends(get_db),
 ):
     appt = db.query(Appointment).filter(
@@ -381,15 +381,18 @@ def appointment_detail(
         Appointment.doctor_id == doctor.id,
     ).first()
     if not appt:
-        return RedirectResponse(url="/appointments", status_code=303)
+        back = "/clinic/reception" if getattr(request.state, "is_staff", False) else "/appointments"
+        return RedirectResponse(url=back, status_code=303)
 
     appt.patient  # lazy-load
 
+    is_staff = getattr(request.state, "is_staff", False)
     return templates.TemplateResponse(request, "appointment_detail.html", {
         "doctor": doctor,
         "appt": appt,
         "active": "appointments",
         "AppointmentStatus": AppointmentStatus,
+        "is_staff": is_staff,
     })
 
 
@@ -400,9 +403,10 @@ def appointment_detail(
 @router.post("/{appt_id}/status", response_class=HTMLResponse)
 def update_status(
     appt_id: int,
+    request: Request,
     status: str = Form(...),
     doctor_notes: str = Form(""),
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(get_appt_doctor),
     db: Session = Depends(get_db),
 ):
     appt = db.query(Appointment).filter(
@@ -432,7 +436,7 @@ def update_status(
 def edit_appointment_page(
     appt_id: int,
     request: Request,
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(get_appt_doctor),
     db: Session = Depends(get_db),
 ):
     appt = db.query(Appointment).filter(
@@ -440,7 +444,8 @@ def edit_appointment_page(
         Appointment.doctor_id == doctor.id,
     ).first()
     if not appt:
-        return RedirectResponse(url="/appointments", status_code=303)
+        back = "/clinic/reception" if getattr(request.state, "is_staff", False) else "/appointments"
+        return RedirectResponse(url=back, status_code=303)
 
     appt.patient  # lazy-load
     slots = get_available_slots(doctor.id, appt.appointment_date, db)
@@ -450,6 +455,7 @@ def edit_appointment_page(
     if current_time_str not in slots:
         slots = [current_time_str] + slots
 
+    is_staff = getattr(request.state, "is_staff", False)
     return templates.TemplateResponse(request, "appointment_edit.html", {
         "doctor": doctor,
         "appt": appt,
@@ -459,6 +465,7 @@ def edit_appointment_page(
         "appointment_types": [e.value for e in AppointmentType if e != AppointmentType.emergency],
         "active": "appointments",
         "error": None,
+        "is_staff": is_staff,
     })
 
 
@@ -477,15 +484,17 @@ async def edit_appointment(
     appointment_type: str = Form("follow_up"),
     duration: int = Form(15),
     patient_notes: str = Form(""),
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(get_appt_doctor),
     db: Session = Depends(get_db),
 ):
+    is_staff = getattr(request.state, "is_staff", False)
     appt = db.query(Appointment).filter(
         Appointment.id == appt_id,
         Appointment.doctor_id == doctor.id,
     ).first()
     if not appt:
-        return RedirectResponse(url="/appointments", status_code=303)
+        back = "/clinic/reception" if is_staff else "/appointments"
+        return RedirectResponse(url=back, status_code=303)
 
     appt.patient  # lazy-load
     today = date.today()
@@ -508,6 +517,7 @@ async def edit_appointment(
             "appointment_types": [e.value for e in AppointmentType if e != AppointmentType.emergency],
             "active": "appointments",
             "error": msg,
+            "is_staff": is_staff,
         })
 
     try:

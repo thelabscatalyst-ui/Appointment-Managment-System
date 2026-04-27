@@ -15,8 +15,13 @@
     {% if appt.status == AppointmentStatus.scheduled %}
     <a href="/appointments/{{ appt.id }}/edit" class="btn btn-secondary btn-sm">Edit</a>
     {% endif %}
+    {% if is_staff %}
+    <a href="/clinic/reception?filter_date={{ appt.appointment_date.isoformat() }}"
+       class="btn btn-secondary btn-sm">← Back</a>
+    {% else %}
     <a href="/appointments?filter_date={{ appt.appointment_date.isoformat() }}"
        class="btn btn-secondary btn-sm">← Back</a>
+    {% endif %}
   </div>
 </div>
 

@@ -171,6 +171,100 @@ def require_pin_auth(request: Request, doctor=Depends(get_current_doctor)):
     return doctor
 
 
+def get_appt_doctor(appt_id: int, request: Request, db: Session = Depends(get_db)):
+    """
+    Dependency for appointment detail / edit / status routes.
+    Accepts both doctor JWTs and staff JWTs so receptionists can view and
+    update appointments without being redirected to login.
+
+    - Doctor JWT  → same as get_paying_doctor (plan-gated).
+    - Staff JWT   → looks up the appointment's doctor, verifies the staff
+                    member belongs to the same clinic and is allowed to manage
+                    that doctor, then returns the Doctor object.
+
+    Sets request.state.is_staff = True/False so templates can adjust back-links.
+    """
+    from database.models import Doctor as DoctorModel, Appointment as ApptModel
+    from database.models import ClinicDoctor, Staff
+
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not logged in")
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+
+    # ── Staff path ────────────────────────────────────────────────────────────
+    if payload.get("user_type") == "staff":
+        staff = db.query(Staff).filter(Staff.id == payload.get("staff_id")).first()
+        if not staff or not staff.is_active:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Staff account not found")
+
+        # Find which doctor this appointment belongs to
+        appt = db.query(ApptModel).filter(ApptModel.id == appt_id).first()
+        if not appt:
+            raise HTTPException(status_code=404, detail="Appointment not found")
+
+        # Verify the doctor is part of staff's clinic
+        membership = db.query(ClinicDoctor).filter(
+            ClinicDoctor.clinic_id == staff.clinic_id,
+            ClinicDoctor.doctor_id == appt.doctor_id,
+            ClinicDoctor.is_active == True,
+        ).first()
+        if not membership:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Honour allowed_doctor_ids restriction
+        allowed = payload.get("allowed_doctor_ids", [])
+        if allowed and appt.doctor_id not in allowed:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        doctor = db.query(DoctorModel).filter(DoctorModel.id == appt.doctor_id).first()
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+
+        request.state.is_staff = True
+        request.state.staff_allowed_doctors = allowed
+        return doctor
+
+    # ── Doctor path ───────────────────────────────────────────────────────────
+    doctor = db.query(DoctorModel).filter(DoctorModel.id == payload.get("doctor_id")).first()
+    if not doctor or not doctor.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found")
+
+    # Plan gate (mirrors get_paying_doctor logic)
+    now = datetime.utcnow()
+    trial_ok = doctor.trial_ends_at and doctor.trial_ends_at > now
+    plan_ok  = doctor.plan_expires_at and doctor.plan_expires_at > now
+    if not trial_ok and not plan_ok:
+        memberships = db.query(ClinicDoctor).filter(
+            ClinicDoctor.doctor_id == doctor.id,
+            ClinicDoctor.is_active == True,
+        ).all()
+        from database.models import Clinic as ClinicModel
+        clinic_ok = False
+        for m in memberships:
+            clinic = db.query(ClinicModel).filter(ClinicModel.id == m.clinic_id).first()
+            if not clinic:
+                continue
+            if clinic.plan_expires_at and clinic.plan_expires_at > now:
+                clinic_ok = True
+                break
+            if clinic.owner_doctor_id:
+                owner = db.query(DoctorModel).filter(DoctorModel.id == clinic.owner_doctor_id).first()
+                if owner and (
+                    (owner.trial_ends_at and owner.trial_ends_at > now) or
+                    (owner.plan_expires_at and owner.plan_expires_at > now)
+                ):
+                    clinic_ok = True
+                    break
+        if not clinic_ok:
+            raise PlanExpired()
+
+    request.state.is_staff = False
+    return doctor
+
+
 def get_admin_doctor(doctor=Depends(get_current_doctor)):
     """Dependency for /admin routes — only allows the platform owner."""
     from config import settings
