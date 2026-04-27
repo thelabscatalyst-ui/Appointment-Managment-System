@@ -2633,6 +2633,50 @@ html.light .sub-pro-tag {
   min-width: 140px;
 }
 
+/* Emergency toggle button — off state looks muted, active state glows red */
+.btn-emergency-toggle {
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid rgba(248, 113, 113, 0.18);
+  background: rgba(248, 113, 113, 0.06);
+  color: rgba(248, 113, 113, 0.45);
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+              box-shadow 0.18s ease;
+  white-space: nowrap;
+}
+.btn-emergency-toggle:hover {
+  background: rgba(248, 113, 113, 0.11);
+  color: rgba(248, 113, 113, 0.7);
+  border-color: rgba(248, 113, 113, 0.28);
+}
+.btn-emergency-toggle.active {
+  background: rgba(248, 113, 113, 0.2);
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.5);
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.15);
+}
+
+html.light .btn-emergency-toggle {
+  border-color: rgba(220, 38, 38, 0.14);
+  background: rgba(220, 38, 38, 0.05);
+  color: rgba(220, 38, 38, 0.38);
+}
+html.light .btn-emergency-toggle:hover {
+  background: rgba(220, 38, 38, 0.09);
+  color: rgba(220, 38, 38, 0.6);
+  border-color: rgba(220, 38, 38, 0.22);
+}
+html.light .btn-emergency-toggle.active {
+  background: rgba(220, 38, 38, 0.13);
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.38);
+  box-shadow: 0 0 10px rgba(220, 38, 38, 0.1);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Booking channel badges                                              */
 /* ------------------------------------------------------------------ */

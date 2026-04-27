@@ -73,11 +73,11 @@
       <input type="tel" name="patient_phone" placeholder="Phone number" required
              minlength="10" maxlength="15" class="input-sm" />
       <input type="text" name="patient_notes" placeholder="Notes (optional)" class="input-sm" />
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:var(--danger);">
-        <input type="checkbox" name="is_emergency" style="accent-color:var(--danger);width:15px;height:15px;" />
-        Emergency
-      </label>
-      <button type="submit" class="btn btn-primary btn-sm">Add Walk-in</button>
+      <input type="checkbox" name="is_emergency" id="emergencyCheck" style="display:none;" />
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="btn-emergency-toggle" id="emergencyToggle" onclick="toggleEmergency()">Emergency</button>
+        <button type="submit" class="btn btn-primary btn-sm" style="flex:1;">Add Walk-in</button>
+      </div>
     </form>
   </div>
 </div>
@@ -164,6 +164,21 @@ function toggleWalkin() {
   const isOpen = panel.style.display !== 'none';
   panel.style.display = isOpen ? 'none' : 'block';
   if (!isOpen) panel.querySelector('input[name="patient_name"]').focus();
+  // Reset emergency state when panel is closed
+  if (isOpen) {
+    const btn = document.getElementById('emergencyToggle');
+    const chk = document.getElementById('emergencyCheck');
+    if (btn) { btn.classList.remove('active'); }
+    if (chk) { chk.checked = false; }
+  }
+}
+
+function toggleEmergency() {
+  const btn = document.getElementById('emergencyToggle');
+  const chk = document.getElementById('emergencyCheck');
+  if (!btn || !chk) return;
+  btn.classList.toggle('active');
+  chk.checked = btn.classList.contains('active');
 }
 
 // Auto-open walk-in panel on validation error so the form is visible
