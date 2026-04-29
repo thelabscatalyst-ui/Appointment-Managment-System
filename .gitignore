@@ -6,7 +6,4 @@ __pycache__/
 *.db
 *.sqlite3
 .DS_Store
-.claude/worktrees/
-.claude/launch.json
-clinic_test.db
-uploads/
+CLAUDE.md

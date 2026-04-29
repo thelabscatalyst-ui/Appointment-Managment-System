@@ -15,207 +15,129 @@
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
 
-<div class="appt-new-split">
+<div class="settings-card appt-form-card">
+  <form method="post" action="/appointments">
 
-  <!-- ── Left: Form ── -->
-  <div>
-    <div class="settings-card appt-form-card">
-      <form method="post" action="/appointments">
+    {% if clinic_doctors %}
+    <!-- Doctor Selector (clinic owner with multiple doctors) -->
+    <p class="form-section-label">Doctor</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="for_doctor_id">Booking for</label>
+        <select id="for_doctor_id" name="for_doctor_id" onchange="onDoctorChange()">
+          {% for doc in clinic_doctors %}
+          <option value="{{ doc.id }}" {% if doc.id == (form_data.get('for_doctor_id', doctor.id) | int) %}selected{% endif %}>
+            Dr. {{ doc.name }} {% if doc.specialization %}— {{ doc.specialization }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% endif %}
 
-        {% if clinic_doctors %}
-        <!-- Doctor Selector (clinic owner with multiple doctors) -->
-        <p class="form-section-label">Doctor</p>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="for_doctor_id">Booking for</label>
-            <select id="for_doctor_id" name="for_doctor_id" onchange="onDoctorChange()">
-              {% for doc in clinic_doctors %}
-              <option value="{{ doc.id }}" {% if doc.id == (form_data.get('for_doctor_id', doctor.id) | int) %}selected{% endif %}>
-                Dr. {{ doc.name }} {% if doc.specialization %}— {{ doc.specialization }}{% endif %}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        {% endif %}
-
-        <!-- Patient Details -->
-        <p class="form-section-label">Patient Details</p>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="patient_name">Full Name</label>
-            <input type="text" id="patient_name" name="patient_name"
-                   placeholder="e.g. Ramesh Kumar"
-                   value="{{ form_data.get('patient_name', '') }}" required>
-          </div>
-          <div class="form-group">
-            <label for="patient_phone">Phone Number</label>
-            <input type="tel" id="patient_phone" name="patient_phone"
-                   placeholder="e.g. 9876543210"
-                   value="{{ form_data.get('patient_phone', '') }}" required>
-          </div>
-        </div>
-
-        <!-- Appointment Details -->
-        <p class="form-section-label" style="margin-top: 8px;">Appointment Details</p>
-        <div class="form-row">
-          <div class="form-group">
-            <label for="appt_date">Date</label>
-            <input type="date" id="appt_date" name="appt_date"
-                   value="{{ form_data.get('appt_date', initial_date) }}"
-                   min="{{ today }}" required>
-          </div>
-          <div class="form-group">
-            <label>Time Slot</label>
-            <div class="slot-wrap" id="slotWrap">
-              <div class="slot-trigger" id="slotTrigger" onclick="toggleSlotDropdown()">
-                <span id="slotDisplay" class="slot-trigger-text slot-trigger-dim">Select a time slot</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-              </div>
-              <div class="slot-dropdown" id="slotDropdown">
-                <div class="slot-loading">Loading…</div>
-              </div>
-            </div>
-            <input type="hidden" id="appt_time" name="appt_time">
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="appointment_type">Visit Type</label>
-            <select id="appointment_type" name="appointment_type">
-              {% for t in appointment_types %}
-              <option value="{{ t }}"
-                {% if form_data.get('appointment_type', 'follow_up') == t %}selected{% endif %}>
-                {{ t.replace('_', ' ').title() }}
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="duration">Duration</label>
-            <select id="duration" name="duration">
-              {% for d in [15, 20, 30, 45, 60] %}
-              <option value="{{ d }}"
-                {% if (form_data.get('duration', 15) | int) == d %}selected{% endif %}>
-                {{ d }} min
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="patient_notes">Notes (optional)</label>
-            <textarea id="patient_notes" name="patient_notes" rows="3" style="resize:vertical;width:100%;box-sizing:border-box;"
-                      placeholder="Chief complaint, reason for visit...">{{ form_data.get('patient_notes', '') }}</textarea>
-          </div>
-          <div class="form-group">
-            <label for="booked_by_field">Booking Channel</label>
-            <select id="booked_by_field" name="booked_by_field">
-              <option value="doctor" selected>Doctor</option>
-              <option value="staff_shared">Receptionist (phone call)</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="appt-form-actions">
-          <a href="/appointments" class="btn btn-secondary btn-sm">Cancel</a>
-          <button type="submit" class="btn btn-primary btn-sm">Book Appointment</button>
-        </div>
-
-      </form>
+    <!-- Patient Details -->
+    <p class="form-section-label">Patient Details</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="patient_name">Full Name</label>
+        <input type="text" id="patient_name" name="patient_name"
+               placeholder="e.g. Ramesh Kumar"
+               value="{{ form_data.get('patient_name', '') }}" required>
+      </div>
+      <div class="form-group">
+        <label for="patient_phone">Phone Number</label>
+        <input type="tel" id="patient_phone" name="patient_phone"
+               placeholder="e.g. 9876543210"
+               value="{{ form_data.get('patient_phone', '') }}" required>
+      </div>
     </div>
 
-  </div>
-
-  <!-- ── Right: Branding ── -->
-  <div class="appt-brand-panel">
-    <div class="appt-brand-eyebrow">Clinic Management</div>
-
-    <div class="appt-brand-title">Clinic<br>OS</div>
-
-    <div class="appt-brand-divider"></div>
-
-    <p class="appt-brand-tagline">
-      Every appointment you book<br>
-      is a patient whose life<br>
-      you're about to improve.
-    </p>
-
-    <div class="appt-brand-divider"></div>
-
-    <div class="appt-brand-clinic">
-      {% if doctor.clinic_name %}{{ doctor.clinic_name }}{% else %}Dr. {{ doctor.name }}{% endif %}
+    <!-- Appointment Details -->
+    <p class="form-section-label" style="margin-top: 8px;">Appointment Details</p>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="appt_date">Date</label>
+        <input type="date" id="appt_date" name="appt_date"
+               value="{{ form_data.get('appt_date', initial_date) }}"
+               min="{{ today }}" required>
+      </div>
+      <div class="form-group">
+        <label for="appt_time">Time Slot</label>
+        <select id="appt_time" name="appt_time" required>
+          {% if slots %}
+            {% for slot in slots %}
+            <option value="{{ slot }}"
+              {% if form_data.get('appt_time') == slot %}selected{% endif %}>
+              {{ slot }}
+            </option>
+            {% endfor %}
+          {% else %}
+            <option value="">No slots — set working hours in Settings</option>
+          {% endif %}
+        </select>
+      </div>
     </div>
-    {% if doctor.specialization %}
-    <div class="appt-brand-clinic-sub">{{ doctor.specialization }}</div>
-    {% endif %}
-    {% if doctor.city %}
-    <div class="appt-brand-clinic-sub">{{ doctor.city }}</div>
-    {% endif %}
-  </div>
 
+    <div class="form-row">
+      <div class="form-group">
+        <label for="appointment_type">Visit Type</label>
+        <select id="appointment_type" name="appointment_type">
+          {% for t in appointment_types %}
+          <option value="{{ t }}"
+            {% if form_data.get('appointment_type', 'follow_up') == t %}selected{% endif %}>
+            {{ t.replace('_', ' ').title() }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="duration">Duration</label>
+        <select id="duration" name="duration">
+          {% for d in [15, 20, 30, 45, 60] %}
+          <option value="{{ d }}"
+            {% if (form_data.get('duration', 15) | int) == d %}selected{% endif %}>
+            {{ d }} min
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="patient_notes">Notes (optional)</label>
+        <textarea id="patient_notes" name="patient_notes" rows="3"
+                  placeholder="Chief complaint, reason for visit...">{{ form_data.get('patient_notes', '') }}</textarea>
+      </div>
+      <div class="form-group">
+        <label for="booked_by_field">Booking Channel</label>
+        <select id="booked_by_field" name="booked_by_field">
+          <option value="doctor" selected>Doctor</option>
+          <option value="staff_shared">Receptionist (phone call)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="appt-form-actions">
+      <a href="/appointments" class="btn btn-secondary btn-sm">Cancel</a>
+      <button type="submit" class="btn btn-primary btn-sm">Book Appointment</button>
+    </div>
+w
+  </form>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-const dateInput = document.getElementById('appt_date');
-const savedTime = "{{ form_data.get('appt_time', '') }}";
+const dateInput  = document.getElementById('appt_date');
+const timeSelect = document.getElementById('appt_time');
+const savedTime  = "{{ form_data.get('appt_time', '') }}";
 
 function fmt(t) {
   const [h, m] = t.split(':').map(Number);
   const p = h >= 12 ? 'PM' : 'AM';
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${p}`;
-}
-
-function toggleSlotDropdown() {
-  document.getElementById('slotDropdown').classList.toggle('slot-dropdown--open');
-}
-
-function selectSlot(el) {
-  document.querySelectorAll('.slot-item').forEach(e => e.classList.remove('slot-item--active'));
-  el.classList.add('slot-item--active');
-  document.getElementById('appt_time').value = el.dataset.value;
-  const disp = document.getElementById('slotDisplay');
-  disp.textContent = el.textContent.trim();
-  disp.classList.remove('slot-trigger-dim');
-  document.getElementById('slotDropdown').classList.remove('slot-dropdown--open');
-}
-
-document.addEventListener('click', function(e) {
-  const wrap = document.getElementById('slotWrap');
-  if (wrap && !wrap.contains(e.target)) {
-    document.getElementById('slotDropdown').classList.remove('slot-dropdown--open');
-  }
-});
-
-function renderSlots(slots) {
-  const dd     = document.getElementById('slotDropdown');
-  const hidden = document.getElementById('appt_time');
-  const disp   = document.getElementById('slotDisplay');
-
-  if (!slots || !slots.length) {
-    dd.innerHTML = '<div class="slot-empty">No slots available for this day</div>';
-    hidden.value = '';
-    disp.textContent = 'No slots available';
-    disp.classList.add('slot-trigger-dim');
-    return;
-  }
-
-  const autoSelect = (savedTime && slots.includes(savedTime)) ? savedTime : slots[0];
-  dd.innerHTML = slots.map(s =>
-    `<div class="slot-item${s === autoSelect ? ' slot-item--active' : ''}" data-value="${s}" onclick="selectSlot(this)">${fmt(s)}</div>`
-  ).join('');
-  hidden.value = autoSelect;
-  disp.textContent = fmt(autoSelect);
-  disp.classList.remove('slot-trigger-dim');
-
-  const active = dd.querySelector('.slot-item--active');
-  if (active) active.scrollIntoView({ block: 'nearest' });
 }
 
 function getTargetDoctorId() {
@@ -224,19 +146,22 @@ function getTargetDoctorId() {
 }
 
 async function loadSlots(d) {
-  const dd = document.getElementById('slotDropdown');
-  dd.innerHTML = '<div class="slot-loading">Loading…</div>';
-  dd.classList.remove('slot-dropdown--open');
-  document.getElementById('slotDisplay').textContent = 'Loading…';
+  timeSelect.innerHTML = '<option value="">Loading…</option>';
   try {
     let url = `/appointments/slots?date=${d}`;
     const docId = getTargetDoctorId();
     if (docId) url += `&for_doctor_id=${docId}`;
     const res  = await fetch(url);
     const data = await res.json();
-    renderSlots(data.slots || []);
+    if (data.slots && data.slots.length) {
+      timeSelect.innerHTML = data.slots.map(s =>
+        `<option value="${s}"${s === savedTime ? ' selected' : ''}>${fmt(s)}</option>`
+      ).join('');
+    } else {
+      timeSelect.innerHTML = '<option value="">No slots available for this day</option>';
+    }
   } catch {
-    dd.innerHTML = '<div class="slot-empty">Error loading slots</div>';
+    timeSelect.innerHTML = '<option value="">Error loading slots</option>';
   }
 }
 

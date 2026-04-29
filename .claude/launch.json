@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "clinicos",
+      "runtimeExecutable": "/Users/apple/Desktop/ClinicOS/venv/bin/uvicorn",
+      "runtimeArgs": ["main:app", "--reload"],
+      "port": 8000
+    }
+  ]
+}
