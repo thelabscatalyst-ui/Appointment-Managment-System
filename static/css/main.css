@@ -7892,14 +7892,6 @@ html.light .skeleton::after {
 }
 
 /* ─── 3. Mobile bottom nav bar (replaces hidden dock on mobile) ───────── */
-@media (max-width: 767px) {
-  /* dock-zone is already hidden at ≤768px via the existing rule above.
-     We add a bottom navigation bar instead. */
-  .mobile-nav {
-    display: flex;
-  }
-}
-
 .mobile-nav {
   display: none; /* hidden by default on desktop */
   position: fixed;
@@ -7952,6 +7944,14 @@ html.light .skeleton::after {
 
 .mobile-nav-item--active svg {
   color: #c9b99a;
+}
+
+/* Show the bar on phones (must come AFTER the base display:none rule —
+   equal specificity means source order decides) */
+@media (max-width: 767px) {
+  .mobile-nav {
+    display: flex;
+  }
 }
 
 /* Push main-content above the mobile nav bar */
