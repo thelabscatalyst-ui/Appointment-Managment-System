@@ -1102,7 +1102,7 @@ html.light .tub-btn { color: #fff; }
 }
 
 /* Responsive: stack on small screens */
-@media (max-width: 800px) {
+@media (max-width: 767px) {
   .appt-split-grid {
     grid-template-columns: 1fr;
   }
@@ -1523,7 +1523,7 @@ html.light .dock-item:hover {
 }
 
 /* Hide dock on narrow screens */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .dock-zone { display: none; }
 }
 
@@ -2509,7 +2509,7 @@ select.input-sm {
   position: relative;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1023px) {
   .appt-new-split {
     grid-template-columns: 1fr;
   }
@@ -3584,7 +3584,7 @@ html.light .billing-plan-card--pro {
   margin-top: 2px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .billing-plans       { grid-template-columns: 1fr; }
   .billing-status-row  { gap: 20px; }
   .admin-table th:nth-child(n+5),
@@ -7861,7 +7861,7 @@ html.light .skeleton::after {
    ═══════════════════════════════════════════════════════════════════════ */
 
 /* ─── 1. Global layout: reduce main-content padding on mobile ─────────── */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .main-content {
     padding: 16px 16px;
     padding-top: calc(52px + 16px);
@@ -7892,7 +7892,7 @@ html.light .skeleton::after {
 }
 
 /* ─── 3. Mobile bottom nav bar (replaces hidden dock on mobile) ───────── */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* dock-zone is already hidden at ≤768px via the existing rule above.
      We add a bottom navigation bar instead. */
   .mobile-nav {
@@ -7955,7 +7955,7 @@ html.light .skeleton::after {
 }
 
 /* Push main-content above the mobile nav bar */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   body:has(.mobile-nav) .main-content {
     padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 16px);
   }
@@ -8109,22 +8109,21 @@ html.light .skeleton::after {
 }
 
 /* ─── 11. Tables: horizontal scroll container ─────────────────────────── */
-@media (max-width: 768px) {
-  /* Wrap any data table in overflow-x: auto */
-  .table-scroll-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    border-radius: var(--radius-sm);
-  }
+/* Table overflow protection — always on; no-op when content fits, saves
+   tablets and narrow desktop windows from page-level horizontal scroll. */
+.table-scroll-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-sm);
+}
+.admin-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
 
-  /* Admin table: horizontal scroll */
-  .admin-table-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: 100%;
-  }
-
-  /* Income / billing tables */
+@media (max-width: 767px) {
+  /* Income / billing tables keep readable column widths, scroll instead */
   .income-table,
   .billing-table,
   .txn-table {
@@ -8288,7 +8287,7 @@ html.light .skeleton::after {
 }
 
 /* ─── 17. Auth pages ──────────────────────────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .auth-page {
     grid-template-columns: 1fr;
   }
@@ -8465,7 +8464,7 @@ html.light .skeleton::after {
 }
 
 /* ─── 25. Misc touch target enforcement ──────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   /* Ensure all buttons/links meet 44px minimum tap target */
   .btn,
   .btn-sm {
@@ -8495,7 +8494,7 @@ html.light .skeleton::after {
 }
 
 /* ─── 26. No horizontal scroll on body ───────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   html, body {
     overflow-x: hidden;
   }
@@ -8737,7 +8736,7 @@ html.light .skeleton::after {
 }
 
 /* ─── 36. Overflow-safe images / media ────────────────────────────────── */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   img, video, iframe {
     max-width: 100%;
   }
