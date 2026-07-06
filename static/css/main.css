@@ -8106,6 +8106,31 @@ html.light .skeleton::after {
     flex-wrap: wrap;
     padding: 10px 12px;
   }
+
+  /* Queue cards: two-row layout on phones.
+     Row 1 = token · patient name/meta · status badge.
+     Row 2 = action buttons (Bill / Hold / Done / ⋮), full width.
+     Without this the single-line flex crushes the name to zero width
+     and pushes buttons off-screen. */
+  .visit-serving-card {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+    padding: 14px 16px;
+  }
+  .visit-serving-card .visit-info,
+  .visit-row .visit-info {
+    min-width: 120px;
+  }
+  .visit-serving-card .visit-actions,
+  .visit-row .visit-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .visit-name {
+    white-space: normal;   /* let long names wrap instead of vanishing */
+  }
 }
 
 /* ─── 11. Tables: horizontal scroll container ─────────────────────────── */
