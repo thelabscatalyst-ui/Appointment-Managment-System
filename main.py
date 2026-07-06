@@ -64,11 +64,14 @@ async def security_headers(request: Request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Content-Security-Policy"]   = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com; "
+        "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com "
+        "https://checkout.razorpay.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data: https:; "
-        "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com; "
+        "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com "
+        "https://api.razorpay.com https://lumberjack.razorpay.com; "
+        "frame-src https://api.razorpay.com https://checkout.razorpay.com; "
         "worker-src 'self'; "
         "frame-ancestors 'none';"
     )
