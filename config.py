@@ -13,10 +13,6 @@ class Settings(BaseSettings):
     TWILIO_WHATSAPP_FROM: str = "whatsapp:+14155238886"  # Twilio sandbox default
     TWILIO_SMS_FROM: str = ""  # optional: your Twilio SMS phone number e.g. +918XXXXXXXXX
 
-    # YCloud WhatsApp (replaces Twilio)
-    YCLOUD_API_KEY: str = ""
-    YCLOUD_WHATSAPP_NUMBER: str = ""  # Your registered WhatsApp Business number e.g. +919XXXXXXXXXX
-
     RAZORPAY_KEY_ID: str = ""
     RAZORPAY_KEY_SECRET: str = ""
 

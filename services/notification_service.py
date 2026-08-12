@@ -1,8 +1,6 @@
 """
 Notification service — Twilio WhatsApp sending (sandbox for testing).
 
-For production, switch to YCloud by setting YCLOUD_API_KEY + YCLOUD_WHATSAPP_NUMBER in .env.
-
 Twilio sandbox setup:
   1. Patient sends "join <keyword>" to whatsapp:+14155238886 once to opt in
   2. All messages then go through fine for testing
@@ -148,7 +146,7 @@ def _log(
 # ------------------------------------------------------------------ #
 
 def notify_appointment_confirmed(appt: Appointment, doctor, db: Session):
-    """Send booking confirmation via WhatsApp (YCloud).
+    """Send booking confirmation via WhatsApp.
 
     Called immediately after an appointment is created (by doctor or patient).
     Failure is logged but never raises — the booking always succeeds.

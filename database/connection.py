@@ -340,7 +340,7 @@ def _run_migrations():
         )
         conn.commit()
 
-        # ── YCloud notification system: avg consult time per doctor ──────────
+        # ── Notification system: avg consult time per doctor ─────────────────
         _add_column(conn, "ALTER TABLE doctors ADD COLUMN avg_consult_mins INTEGER DEFAULT 10")
 
         # ── Seat-based billing: max doctors per plan ──────────────────────────
