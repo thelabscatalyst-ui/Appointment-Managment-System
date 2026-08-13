@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # Public base URL used to build patient-facing links (e.g. the feedback
     # link in the WhatsApp bill receipt). Override in .env for staging/local.
-    PUBLIC_BASE_URL: str = "https://www.clinicos.store"
+    PUBLIC_BASE_URL: str = "https://www.nivora.store"
 
     # Set ENVIRONMENT=development in local .env to allow http:// cookies.
     # In production (Railway) leave unset — defaults to "production" so

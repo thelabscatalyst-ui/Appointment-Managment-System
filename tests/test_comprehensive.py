@@ -1,5 +1,5 @@
 """
-test_comprehensive.py — Full integration + unit test suite for ClinicOS.
+test_comprehensive.py — Full integration + unit test suite for Nivora.
 
 Coverage areas:
   A. Authentication
@@ -29,6 +29,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Test DB
+# ─────────────────────────────────────────────────────────────────────────────
+TEST_DB_URL = "sqlite:///./test_clinic.db"
+os.environ["DATABASE_URL"] = TEST_DB_URL
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database.connection import Base, get_db
@@ -40,11 +46,6 @@ from database.models import (
 from services.appointment_service import get_available_slots, get_or_create_patient
 import services.visit_service as vs
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  Test DB
-# ─────────────────────────────────────────────────────────────────────────────
-
-TEST_DB_URL = "sqlite:///./test_clinicos_comprehensive.db"
 test_engine = create_engine(TEST_DB_URL, connect_args={"check_same_thread": False})
 TestSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
@@ -68,7 +69,7 @@ def create_tables():
     yield
     Base.metadata.drop_all(bind=test_engine)
     try:
-        os.remove("test_clinicos_comprehensive.db")
+        os.remove("test_clinic.db")
     except FileNotFoundError:
         pass
 
@@ -869,7 +870,7 @@ class TestPatients:
         db = TestSession()
         pat = db.query(Patient).filter(Patient.id == pat_id).first()
         db.close()
-        assert pat.name == "NewName"
+        assert pat.name == "Newname"
 
     def test_patient_created_with_visit_count(self, client):
         tok = auth_cookie(client, "visitcount@test.com")

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login · ClinicOS</title>
+  <title>Login · Nivora</title>
   <link rel="stylesheet" href="/static/css/main.css?v=161" />
   <style>
     /* Auth pages default to light theme · override dark unless user explicitly chose dark */
@@ -27,6 +28,7 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       flex-shrink: 0;
     }
+
     .auth-nav-brand {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 18px;
@@ -35,6 +37,7 @@
       text-decoration: none;
       letter-spacing: -0.3px;
     }
+
     .auth-nav-back {
       display: flex;
       align-items: center;
@@ -47,15 +50,18 @@
       border-radius: 8px;
       transition: opacity 0.15s, border-color 0.15s;
     }
+
     .auth-nav-back:hover {
       opacity: 0.85;
       border-color: rgba(201, 185, 154, 0.5);
     }
+
     .auth-nav-right {
       display: flex;
       align-items: center;
       gap: 12px;
     }
+
     .auth-nav-link {
       font-size: 13px;
       color: #9a8f85;
@@ -64,7 +70,10 @@
       border-radius: 8px;
       transition: color 0.15s;
     }
-    .auth-nav-link:hover { color: #c9b99a; }
+
+    .auth-nav-link:hover {
+      color: #c9b99a;
+    }
 
     /* Two-column layout under the navbar */
     .auth-page {
@@ -76,26 +85,72 @@
 
     /* Shake on error */
     @keyframes authShake {
-      0%, 100% { transform: translateX(0); }
-      20%       { transform: translateX(-7px); }
-      40%       { transform: translateX(7px); }
-      60%       { transform: translateX(-4px); }
-      80%       { transform: translateX(4px); }
+
+      0%,
+      100% {
+        transform: translateX(0);
+      }
+
+      20% {
+        transform: translateX(-7px);
+      }
+
+      40% {
+        transform: translateX(7px);
+      }
+
+      60% {
+        transform: translateX(-4px);
+      }
+
+      80% {
+        transform: translateX(4px);
+      }
     }
-    .auth-card--shake { animation: authShake 0.38s ease; }
+
+    .auth-card--shake {
+      animation: authShake 0.38s ease;
+    }
 
     @media (max-width: 900px) {
-      .auth-page { grid-template-columns: 1fr; }
-      .auth-nav  { padding: 0 20px; }
+      .auth-page {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-nav {
+        padding: 0 20px;
+      }
     }
+
     @media (max-width: 480px) {
-      .auth-nav  { padding: 0 14px; }
-      .auth-page { grid-template-columns: 1fr; }
-      .auth-brand { padding: 24px 16px 20px; }
-      .brand-title { font-size: 40px; }
-      .auth-panel { padding: 24px 16px 32px; }
-      .auth-nav-link { display: none; }
-      html, body { overflow-x: hidden; }
+      .auth-nav {
+        padding: 0 14px;
+      }
+
+      .auth-page {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-brand {
+        padding: 24px 16px 20px;
+      }
+
+      .brand-title {
+        font-size: 40px;
+      }
+
+      .auth-panel {
+        padding: 24px 16px 32px;
+      }
+
+      .auth-nav-link {
+        display: none;
+      }
+
+      html,
+      body {
+        overflow-x: hidden;
+      }
     }
   </style>
   <script>
@@ -105,150 +160,139 @@
     }
   </script>
 </head>
+
 <body>
 
-<!-- Ambient drifting brown blobs · fixed to the viewport, behind everything -->
-<div class="ln-ambient" aria-hidden="true">
-  <span class="ln-blob ln-blob-1"></span>
-  <span class="ln-blob ln-blob-2"></span>
-  <span class="ln-blob ln-blob-3"></span>
-  <span class="ln-blob ln-blob-4"></span>
-</div>
+  <!-- Ambient drifting brown blobs · fixed to the viewport, behind everything -->
+  <div class="ln-ambient" aria-hidden="true">
+    <span class="ln-blob ln-blob-1"></span>
+    <span class="ln-blob ln-blob-2"></span>
+    <span class="ln-blob ln-blob-3"></span>
+    <span class="ln-blob ln-blob-4"></span>
+  </div>
 
-<div class="auth-page-wrap">
+  <div class="auth-page-wrap">
 
-  <!-- ── Auth Navbar ── -->
-  <nav class="auth-nav">
-    <a href="/" class="auth-nav-brand">ClinicOS</a>
-    <div class="auth-nav-right">
-      <a href="/register" class="auth-nav-link">Create account</a>
-      <a href="/" class="auth-nav-back">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-        Back to site
-      </a>
-    </div>
-  </nav>
-
-  <!-- ── Two-column layout ── -->
-  <div class="auth-page">
-
-    <!-- ── Left: Branding ── -->
-    <div class="auth-brand">
-      <div class="brand-content">
-        <p class="brand-eyebrow">For independent doctors</p>
-        <h1 class="brand-title">Clinic<br>OS</h1>
-        <p class="brand-tagline">
-          Appointment management built for doctors in India.
-          Simple, fast, WhatsApp-first.
-        </p>
-        <div class="brand-divider"></div>
-        <div class="brand-features">
-          <div class="brand-feature">
-            <span class="brand-feature-dot"></span>
-            <span>Patients book via your personal link</span>
-          </div>
-          <div class="brand-feature">
-            <span class="brand-feature-dot"></span>
-            <span>Automated WhatsApp reminders</span>
-          </div>
-          <div class="brand-feature">
-            <span class="brand-feature-dot"></span>
-            <span>No more missed appointments</span>
-          </div>
-          <div class="brand-feature">
-            <span class="brand-feature-dot"></span>
-            <span>₹599/month · less than a coffee a day</span>
-          </div>
-        </div>
+    <!-- ── Auth Navbar ── -->
+    <nav class="auth-nav">
+      <a href="/" class="auth-nav-brand">Nivora</a>
+      <div class="auth-nav-right">
+        <a href="/register" class="auth-nav-link">Create account</a>
+        <a href="/" class="auth-nav-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back to site
+        </a>
       </div>
-    </div>
+    </nav>
 
-    <!-- ── Right: Login Card ── -->
-    <div class="auth-panel">
-      <div class="auth-card" id="authCard">
+    <!-- ── Two-column layout ── -->
+    <div class="auth-page">
 
-        <h2 class="auth-card-title">Welcome back</h2>
-        <p class="auth-card-sub">Sign in to your clinic dashboard</p>
-
-        {% if success %}
-        <div class="alert alert-success">{{ success }}</div>
-        {% endif %}
-
-        {% if error %}
-        <div class="alert alert-error">{{ error }}</div>
-        {% endif %}
-
-        <form method="POST" action="/login" id="loginForm">
-          <input type="hidden" name="next" value="{{ next or '' }}" />
-
-          <div class="form-group">
-            <label for="email">Email address</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              placeholder="you@example.com"
-              required
-              autocomplete="email"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              placeholder="Enter your password"
-              required
-              autocomplete="current-password"
-            />
-          </div>
-
-          <p style="font-size:12px;color:var(--muted);text-align:right;margin-top:-8px;margin-bottom:16px;">
-            Session lasts 24 hours
+      <!-- ── Left: Branding ── -->
+      <div class="auth-brand">
+        <div class="brand-content">
+          <p class="brand-eyebrow">For independent doctors</p>
+          <h1 class="brand-title">NIVORA<br></h1>
+          <p class="brand-tagline">
+            Appointment management built for doctors in India.
+            Simple, fast, WhatsApp-first.
           </p>
-
-          <button type="submit" class="btn btn-primary" id="loginSubmit">
-            <span class="btn-text">Log in</span>
-          </button>
-        </form>
-
-        <div class="auth-footer">
-          Don't have an account? <a href="/register">Start free trial</a>
+          <div class="brand-divider"></div>
+          <div class="brand-features">
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>Patients book via your personal link</span>
+            </div>
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>Automated WhatsApp reminders</span>
+            </div>
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>No more missed appointments</span>
+            </div>
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>₹599/month · less than a coffee a day</span>
+            </div>
+          </div>
         </div>
-
       </div>
-    </div>
 
-  </div><!-- /.auth-page -->
-</div><!-- /.auth-page-wrap -->
+      <!-- ── Right: Login Card ── -->
+      <div class="auth-panel">
+        <div class="auth-card" id="authCard">
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  var card = document.getElementById('authCard');
-  var form = document.getElementById('loginForm');
-  var btn  = document.getElementById('loginSubmit');
+          <h2 class="auth-card-title">Welcome back</h2>
+          <p class="auth-card-sub">Sign in to your clinic dashboard</p>
 
-  {% if error %}
-  if (card) {
-    card.classList.add('auth-card--shake');
-    card.addEventListener('animationend', function () {
-      card.classList.remove('auth-card--shake');
-    }, { once: true });
-  }
-  {% endif %}
+          {% if success %}
+          <div class="alert alert-success">{{ success }}</div>
+          {% endif %}
 
-  if (form && btn) {
-    form.addEventListener('submit', function () {
-      btn.classList.add('btn--loading');
-      btn.disabled = true;
+          {% if error %}
+          <div class="alert alert-error">{{ error }}</div>
+          {% endif %}
+
+          <form method="POST" action="/login" id="loginForm">
+            <input type="hidden" name="next" value="{{ next or '' }}" />
+
+            <div class="form-group">
+              <label for="email">Email address</label>
+              <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email" />
+            </div>
+
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" name="password" placeholder="Enter your password" required
+                autocomplete="current-password" />
+            </div>
+
+            <p style="font-size:12px;color:var(--muted);text-align:right;margin-top:-8px;margin-bottom:16px;">
+              Session lasts 24 hours
+            </p>
+
+            <button type="submit" class="btn btn-primary" id="loginSubmit">
+              <span class="btn-text">Log in</span>
+            </button>
+          </form>
+
+          <div class="auth-footer">
+            Don't have an account? <a href="/register">Start free trial</a>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /.auth-page -->
+  </div><!-- /.auth-page-wrap -->
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var card = document.getElementById('authCard');
+      var form = document.getElementById('loginForm');
+      var btn = document.getElementById('loginSubmit');
+
+      {% if error %}
+      if (card) {
+        card.classList.add('auth-card--shake');
+        card.addEventListener('animationend', function () {
+          card.classList.remove('auth-card--shake');
+        }, { once: true });
+      }
+      {% endif %}
+
+      if (form && btn) {
+        form.addEventListener('submit', function () {
+          btn.classList.add('btn--loading');
+          btn.disabled = true;
+        });
+      }
     });
-  }
-});
-</script>
+  </script>
 </body>
+
 </html>

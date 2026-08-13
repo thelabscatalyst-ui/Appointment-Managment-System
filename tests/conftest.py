@@ -1,5 +1,5 @@
 """
-conftest.py — shared fixtures for ClinicOS test suite.
+conftest.py — shared fixtures for Nivora test suite.
 """
 import os
 import sys
@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # ── in-memory SQLite ────────────────────────────────────────────────────────
 TEST_DATABASE_URL = "sqlite:///./test_clinic.db"
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 from database.connection import Base, get_db
 

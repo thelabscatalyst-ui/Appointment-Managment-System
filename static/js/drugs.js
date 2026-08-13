@@ -1,5 +1,5 @@
 /**
- * drugs.js — Indian market drug database for ClinicOS autocomplete
+ * drugs.js — Indian market drug database for Nivora autocomplete
  * Includes generic (INN) names + common Indian brand names
  * Organised by therapeutic category for maintainability
  * ~800 entries covering primary-care and specialist prescribing

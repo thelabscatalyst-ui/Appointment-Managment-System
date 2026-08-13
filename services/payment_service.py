@@ -82,7 +82,7 @@ def create_order(plan: str) -> dict:
         order = client.order.create({
             "amount":   PLAN_AMOUNTS[plan],
             "currency": "INR",
-            "notes":    {"plan": plan, "product": "ClinicOS"},
+            "notes":    {"plan": plan, "product": "Nivora"},
         })
         return {
             "order_id": order["id"],

@@ -1,5 +1,5 @@
 /**
- * ClinicOS Service Worker — offline queue support
+ * Nivora Service Worker — offline queue support
  *
  * Strategy:
  *   - Static assets  → Cache-first (long-lived CSS/fonts/images)
@@ -7,8 +7,8 @@
  *   - Everything else → Network-only (authenticated HTML pages should not be cached)
  */
 
-const CACHE_NAME    = "clinicos-v1";
-const QUEUE_CACHE   = "clinicos-queue-v1";
+const CACHE_NAME    = "nivora-v1";
+const QUEUE_CACHE   = "nivora-queue-v1";
 
 // Static assets to pre-cache on install
 const PRECACHE_URLS = [

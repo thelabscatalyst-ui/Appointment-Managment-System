@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Billing · ClinicOS{% endblock %}
+{% block title %}Billing · Nivora{% endblock %}
 
 {% block content %}
 <style>
@@ -177,7 +177,7 @@ html.light .pc-btn--primary:hover { color: #fff; }
 <div class="billing-wrap">
   <div class="billing-header">
     <div class="billing-title">Billing &amp; Plans</div>
-    <div class="billing-sub">Manage your ClinicOS subscription</div>
+    <div class="billing-sub">Manage your Nivora subscription</div>
   </div>
 
   {% if success == '1' %}
@@ -192,7 +192,7 @@ html.light .pc-btn--primary:hover { color: #fff; }
 
   {% if is_expired %}
   <div class="billing-expired">
-    <span>&#9888;</span> Your access has expired. Choose a plan below to continue using ClinicOS.
+    <span>&#9888;</span> Your access has expired. Choose a plan below to continue using Nivora.
   </div>
   {% endif %}
 
@@ -337,7 +337,7 @@ html.light .pc-btn--primary:hover { color: #fff; }
         <li>Dedicated account manager</li>
         <li>White-glove onboarding</li>
       </ul>
-      <a href="mailto:support@clinicos.in" class="pc-btn">Contact us</a>
+      <a href="mailto:support@nivora.in" class="pc-btn">Contact us</a>
     </div>
 
   </div>{# /billing-plan-grid #}
@@ -422,7 +422,7 @@ async function startPayment(plan, amount, btn) {
       amount:      data.amount,
       currency:    data.currency,
       order_id:    data.order_id,
-      name:        'ClinicOS',
+      name:        'Nivora',
       description: plan.charAt(0).toUpperCase() + plan.slice(1) + ' Plan · 1 Month',
       prefill:     { name: '{{ doctor.name }}', email: '{{ doctor.email }}', contact: '{{ doctor.phone }}' },
       theme:       { color: '#b48230' },

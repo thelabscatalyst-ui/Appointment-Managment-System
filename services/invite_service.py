@@ -28,22 +28,22 @@ def send_invite_email(to_email: str, token: str, clinic_name: str, invited_by: s
     accept_url = f"{base_url}/clinic/invite/{token}"
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"You're invited to join {clinic_name} on ClinicOS"
+    msg["Subject"] = f"You're invited to join {clinic_name} on Nivora"
     msg["From"]    = getattr(settings, "SMTP_FROM", settings.SMTP_USER)
     msg["To"]      = to_email
 
     text_body = (
         f"Hi,\n\n"
-        f"{invited_by} has invited you to join {clinic_name} as a staff member on ClinicOS.\n\n"
+        f"{invited_by} has invited you to join {clinic_name} as a staff member on Nivora.\n\n"
         f"Click the link below to set up your account (valid for 7 days):\n"
         f"{accept_url}\n\n"
         f"If you didn't expect this invite, you can safely ignore this email.\n\n"
-        f"— ClinicOS"
+        f"— Nivora"
     )
     html_body = f"""
     <div style="font-family:Inter,sans-serif;max-width:480px;margin:40px auto;color:#111">
       <h2 style="font-size:20px;margin-bottom:8px">You're invited to {clinic_name}</h2>
-      <p style="color:#555">{invited_by} has invited you to join as a staff member on ClinicOS.</p>
+      <p style="color:#555">{invited_by} has invited you to join as a staff member on Nivora.</p>
       <a href="{accept_url}"
          style="display:inline-block;margin-top:16px;padding:12px 24px;
                 background:#111;color:#fff;text-decoration:none;border-radius:8px;font-size:14px">

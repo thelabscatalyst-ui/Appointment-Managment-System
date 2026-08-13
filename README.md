@@ -1,4 +1,4 @@
-# ClinicOS
+# Nivora
 
 Clinic management platform built for independent doctors and small clinics in India. Handles appointments, live patient queue, billing with PDF receipts, patient records with document vault, WhatsApp notifications, income tracking, and subscription management — all from a single web app. No app download needed for patients.
 
@@ -185,7 +185,7 @@ PostgreSQL          Razorpay API
 ## Project Structure
 
 ```
-ClinicOS/
+Nivora/
 ├── main.py                        # App entry, middleware, exception handlers, router mounts
 ├── config.py                      # Pydantic Settings — loads .env
 ├── requirements.txt               # Python dependencies
@@ -270,7 +270,7 @@ ClinicOS/
 ```bash
 # Clone and enter project
 git clone <repo-url>
-cd ClinicOS
+cd Nivora
 
 # Create virtual environment
 python3 -m venv venv
@@ -374,7 +374,7 @@ Schema migrations run automatically on every app startup via `create_tables()` a
 
 ## Queue System
 
-The core of ClinicOS is the live patient queue. Every patient interaction flows through it:
+The core of Nivora is the live patient queue. Every patient interaction flows through it:
 
 ```
 Walk-in / Check-in
