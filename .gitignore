@@ -9,3 +9,6 @@ __pycache__/
 CLAUDE.md
 .claude/
 uploads/
+# Duplicate local checkout of this repo — has its own .git, must never be
+# added as an embedded gitlink by `git add -A`
+Clincos/

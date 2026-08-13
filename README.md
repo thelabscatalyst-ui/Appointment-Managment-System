@@ -23,16 +23,19 @@ Clinic management platform built for independent doctors and small clinics in In
 - [Security](#security)
 - [Public Booking](#public-booking)
 - [Design System](#design-system)
+- [Mobile & Tablet](#mobile--tablet)
 - [Deployment](#deployment)
 - [API Reference](#api-reference)
+- [Roadmap](#roadmap)
 
 ---
 
 ## Features
 
 ### Appointments & Live Queue
-- Live token queue — check in walk-ins, call next, serve, skip, promote emergencies
-- Queue state machine: `Waiting` → `Serving` → `Billing Pending` → `Done`
+- Live token queue — check in walk-ins, call next, serve, promote emergencies
+- Queue state machine: `Waiting` → `Serving` → `Billing Pending` → `Done`, with a resumable `On Hold` branch
+- **Hold & Resume** — park the patient being served (sent for an x-ray, lab work, or dressing) and auto-call the next patient so the doctor keeps moving. Resuming serves them immediately if the doctor is free, otherwise puts them at the **front** of the queue
 - Walk-in quick booking with automatic check-in
 - Returning patient detection — entering a known phone shows a **Returning** badge with visit count
 - Slot-based scheduling with conflict prevention (no double booking)
@@ -67,6 +70,21 @@ Clinic management platform built for independent doctors and small clinics in In
 - Document vault — upload, categorize (Lab Report, Prescription, X-Ray, Insurance, etc.), and search files
 - Pin frequently visited patients for quick access
 - Delete patient with full cascade (PIN-protected)
+
+### e-Prescriptions
+- Write prescriptions against a visit or straight from a patient profile
+- Drug autocomplete backed by a 787-entry list (`static/js/drugs.js`) covering generic (INN) names and Indian brand names — e.g. Paracetamol, Dolo 650, Crocin
+- Per-drug dosage, frequency, duration, and instructions
+- Diagnosis, advice, and follow-up fields
+- Print-optimised prescription layout
+- Prescription history shown on the patient profile and the appointment card
+- Completeness warning if the doctor's specialization, clinic name, or medical registration number is missing
+
+### Patient Feedback & Ratings
+- Every WhatsApp bill receipt appends a tokenised feedback link (kept separate from the billing content)
+- Minimal public rating page at `/feedback/{token}` — 1–5 stars plus an optional written review, no login required
+- One submission per link; re-visiting shows a thank-you state with the submitted rating
+- Patients who left a rating show a gold ★ badge in the patients list
 
 ### Settings
 - Configurable working hours per day of week
@@ -453,7 +471,7 @@ Six notification types, all sent via WhatsApp (Twilio):
 | 3 | 24h Reminder | Scheduler (T-24h) | "Reminder: appointment tomorrow at X" |
 | 4 | 2h Reminder | Scheduler (T-2h) | "Reminder: appointment in 2 hours" |
 | 5 | Walk-in Queued | Walk-in check-in | Token number, people ahead, estimated wait |
-| 6 | Bill Receipt | Bill created/edited | Itemized bill with total, payment mode |
+| 6 | Bill Receipt | Bill created/edited | Itemized bill with total, payment mode, **feedback link** |
 
 ### How it works
 - All sends go through `_send_with_fallback()` → Twilio WhatsApp API
@@ -461,6 +479,15 @@ Six notification types, all sent via WhatsApp (Twilio):
 - All notification calls are wrapped in `try/except` — **a failure never blocks any user action**
 - Background scheduler runs every 15 minutes to check for due reminders
 - Duplicate prevention: `reminder_24h_sent` and `reminder_2h_sent` flags on each appointment
+
+### Non-blocking sends
+Every notification triggered by a user action (booking, follow-up, walk-in check-in, bill create/edit/mark-paid) is dispatched through FastAPI `BackgroundTasks` via `send_*_bg` wrappers, so the WhatsApp round-trip (300ms–1.5s) runs **after** the HTTP response is returned and never delays the click.
+
+Each background wrapper opens its **own** `SessionLocal()` and re-queries by primary key — never pass SQLAlchemy ORM objects across the background-task boundary, since the request-scoped session is already closed by then.
+
+Scheduler reminders already run off the request path and are unchanged.
+
+> **Current status:** the production Twilio credentials return HTTP 401 (`Authentication Error - invalid username`), so no live messages are being delivered. The code path, logging, and feedback-link generation all work — this is a credentials/config issue.
 
 ---
 
@@ -595,6 +622,27 @@ Warm sepia/parchment palette with dark and light themes.
 - **Border radius:** 6px (xs), 8px (sm), 16px (default), 24px (lg)
 - **Theme toggle** persisted in `localStorage`
 - Full token reference in `docs/design-tokens.md`
+
+---
+
+## Mobile & Tablet
+
+Nivora is used at the desk, on a phone between patients, and on a tablet at reception. The layout splits at **767px**, not the usual 768px — 768px is exactly iPad portrait width, and tablets are meant to get the full desktop interface.
+
+### Phones (≤ 767px)
+- Fixed bottom navigation bar — Home, Queue, Patients, Calendar, More
+- Desktop dock hidden; all multi-column grids collapse to a single column
+- Queue cards use a two-row layout: token + name + status on top, action buttons full-width below
+- Secondary table columns (phone, allergies, last-seen) hidden to keep rows readable
+- 44px minimum tap targets; wide tables scroll inside their own container rather than the page
+
+### Tablets (≥ 768px)
+- Render the **same interface as the laptop** — top navbar, bottom dock, multi-column layouts
+- Grids reflow fluidly at narrower widths exactly as a resized desktop window would
+
+Verified in-browser at 375px, 768px, and 1024px with zero horizontal page overflow across dashboard, queue, billing modal, patients, patient detail, income, transactions, settings, appointment form, prescriptions, calendar, and reports.
+
+> When shipping CSS changes, bump the cache-buster in `templates/base.html` (`main.css?v=NNN`) so browsers and the service worker pick them up.
 
 ---
 
@@ -746,6 +794,22 @@ Warm sepia/parchment palette with dark and light themes.
 |---|---|---|---|
 | GET | `/admin/dashboard` | Admin | Platform overview |
 | GET | `/admin/doctors` | Admin | All doctors list |
+
+---
+
+## Roadmap
+
+Prioritised next work — including known gaps and unbuilt scaffolding — lives in **[ROADMAP.md](ROADMAP.md)**.
+
+Quick summary of what is *not* production-ready today:
+
+| Gap | Status |
+|---|---|
+| Receptionist / staff role | Scaffolding only — `is_staff` is read but never set, no `Staff` model |
+| WhatsApp delivery | Twilio prod credentials return 401 |
+| Support contact on lapsed-plan page | Placeholder number `919999999999` |
+| Razorpay | Test keys; KYC pending |
+| Patient vault storage | Railway ephemeral disk — files lost on redeploy |
 
 ---
 
