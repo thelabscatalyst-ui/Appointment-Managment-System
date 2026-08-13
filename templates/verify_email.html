@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Verify your email · Nivora{% endblock %}
+
+{% block content %}
+<div class="ve-wrap">
+
+  <div class="ve-card">
+    <div class="ve-icon" aria-hidden="true">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2.5"/>
+        <path d="m2.5 6.5 8.4 6a2 2 0 0 0 2.2 0l8.4-6"/>
+      </svg>
+    </div>
+
+    <h1 class="ve-title">Confirm your email</h1>
+    <p class="ve-sub">
+      We sent a 6-digit code to<br>
+      <strong class="ve-email">{{ doctor.email }}</strong>
+    </p>
+
+    {% if error %}
+    <div class="alert alert-error" style="margin-bottom:16px;">{{ error }}</div>
+    {% endif %}
+    {% if success %}
+    <div class="alert alert-success" style="margin-bottom:16px;">{{ success }}</div>
+    {% endif %}
+
+    <form method="POST" action="/verify-email" id="veForm">
+      <input
+        type="text"
+        name="code"
+        id="veCode"
+        class="ve-code-input"
+        inputmode="numeric"
+        autocomplete="one-time-code"
+        pattern="[0-9]*"
+        maxlength="7"
+        placeholder="000000"
+        aria-label="6-digit verification code"
+        autofocus
+        required
+      />
+      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:4px;">
+        Verify email
+      </button>
+    </form>
+
+    <div class="ve-divider"><span>Didn't get the code?</span></div>
+
+    <ul class="ve-tips">
+      <li>Check your spam or promotions folder.</li>
+      <li>Codes expire after 10 minutes.</li>
+    </ul>
+
+    <form method="POST" action="/verify-email/resend" style="margin-bottom:10px;">
+      <button type="submit" class="btn btn-secondary ve-full"
+              {% if resend_wait and resend_wait > 0 %}disabled data-wait="{{ resend_wait }}"{% endif %}
+              id="veResend">
+        {% if resend_wait and resend_wait > 0 %}
+          Resend in {{ resend_wait }}s
+        {% else %}
+          Send a new code
+        {% endif %}
+      </button>
+    </form>
+
+    {% if show_change %}
+    <form method="POST" action="/verify-email/change-address" class="ve-change">
+      <label for="veNewEmail" class="ve-change-label">Corrected email address</label>
+      <input type="email" id="veNewEmail" name="new_email" class="input-sm ve-change-input"
+             placeholder="you@example.com" required value="" />
+      <button type="submit" class="btn btn-secondary ve-full">Update &amp; resend</button>
+    </form>
+    {% else %}
+    <a href="/verify-email?change=1" class="ve-link">Mistyped your email? Change it</a>
+    {% endif %}
+
+    <p class="ve-support">
+      Still stuck? Message us on
+      <a href="https://wa.me/{{ request.state.support_whatsapp }}?text=Hi%2C+I+can%27t+receive+my+Nivora+verification+code."
+         target="_blank" rel="noopener">WhatsApp</a>
+      and we'll verify you manually.
+    </p>
+
+    <a href="/dashboard" class="ve-skip">Skip for now →</a>
+  </div>
+</div>
+
+<style>
+  .ve-wrap { display:flex; justify-content:center; padding: 8px 0 40px; }
+  .ve-card {
+    width:100%; max-width:440px; background:var(--bg-2);
+    border:1px solid var(--border); border-radius:var(--radius);
+    padding:32px 28px; box-shadow:var(--glow); text-align:center;
+  }
+  .ve-icon {
+    width:52px; height:52px; margin:0 auto 16px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(175,145,105,.16); color:#c9a96e;
+  }
+  .ve-title {
+    font-family:'Playfair Display',serif; font-size:1.5rem; font-weight:700;
+    color:var(--text); margin:0 0 8px;
+  }
+  .ve-sub { font-size:14px; color:var(--muted); line-height:1.6; margin:0 0 22px; }
+  .ve-email { color:var(--text); word-break:break-all; }
+
+  .ve-code-input {
+    width:100%; box-sizing:border-box; text-align:center;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:30px; font-weight:700; letter-spacing:10px; text-indent:10px;
+    padding:14px 12px; margin-bottom:14px;
+    background:var(--bg-input); color:var(--text);
+    border:1px solid var(--border-light); border-radius:var(--radius-sm);
+    outline:none; transition:border-color .15s;
+  }
+  .ve-code-input:focus { border-color:#af9169; }
+  .ve-code-input::placeholder { color:var(--dim); letter-spacing:10px; }
+
+  .ve-divider {
+    position:relative; margin:26px 0 14px; text-align:center;
+    font-size:12px; color:var(--dim);
+  }
+  .ve-divider::before {
+    content:''; position:absolute; left:0; right:0; top:50%;
+    height:1px; background:var(--border);
+  }
+  .ve-divider span { position:relative; background:var(--bg-2); padding:0 12px; }
+
+  .ve-tips {
+    list-style:none; padding:0; margin:0 0 16px;
+    font-size:13px; color:var(--muted); line-height:1.7; text-align:left;
+  }
+  .ve-tips li::before { content:'· '; color:var(--dim); }
+
+  .ve-full { width:100%; }
+  .ve-change { margin-bottom:10px; text-align:left; }
+  .ve-change-label {
+    display:block; font-size:11px; font-weight:600; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--dim); margin-bottom:6px;
+  }
+  .ve-change-input { width:100%; box-sizing:border-box; margin-bottom:10px; }
+
+  .ve-link {
+    display:inline-block; font-size:13px; color:var(--muted);
+    text-decoration:none; border-bottom:1px solid var(--border);
+    padding-bottom:1px; margin-bottom:6px;
+  }
+  .ve-link:hover { color:var(--text); }
+
+  .ve-support {
+    font-size:12px; color:var(--dim); line-height:1.6; margin:16px 0 0;
+    padding-top:14px; border-top:1px solid var(--border);
+  }
+  .ve-support a { color:var(--muted); }
+
+  .ve-skip {
+    display:inline-block; margin-top:14px; font-size:12px;
+    color:var(--dim); text-decoration:none;
+  }
+  .ve-skip:hover { color:var(--muted); }
+</style>
+
+<script>
+  // Accept pasted codes with spaces or dashes, and keep it numeric.
+  (function () {
+    var input = document.getElementById('veCode');
+    if (!input) return;
+    input.addEventListener('input', function () {
+      var digits = this.value.replace(/\D/g, '').slice(0, 6);
+      if (this.value !== digits) this.value = digits;
+      // Auto-submit once six digits are in — saves a tap on mobile.
+      if (digits.length === 6) document.getElementById('veForm').submit();
+    });
+
+    // Live countdown on the resend button so it re-enables on its own.
+    var btn = document.getElementById('veResend');
+    if (btn && btn.disabled && btn.dataset.wait) {
+      var left = parseInt(btn.dataset.wait, 10);
+      var tick = setInterval(function () {
+        left -= 1;
+        if (left <= 0) {
+          clearInterval(tick);
+          btn.disabled = false;
+          btn.textContent = 'Send a new code';
+        } else {
+          btn.textContent = 'Resend in ' + left + 's';
+        }
+      }, 1000);
+    }
+  })();
+</script>
+{% endblock %}

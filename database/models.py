@@ -161,6 +161,37 @@ class ClinicDoctorInvite(Base):
     clinic = relationship("Clinic")
 
 
+class EmailVerification(Base):
+    """One-time 6-digit code proving a doctor owns their email address.
+
+    Follows the ClinicDoctorInvite pattern above, with three differences that
+    matter for a credential:
+
+      * `code_hash` — the code is stored hashed, never in plaintext, so DB
+        read access does not hand over live verification codes.
+      * `attempts`  — brute force over a 10^6 space is cheap, so we cap tries
+        and invalidate the code once the cap is hit.
+      * `consumed_at` — single use; a code cannot be replayed.
+
+    Expiry is enforced by query predicate (expires_at > utcnow()), matching how
+    ClinicDoctorInvite is queried elsewhere in the codebase.
+    """
+    __tablename__ = "email_verifications"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    doctor_id   = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
+    # The address this code was sent to. Kept separately from Doctor.email so a
+    # code issued before a typo-correction can't verify the corrected address.
+    email       = Column(String(150), nullable=False)
+    code_hash   = Column(String(255), nullable=False)
+    expires_at  = Column(DateTime, nullable=False)
+    consumed_at = Column(DateTime, nullable=True)
+    attempts    = Column(Integer, default=0, nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    doctor = relationship("Doctor")
+
+
 # --------------------------------------------------------------------------- #
 #  Doctor                                                                       #
 # --------------------------------------------------------------------------- #
@@ -191,7 +222,12 @@ class Doctor(Base):
     plan_seats       = Column(Integer, nullable=True)                   # max doctors allowed under this plan (None = unlimited)
     # v3: medical registration
     medical_reg_number = Column(String(50), nullable=True)             # NMC/State council registration number
-    is_verified        = Column(Boolean, default=False)                # set True after manual platform verification
+    is_verified        = Column(Boolean, default=False)                # MANUAL platform trust badge — NOT email verification
+    # v4: email ownership verification.
+    # Nullable timestamp rather than a boolean: it records *when*, which an
+    # audit trail needs, and avoids the Postgres "BOOLEAN DEFAULT 0" trap that
+    # silently drops the column (see database/connection.py:_add_column).
+    email_verified_at  = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     appointments       = relationship("Appointment", back_populates="doctor", cascade="all, delete-orphan")

@@ -461,3 +461,23 @@ def _run_migrations():
             conn.commit()
         except Exception:
             conn.rollback()
+
+        # ── v4: email ownership verification ─────────────────────────────────
+        # TIMESTAMP (not BOOLEAN) — records when, and sidesteps the Postgres
+        # "BOOLEAN DEFAULT 0" failure that silently drops the column.
+        # The email_verifications TABLE needs no DDL here: create_all() above
+        # builds it from the model class.
+        _add_column(conn, "ALTER TABLE doctors ADD COLUMN email_verified_at TIMESTAMP")
+
+        # Grandfather existing doctors. They registered before verification
+        # existed; forcing them through it retroactively would strand real
+        # users mid-clinic, and their accounts are already in active use.
+        # New signups start NULL and must verify.
+        try:
+            conn.execute(text(
+                "UPDATE doctors SET email_verified_at = created_at "
+                "WHERE email_verified_at IS NULL"
+            ))
+            conn.commit()
+        except Exception:
+            conn.rollback()

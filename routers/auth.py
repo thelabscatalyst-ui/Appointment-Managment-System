@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Request, Depends, Form, Query, HTTPException
+from fastapi import APIRouter, Request, Depends, Form, Query, HTTPException, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from database.models import Doctor, PlanType, Clinic, ClinicDoctor, ClinicDoctor
 from config import settings
 from services.auth_service import (
     hash_password, verify_password, verify_and_rehash,
-    create_access_token, decode_token,
+    create_access_token, decode_token, get_current_doctor,
 )
 from services.password_policy import validate_password
 
@@ -102,6 +102,7 @@ def register_page(
 @router.post("/register", response_class=HTMLResponse)
 def register(
     request: Request,
+    background_tasks: BackgroundTasks,
     name: str = Form(...),
     email: str = Form(...),
     phone: str = Form(...),
@@ -243,6 +244,12 @@ def register(
         ))
         db.commit()
 
+    # Send the verification code after the response — the Resend round-trip
+    # must not delay the redirect. Passes the ID only; the wrapper opens its
+    # own session (the request-scoped one is closed by then).
+    from services.verification_service import issue_code_bg
+    background_tasks.add_task(issue_code_bg, doctor.id)
+
     return RedirectResponse(url="/login?registered=1", status_code=303)
 
 
@@ -327,3 +334,93 @@ def logout():
     for cookie in ("access_token", "pin_session", "clinic_admin_auth"):
         response.delete_cookie(cookie)
     return response
+
+
+# ------------------------------------------------------------------ #
+#  Email verification                                                  #
+# ------------------------------------------------------------------ #
+# Verification is NOT a login gate. An unverified doctor is alone in their
+# own tenant, so blocking login would be disproportionate — and if mail
+# delivery hiccups it would lock them out of software they may have paid
+# for. Instead they log in normally, see a persistent banner, and certain
+# actions (notably password reset) require a verified address.
+
+@router.get("/verify-email", response_class=HTMLResponse)
+def verify_email_page(
+    request: Request,
+    doctor: Doctor = Depends(get_current_doctor),
+    db: Session = Depends(get_db),
+):
+    from services.verification_service import seconds_until_resend
+
+    if doctor.email_verified_at:
+        return RedirectResponse(url="/dashboard?verified=1", status_code=303)
+
+    return templates.TemplateResponse(request, "verify_email.html", {
+        "doctor":         doctor,
+        "error":          None,
+        "success":        None,
+        "resend_wait":    seconds_until_resend(db, doctor.id),
+        "show_change":    request.query_params.get("change") == "1",
+    })
+
+
+@router.post("/verify-email", response_class=HTMLResponse)
+def verify_email_submit(
+    request: Request,
+    code: str = Form(...),
+    doctor: Doctor = Depends(get_current_doctor),
+    db: Session = Depends(get_db),
+):
+    from services.verification_service import verify_code, seconds_until_resend
+
+    ok, message = verify_code(db, doctor, code)
+    if ok:
+        return RedirectResponse(url="/dashboard?verified=1", status_code=303)
+
+    return templates.TemplateResponse(request, "verify_email.html", {
+        "doctor":      doctor,
+        "error":       message,
+        "success":     None,
+        "resend_wait": seconds_until_resend(db, doctor.id),
+        "show_change": False,
+    }, status_code=400)
+
+
+@router.post("/verify-email/resend", response_class=HTMLResponse)
+def verify_email_resend(
+    request: Request,
+    doctor: Doctor = Depends(get_current_doctor),
+    db: Session = Depends(get_db),
+):
+    from services.verification_service import issue_code, seconds_until_resend
+
+    ok, detail = issue_code(db, doctor)
+    return templates.TemplateResponse(request, "verify_email.html", {
+        "doctor":      doctor,
+        "error":       None if ok else detail,
+        "success":     f"We've sent a new code to {doctor.email}." if ok else None,
+        "resend_wait": seconds_until_resend(db, doctor.id),
+        "show_change": False,
+    })
+
+
+@router.post("/verify-email/change-address", response_class=HTMLResponse)
+def verify_email_change_address(
+    request: Request,
+    new_email: str = Form(...),
+    doctor: Doctor = Depends(get_current_doctor),
+    db: Session = Depends(get_db),
+):
+    """Correct a mistyped address. A typo at signup is the most common
+    reason a verification code never arrives."""
+    from services.verification_service import change_email, seconds_until_resend
+
+    ok, message = change_email(db, doctor, new_email)
+    return templates.TemplateResponse(request, "verify_email.html", {
+        "doctor":      doctor,
+        "error":       None if ok else message,
+        "success":     message if ok else None,
+        "resend_wait": seconds_until_resend(db, doctor.id),
+        "show_change": not ok,
+    }, status_code=200 if ok else 400)

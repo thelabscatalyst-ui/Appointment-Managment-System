@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     EMAIL_FROM: str = "Nivora <onboarding@resend.dev>"  # override once the domain is verified
     EMAIL_REPLY_TO: str = ""
 
+    # Support WhatsApp number in E.164 WITHOUT the leading '+' (wa.me format),
+    # e.g. 919812345678. Shown to doctors who can't receive a verification
+    # code or whose plan has lapsed. Set this in .env — the fallback below is
+    # a placeholder and will not reach anyone.
+    SUPPORT_WHATSAPP: str = "919999999999"
+
     # Public base URL used to build patient-facing links (e.g. the feedback
     # link in the WhatsApp bill receipt). Override in .env for staging/local.
     PUBLIC_BASE_URL: str = "https://www.nivora.store"

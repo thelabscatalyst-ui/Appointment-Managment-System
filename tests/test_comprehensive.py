@@ -84,14 +84,14 @@ def clean_db():
             PatientNote, NoteFile, PatientDocument, PinnedPatient,
             BlockedDate, BlockedTime, DoctorSchedule, Subscription,
             Expense, RecurringExpense, PriceCatalog,
-            Patient, ClinicDoctor, ClinicDoctorInvite, Clinic, Doctor,
+            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, Clinic, Doctor,
         )
         for mdl in [
             BillItem, Bill, NotificationLog, Visit, Appointment,
             PatientNote, NoteFile, PatientDocument, PinnedPatient,
             BlockedDate, BlockedTime, DoctorSchedule, Subscription,
             Expense, RecurringExpense, PriceCatalog,
-            Patient, ClinicDoctor, ClinicDoctorInvite, Clinic, Doctor,
+            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, Clinic, Doctor,
         ]:
             db.query(mdl).delete()
         db.commit()
@@ -2023,3 +2023,189 @@ class TestInviteService:
                 f"{field} reappeared on Settings — invite_service no longer uses "
                 f"SMTP; use PUBLIC_BASE_URL and RESEND_API_KEY instead"
             )
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  Email verification OTP (Phase 2)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestEmailVerification:
+
+    def _doctor(self, db, email, phone, slug):
+        from services.auth_service import hash_password
+        d = Doctor(name="Dr Verify", email=email, phone=phone,
+                   password_hash=hash_password("Zx9@pLmv6Bq4Nr"), slug=slug,
+                   plan_type=PlanType.trial,
+                   trial_ends_at=datetime.utcnow() + timedelta(days=14))
+        db.add(d); db.commit(); db.refresh(d)
+        return d
+
+    def _capture(self, monkeypatch_target, codes):
+        """Wrap _generate_code so the test can read the plaintext code."""
+        import services.verification_service as vs
+        original = vs._generate_code
+
+        def _wrapped():
+            c = original()
+            codes.append(c)
+            return c
+        vs._generate_code = _wrapped
+        return original
+
+    def test_code_stored_hashed_never_plaintext(self, client):
+        import services.verification_service as vs
+        from database.models import EmailVerification
+        db = TestSession()
+        doc = self._doctor(db, "vh1@test.com", "9340000001", "v-h1")
+        codes = []
+        orig = self._capture(vs, codes)
+        try:
+            vs.issue_code(db, doc)
+        finally:
+            vs._generate_code = orig
+        rec = db.query(EmailVerification).filter_by(doctor_id=doc.id).first()
+        plaintext = codes[0]
+        db.close()
+        assert rec.code_hash.startswith("$argon2id$")
+        assert plaintext not in rec.code_hash
+
+    def test_correct_code_verifies(self, client):
+        import services.verification_service as vs
+        db = TestSession()
+        doc = self._doctor(db, "vh2@test.com", "9340000002", "v-h2")
+        codes = []
+        orig = self._capture(vs, codes)
+        try:
+            vs.issue_code(db, doc)
+            ok, msg = vs.verify_code(db, doc, codes[0])
+        finally:
+            vs._generate_code = orig
+        verified = doc.email_verified_at
+        db.close()
+        assert ok is True
+        assert verified is not None
+
+    def test_wrong_code_rejected_and_counts_attempt(self, client):
+        import services.verification_service as vs
+        from database.models import EmailVerification
+        db = TestSession()
+        doc = self._doctor(db, "vh3@test.com", "9340000003", "v-h3")
+        vs.issue_code(db, doc)
+        ok, msg = vs.verify_code(db, doc, "000000")
+        rec = db.query(EmailVerification).filter_by(doctor_id=doc.id).first()
+        attempts = rec.attempts
+        db.close()
+        assert ok is False
+        assert attempts == 1
+
+    def test_code_burned_after_max_attempts(self, client):
+        import services.verification_service as vs
+        from database.models import EmailVerification
+        db = TestSession()
+        doc = self._doctor(db, "vh4@test.com", "9340000004", "v-h4")
+        vs.issue_code(db, doc)
+        for _ in range(vs.MAX_ATTEMPTS):
+            vs.verify_code(db, doc, "000000")
+        rec = db.query(EmailVerification).filter_by(doctor_id=doc.id).first()
+        consumed = rec.consumed_at
+        db.close()
+        assert consumed is not None, "code must be burned after the attempt cap"
+
+    def test_expired_code_rejected(self, client):
+        import services.verification_service as vs
+        from database.models import EmailVerification
+        db = TestSession()
+        doc = self._doctor(db, "vh5@test.com", "9340000005", "v-h5")
+        codes = []
+        orig = self._capture(vs, codes)
+        try:
+            vs.issue_code(db, doc)
+        finally:
+            vs._generate_code = orig
+        rec = db.query(EmailVerification).filter_by(doctor_id=doc.id).first()
+        rec.expires_at = datetime.utcnow() - timedelta(minutes=1)
+        db.commit()
+        ok, msg = vs.verify_code(db, doc, codes[0])
+        db.close()
+        assert ok is False
+        assert "expired" in msg.lower()
+
+    def test_reissue_invalidates_previous_code(self, client):
+        import services.verification_service as vs
+        from database.models import EmailVerification
+        db = TestSession()
+        doc = self._doctor(db, "vh6@test.com", "9340000006", "v-h6")
+        codes = []
+        orig = self._capture(vs, codes)
+        try:
+            vs.issue_code(db, doc)
+            # clear the resend cooldown
+            rec = db.query(EmailVerification).filter_by(doctor_id=doc.id).first()
+            rec.created_at = datetime.utcnow() - timedelta(seconds=120)
+            db.commit()
+            vs.issue_code(db, doc)
+            old_ok, _ = vs.verify_code(db, doc, codes[0])
+            new_ok, _ = vs.verify_code(db, doc, codes[1])
+        finally:
+            vs._generate_code = orig
+        db.close()
+        assert old_ok is False, "superseded code must not verify"
+        assert new_ok is True
+
+    def test_resend_cooldown_enforced(self, client):
+        import services.verification_service as vs
+        db = TestSession()
+        doc = self._doctor(db, "vh7@test.com", "9340000007", "v-h7")
+        vs.issue_code(db, doc)
+        ok, detail = vs.issue_code(db, doc)
+        db.close()
+        assert ok is False
+        assert "wait" in detail.lower()
+
+    def test_change_email_bypasses_cooldown_and_sends(self, client):
+        """Regression: the resend cooldown blocked the new code, so a doctor
+        correcting a typo got nothing — defeating the whole fallback."""
+        import services.verification_service as vs
+        db = TestSession()
+        doc = self._doctor(db, "typo@gmial.com", "9340000008", "v-h8")
+        codes = []
+        orig = self._capture(vs, codes)
+        try:
+            vs.issue_code(db, doc)
+            ok, msg = vs.change_email(db, doc, "Correct@Gmail.com")
+        finally:
+            vs._generate_code = orig
+        new_email = doc.email
+        db.close()
+        assert ok is True
+        assert new_email == "correct@gmail.com", "must normalise the new address"
+        assert len(codes) == 2, "a fresh code must actually be sent"
+        assert "could not be sent" not in msg
+
+    def test_change_email_to_taken_address_is_generic(self, client):
+        import services.verification_service as vs
+        db = TestSession()
+        self._doctor(db, "taken@test.com", "9340000009", "v-h9")
+        doc = self._doctor(db, "mover@test.com", "9340000010", "v-h10")
+        ok, msg = vs.change_email(db, doc, "taken@test.com")
+        db.close()
+        assert ok is False
+        assert "already" not in msg.lower(), "must not confirm the address exists"
+
+    def test_verified_doctor_redirected_away_from_verify_page(self, client):
+        tok = auth_cookie(client, "vdone@test.com")
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "vdone@test.com").first()
+        doc.email_verified_at = datetime.utcnow()
+        db.commit(); db.close()
+        r = client.get("/verify-email", cookies={"access_token": tok},
+                       follow_redirects=False)
+        assert r.status_code == 303
+        assert "/dashboard" in r.headers.get("location", "")
+
+    def test_registration_does_not_block_login(self, client):
+        """Verification must NOT gate login — otherwise a mail outage locks
+        doctors out, and every existing test would break."""
+        register(client, email="nogate@test.com", phone="9340000020")
+        r = login(client, "nogate@test.com")
+        assert r.status_code == 303, "unverified doctors must still log in"

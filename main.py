@@ -176,6 +176,10 @@ async def login_rate_limit(request: Request, call_next):
 async def inject_clinic_owner_state(request: Request, call_next):
     """Sets request.state.is_clinic_owner so base.html navbar can show Clinic Admin link."""
     request.state.is_clinic_owner = False
+    # Support contact, read by templates that offer a human fallback
+    # (verify_email.html, plan_lapsed.html). Set here rather than threaded
+    # through every route context — same pattern as is_clinic_owner.
+    request.state.support_whatsapp = settings.SUPPORT_WHATSAPP
     token = request.cookies.get("access_token")
     if token:
         payload = decode_token(token)
