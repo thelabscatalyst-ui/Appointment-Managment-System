@@ -8,10 +8,44 @@ from sqlalchemy.orm import Session
 from database.connection import get_db
 from database.models import Doctor, PlanType, Clinic, ClinicDoctor, ClinicDoctorInvite
 from config import settings
-from services.auth_service import hash_password, verify_password, create_access_token, decode_token
+from services.auth_service import (
+    hash_password, verify_password, verify_and_rehash,
+    create_access_token, decode_token,
+)
+from services.password_policy import validate_password
 
 router = APIRouter(tags=["auth"])
 templates = Jinja2Templates(directory="templates")
+
+# Generic message for duplicate email OR phone. Deliberately does not reveal
+# which field collided, or whether the account exists at all — otherwise
+# /register becomes a probe for "is this doctor on Nivora?".
+_DUPLICATE_MSG = (
+    "That email or phone number is already registered. "
+    "Try logging in, or reset your password."
+)
+
+
+def _normalise_email(email: str) -> str:
+    """Canonical form used for BOTH duplicate checks and storage.
+
+    Previously the duplicate check compared the raw input while the insert
+    stored a lowercased value, so 'Foo@x.com' passed the check and then hit
+    the DB unique constraint as a 500.
+    """
+    return (email or "").strip().lower()
+
+
+def _normalise_phone(phone: str) -> str:
+    """Canonical phone form, reusing the existing E.164 helper."""
+    from services.notification_service import _e164
+    cleaned = (phone or "").strip()
+    if not cleaned:
+        return ""
+    try:
+        return _e164(cleaned)
+    except Exception:
+        return cleaned
 
 
 def _make_slug(name: str, city: str) -> str:
@@ -81,21 +115,46 @@ def register(
 ):
     invite_token = clinic_invite.strip()
 
-    # Check duplicates
-    if db.query(Doctor).filter(Doctor.email == email).first():
+    # Normalise BEFORE any lookup so the duplicate check and the eventual
+    # insert compare the exact same value.
+    norm_email = _normalise_email(email)
+    norm_phone = _normalise_phone(phone)
+
+    def _reject(message: str, status_code: int = 400):
         return templates.TemplateResponse(
             request, "register.html",
-            {"error": "Email already registered. Please login.", "clinic_invite": invite_token,
+            {"error": message, "clinic_invite": invite_token,
              "joining_clinic": None, "plan_hint": "solo"},
-            status_code=400,
+            status_code=status_code,
         )
-    if db.query(Doctor).filter(Doctor.phone == phone).first():
-        return templates.TemplateResponse(
-            request, "register.html",
-            {"error": "Phone number already registered.", "clinic_invite": invite_token,
-             "joining_clinic": None, "plan_hint": "solo"},
-            status_code=400,
-        )
+
+    # ── Basic field validation ────────────────────────────────────────────
+    if not norm_email or "@" not in norm_email or "." not in norm_email.split("@")[-1]:
+        return _reject("Enter a valid email address.")
+
+    digits = re.sub(r"\D", "", norm_phone)
+    if len(digits) < 10:
+        return _reject("Enter a valid 10-digit phone number.")
+
+    # ── Password policy (server-side; the HTML minlength is not a control) ─
+    problems = validate_password(
+        password, email=norm_email, name=name, clinic_name=clinic_name,
+    )
+    if problems:
+        return _reject(" ".join(problems))
+
+    # ── Duplicate check — one generic message for both fields ─────────────
+    # Phone is matched against BOTH the normalised (+91…) and raw-stripped
+    # forms: rows created before normalisation store the raw value, and
+    # Doctor.phone is UNIQUE — missing a legacy match would turn a friendly
+    # 400 into an IntegrityError 500.
+    phone_candidates = {norm_phone, phone.strip()}
+    phone_candidates.discard("")
+    existing = db.query(Doctor).filter(
+        (Doctor.email == norm_email) | (Doctor.phone.in_(phone_candidates))
+    ).first()
+    if existing:
+        return _reject(_DUPLICATE_MSG)
 
     slug = _unique_slug(_make_slug(name, city or "clinic"), db)
 
@@ -112,8 +171,8 @@ def register(
         # ── Clinic member path: no trial, no solo clinic ──────────────────────
         doctor = Doctor(
             name=name,
-            email=email.lower().strip(),
-            phone=phone.strip(),
+            email=norm_email,
+            phone=norm_phone,
             password_hash=hash_password(password),
             specialization=specialization.strip() or None,
             clinic_name=None,    # will show joined clinic name from Clinic table
@@ -141,8 +200,8 @@ def register(
         # ── Solo doctor path: 14-day trial + auto solo clinic ─────────────────
         doctor = Doctor(
             name=name,
-            email=email.lower().strip(),
-            phone=phone.strip(),
+            email=norm_email,
+            phone=norm_phone,
             password_hash=hash_password(password),
             specialization=specialization.strip() or None,
             clinic_name=clinic_name.strip() or None,
@@ -211,17 +270,23 @@ def login(
     next: str = Form(default=""),
     db: Session = Depends(get_db),
 ):
-    normalized_email = email.lower().strip()
+    normalized_email = _normalise_email(email)
 
     # ── Try doctor first ──────────────────────────────────────────────────────
     doctor = db.query(Doctor).filter(Doctor.email == normalized_email).first()
     if doctor:
-        if not verify_password(password, doctor.password_hash):
+        # verify_and_rehash also upgrades legacy bcrypt hashes to argon2id
+        # transparently on a successful login.
+        password_ok, upgraded_hash = verify_and_rehash(password, doctor.password_hash)
+        if not password_ok:
             return templates.TemplateResponse(
                 request, "login.html",
                 {"error": "Invalid email or password.", "success": None, "next": next},
                 status_code=401,
             )
+        if upgraded_hash:
+            doctor.password_hash = upgraded_hash
+            db.commit()
         if not doctor.is_active:
             return templates.TemplateResponse(
                 request, "login.html",
@@ -256,5 +321,9 @@ def login(
 @router.get("/logout")
 def logout():
     response = RedirectResponse(url="/login", status_code=303)
-    response.delete_cookie("access_token")
+    # Clear EVERY auth cookie. Previously only access_token was deleted, so a
+    # logged-out session left a live pin_session / clinic_admin_auth behind —
+    # logging back in silently skipped the PIN gate.
+    for cookie in ("access_token", "pin_session", "clinic_admin_auth"):
+        response.delete_cookie(cookie)
     return response

@@ -90,7 +90,7 @@ def client():
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
-def register_doctor(client, *, name, email, phone, password="Pass1234!", city="TestCity", clinic_name="Test Clinic"):
+def register_doctor(client, *, name, email, phone, password="Wq7$mzKp9Xv2Ld", city="TestCity", clinic_name="Test Clinic"):
     """Register a doctor and return the response."""
     return client.post("/register", data={
         "name": name,
@@ -104,7 +104,7 @@ def register_doctor(client, *, name, email, phone, password="Pass1234!", city="T
     }, follow_redirects=False)
 
 
-def login_doctor(client, email, password="Pass1234!"):
+def login_doctor(client, email, password="Wq7$mzKp9Xv2Ld"):
     """Login and return the response (has Set-Cookie if successful)."""
     return client.post("/login", data={
         "email": email,
@@ -112,7 +112,7 @@ def login_doctor(client, email, password="Pass1234!"):
     }, follow_redirects=False)
 
 
-def get_auth_client(client, email, password="Pass1234!"):
+def get_auth_client(client, email, password="Wq7$mzKp9Xv2Ld"):
     """Login and return (client, cookie_dict) with auth cookie set."""
     resp = login_doctor(client, email, password)
     assert resp.status_code == 303, f"Login failed for {email}: {resp.status_code}"

@@ -9,6 +9,7 @@ annotated-types==0.7.0
 anyio==4.13.0
 APScheduler==3.11.2
 attrs==26.1.0
+argon2-cffi==25.1.0
 bcrypt==4.0.1
 certifi==2026.2.25
 cffi==2.0.0

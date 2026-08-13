@@ -25,10 +25,65 @@ from services.scheduler_service import start_scheduler, stop_scheduler
 from services.auth_service import PlanExpired, PinRequired, decode_token
 from config import settings
 
-# ── Login rate limiter — max 10 attempts per IP per 15 minutes ──────────────
+# ── Auth rate limiter — max 10 attempts per client IP per 15 minutes ────────
 _LOGIN_WINDOW  = 15 * 60   # 15 minutes in seconds
 _LOGIN_MAX     = 10        # max attempts per window
 _login_attempts: dict[str, list[float]] = collections.defaultdict(list)
+
+# Sensitive auth endpoints. Prefix-matched, so future routes (/verify-email,
+# /reset-password/<token>) are covered without touching this list again.
+_RATE_LIMITED_PREFIXES = (
+    "/login",
+    "/register",
+    "/pin-prompt",
+    "/forgot-password",
+    "/reset-password",
+    "/verify-email",
+)
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort real client IP, correct behind Railway's proxy.
+
+    `request.client.host` is the *proxy's* address on Railway — production
+    logs show 100.64.0.0/10 (CGNAT), which is their internal network. Keying
+    the rate limiter on that pools unrelated doctors into shared buckets:
+    ten failed logins by anyone could lock out everyone sharing that proxy IP,
+    while an attacker rotating across the pool gets 10x the attempts.
+
+    X-Forwarded-For reads left-to-right as client -> ...-> last proxy. A client
+    can forge the left-hand entries, but not the ones our edge appends, so we
+    walk from the RIGHT and take the first genuinely public address. Internal
+    hops (private/loopback/CGNAT) are skipped.
+    """
+    import ipaddress
+
+    candidates: list[str] = []
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        candidates.extend(part.strip() for part in xff.split(","))
+    real_ip = request.headers.get("x-real-ip", "")
+    if real_ip:
+        candidates.append(real_ip.strip())
+
+    for raw in reversed(candidates):
+        if not raw:
+            continue
+        try:
+            ip = ipaddress.ip_address(raw)
+        except ValueError:
+            continue
+        # Skip infra hops; 100.64.0.0/10 is CGNAT and is_private covers it
+        # on modern Python, but check explicitly for older behaviour.
+        if ip.is_private or ip.is_loopback or ip.is_reserved or ip.is_link_local:
+            continue
+        if ip.version == 4 and ipaddress.ip_address("100.64.0.0") <= ip <= ipaddress.ip_address("100.127.255.255"):
+            continue
+        return str(ip)
+
+    # Nothing public found — fall back to the socket peer. Better than
+    # "unknown", which would collapse every caller into one bucket.
+    return request.client.host if request.client else "unknown"
 
 
 @asynccontextmanager
@@ -92,8 +147,9 @@ async def login_rate_limit(request: Request, call_next):
     if "pytest" in sys.modules:
         return await call_next(request)
 
-    if request.method == "POST" and request.url.path in ("/login", "/pin-prompt"):
-        ip  = request.client.host if request.client else "unknown"
+    path = request.url.path
+    if request.method == "POST" and any(path.startswith(p) for p in _RATE_LIMITED_PREFIXES):
+        ip  = _client_ip(request)
         now = time.time()
         # Purge old timestamps outside the window
         _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _LOGIN_WINDOW]
@@ -103,11 +159,14 @@ async def login_rate_limit(request: Request, call_next):
             _t = _Tmpl(directory="templates")
             retry_secs = int(_LOGIN_WINDOW - (now - _login_attempts[ip][0]))
             retry_mins = max(1, retry_secs // 60)
+            # Bounce back to the page they came from, not always /login.
+            back = path if path.startswith("/register") else "/login"
             return _HTML(
-                f'<meta http-equiv="refresh" content="5;url=/login">'
+                f'<meta http-equiv="refresh" content="5;url={back}">'
                 f'<p style="font-family:sans-serif;padding:40px;color:#9a8f85;">'
-                f'Too many login attempts. Try again in {retry_mins} minute(s).</p>',
+                f'Too many attempts. Try again in {retry_mins} minute(s).</p>',
                 status_code=429,
+                headers={"Retry-After": str(max(1, retry_secs))},
             )
         _login_attempts[ip].append(now)
     return await call_next(request)

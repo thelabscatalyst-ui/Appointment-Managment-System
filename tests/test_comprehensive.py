@@ -41,7 +41,7 @@ from database.connection import Base, get_db
 from database.models import (
     Doctor, Patient, Appointment, AppointmentStatus, AppointmentType,
     BookedBy, DoctorSchedule, BlockedDate, Visit, VisitStatus,
-    Bill, BillItem, PaymentMode, PriceCatalog,
+    Bill, BillItem, PaymentMode, PriceCatalog, PlanType,
 )
 from services.appointment_service import get_available_slots, get_or_create_patient
 import services.visit_service as vs
@@ -123,7 +123,7 @@ def _next_phone() -> str:
 
 
 def register(client, *, name="Dr Test", email="test@example.com",
-             phone=None, password="Pass1234!", city="Mumbai",
+             phone=None, password="Wq7$mzKp9Xv2Ld", city="Mumbai",
              clinic_name="Test Clinic"):
     if phone is None:
         phone = _next_phone()
@@ -134,12 +134,12 @@ def register(client, *, name="Dr Test", email="test@example.com",
     }, follow_redirects=False)
 
 
-def login(client, email, password="Pass1234!"):
+def login(client, email, password="Wq7$mzKp9Xv2Ld"):
     return client.post("/login", data={"email": email, "password": password},
                        follow_redirects=False)
 
 
-def auth_cookie(client, email, password="Pass1234!", **reg_kwargs):
+def auth_cookie(client, email, password="Wq7$mzKp9Xv2Ld", **reg_kwargs):
     """Register + login, return access_token cookie string."""
     register(client, email=email, **reg_kwargs)
     r = login(client, email, password)
@@ -1742,3 +1742,204 @@ class TestPINSystem:
         r2 = client.get("/reports",
                         cookies={"access_token": tok, "pin_session": pin_session})
         assert r2.status_code == 200
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  Auth hardening (Phase 0)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestPasswordPolicy:
+    """Server-side password policy — the HTML minlength is not a control."""
+
+    def test_short_password_rejected(self, client):
+        r = register(client, email="pw1@test.com", phone="9310000001",
+                     password="Short1!x")          # 8 chars, under the 12 min
+        assert r.status_code == 400
+        assert b"12 characters" in r.content
+
+    def test_password_containing_name_rejected(self, client):
+        r = register(client, email="pw2@test.com", phone="9310000002",
+                     name="Ramesh Kumar", password="RameshKumar99xy")
+        assert r.status_code == 400
+        assert b"must not contain your name" in r.content
+
+    def test_password_containing_email_localpart_rejected(self, client):
+        r = register(client, email="drsunita@test.com", phone="9310000003",
+                     password="drsunitaClinic9")
+        assert r.status_code == 400
+        assert b"must not contain your name" in r.content
+
+    def test_sequential_password_rejected(self, client):
+        r = register(client, email="pw4@test.com", phone="9310000004",
+                     password="Xk9mVpQz1234Rt")
+        assert r.status_code == 400
+        assert b"keyboard patterns" in r.content
+
+    def test_common_password_rejected(self, client):
+        r = register(client, email="pw5@test.com", phone="9310000005",
+                     password="password123")
+        assert r.status_code == 400
+
+    def test_all_problems_returned_together(self, client):
+        """One submit should surface every failure, not just the first."""
+        r = register(client, email="pw6@test.com", phone="9310000006",
+                     name="Ravi", password="ravi1234")
+        assert r.status_code == 400
+        body = r.content
+        assert b"12 characters" in body          # too short
+        assert b"keyboard patterns" in body      # contains 1234
+
+    def test_valid_password_accepted(self, client):
+        r = register(client, email="pw7@test.com", phone="9310000007",
+                     password="Zx9@pLmv6Bq4Nr")
+        assert r.status_code in (200, 302, 303)
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "pw7@test.com").first()
+        db.close()
+        assert doc is not None
+
+
+class TestRegistrationHardening:
+
+    def test_email_case_variant_is_400_not_500(self, client):
+        """Regression: the dup-check compared raw email while the insert
+        lowercased it, so a case-variant slipped through to the DB unique
+        constraint and surfaced as a 500."""
+        r1 = register(client, email="Case@Test.com", phone="9320000001",
+                      password="Zx9@pLmv6Bq4Nr")
+        assert r1.status_code in (200, 302, 303)
+        r2 = register(client, email="case@test.com", phone="9320000002",
+                      password="Zx9@pLmv6Bq4Nr")
+        assert r2.status_code == 400, "case-variant duplicate must be a friendly 400"
+
+    def test_email_stored_lowercased(self, client):
+        register(client, email="MiXeD@Test.com", phone="9320000003",
+                 password="Zx9@pLmv6Bq4Nr")
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "mixed@test.com").first()
+        db.close()
+        assert doc is not None, "email should be normalised to lowercase on write"
+
+    def test_case_variant_can_log_in(self, client):
+        register(client, email="Login@Test.com", phone="9320000004",
+                 password="Zx9@pLmv6Bq4Nr")
+        r = login(client, "LOGIN@TEST.COM", "Zx9@pLmv6Bq4Nr")
+        assert r.status_code == 303
+
+    def test_no_user_enumeration_between_email_and_phone(self, client):
+        """A duplicate email and a duplicate phone must be indistinguishable,
+        otherwise /register becomes a probe for who is on Nivora."""
+        register(client, email="enum@test.com", phone="9320000010",
+                 password="Zx9@pLmv6Bq4Nr")
+        dup_email = register(client, email="enum@test.com", phone="9320000011",
+                             password="Zx9@pLmv6Bq4Nr")
+        dup_phone = register(client, email="other@test.com", phone="9320000010",
+                             password="Zx9@pLmv6Bq4Nr")
+        assert dup_email.status_code == dup_phone.status_code == 400
+        assert dup_email.content == dup_phone.content, \
+            "responses must be byte-identical to prevent enumeration"
+
+    def test_short_phone_rejected(self, client):
+        r = register(client, email="ph1@test.com", phone="12345",
+                     password="Zx9@pLmv6Bq4Nr")
+        assert r.status_code == 400
+
+    def test_invalid_email_rejected(self, client):
+        r = register(client, email="not-an-email", phone="9320000020",
+                     password="Zx9@pLmv6Bq4Nr")
+        assert r.status_code == 400
+
+
+class TestPasswordHashing:
+
+    def test_new_passwords_use_argon2id(self, client):
+        register(client, email="hash1@test.com", phone="9330000001",
+                 password="Zx9@pLmv6Bq4Nr")
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "hash1@test.com").first()
+        db.close()
+        assert doc.password_hash.startswith("$argon2id$")
+
+    def test_legacy_bcrypt_hash_still_logs_in_and_upgrades(self, client):
+        """Existing doctors must not be locked out, and should migrate to
+        argon2id transparently on their next successful login."""
+        from passlib.context import CryptContext
+        bcrypt_only = CryptContext(schemes=["bcrypt"])
+        legacy_hash = bcrypt_only.hash("Zx9@pLmv6Bq4Nr")
+
+        db = TestSession()
+        doc = Doctor(
+            name="Legacy Doc", email="legacy@test.com", phone="9330000002",
+            password_hash=legacy_hash, slug="legacy-doc-hash",
+            plan_type=PlanType.trial,
+            trial_ends_at=datetime.utcnow() + timedelta(days=14),
+        )
+        db.add(doc)
+        db.commit()
+        db.close()
+
+        assert legacy_hash.startswith("$2b$")
+
+        r = login(client, "legacy@test.com", "Zx9@pLmv6Bq4Nr")
+        assert r.status_code == 303, "legacy bcrypt doctor must still log in"
+
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "legacy@test.com").first()
+        upgraded = doc.password_hash
+        db.close()
+        assert upgraded.startswith("$argon2id$"), "hash should upgrade on login"
+
+    def test_malformed_hash_fails_closed(self):
+        """A corrupt hash must be a failed login, never a 500."""
+        from services.auth_service import verify_password
+        assert verify_password("anything", "not-a-real-hash") is False
+
+
+class TestLogoutClearsAllCookies:
+
+    def test_logout_clears_pin_and_admin_cookies(self, client):
+        """Only access_token used to be cleared, leaving a live pin_session
+        behind so the PIN gate was skipped after logging back in."""
+        r = client.get("/logout", follow_redirects=False)
+        assert r.status_code == 303
+        cleared = [
+            h for h in r.headers.get_list("set-cookie")
+            if 'Max-Age=0' in h or 'expires=Thu, 01 Jan 1970' in h.lower()
+        ]
+        blob = " ".join(cleared)
+        for name in ("access_token", "pin_session", "clinic_admin_auth"):
+            assert name in blob, f"{name} not cleared on logout"
+
+
+class TestClientIPExtraction:
+    """Rate limiting keys on this. Railway reports 100.64.0.0/10 (CGNAT) as
+    request.client.host, so XFF must be parsed or all doctors share a bucket."""
+
+    def _req(self, headers, peer="100.64.0.7"):
+        class _R:
+            def __init__(self):
+                self.headers = headers
+                self.client = type("C", (), {"host": peer})()
+        return _R()
+
+    def test_public_client_ip_extracted(self):
+        from main import _client_ip
+        assert _client_ip(self._req({"x-forwarded-for": "49.36.180.5"})) == "49.36.180.5"
+
+    def test_cgnat_hop_skipped(self):
+        from main import _client_ip
+        got = _client_ip(self._req({"x-forwarded-for": "49.36.180.5, 100.64.0.3"}))
+        assert got == "49.36.180.5", "Railway's CGNAT hop must be skipped"
+
+    def test_forged_left_entry_ignored(self):
+        from main import _client_ip
+        got = _client_ip(self._req({"x-forwarded-for": "1.2.3.4, 49.36.180.5"}))
+        assert got == "49.36.180.5", "must take the rightmost public entry"
+
+    def test_all_private_falls_back_to_peer(self):
+        from main import _client_ip
+        assert _client_ip(self._req({"x-forwarded-for": "10.0.0.1, 192.168.1.1"})) == "100.64.0.7"
+
+    def test_malformed_header_falls_back(self):
+        from main import _client_ip
+        assert _client_ip(self._req({"x-forwarded-for": "garbage,,"})) == "100.64.0.7"
