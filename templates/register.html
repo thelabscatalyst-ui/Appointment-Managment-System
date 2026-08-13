@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,6 +12,7 @@
       flex-direction: column;
       min-height: 100vh;
     }
+
     .auth-nav {
       position: sticky;
       top: 0;
@@ -24,6 +26,7 @@
       border-bottom: 1px solid rgba(255, 255, 255, 0.06);
       flex-shrink: 0;
     }
+
     .auth-nav-brand {
       font-family: 'Playfair Display', Georgia, serif;
       font-size: 18px;
@@ -32,6 +35,7 @@
       text-decoration: none;
       letter-spacing: -0.3px;
     }
+
     .auth-nav-back {
       display: flex;
       align-items: center;
@@ -44,8 +48,18 @@
       border-radius: 8px;
       transition: opacity 0.15s, border-color 0.15s;
     }
-    .auth-nav-back:hover { opacity: 0.85; border-color: rgba(201,185,154,0.5); }
-    .auth-nav-right { display: flex; align-items: center; gap: 12px; }
+
+    .auth-nav-back:hover {
+      opacity: 0.85;
+      border-color: rgba(201, 185, 154, 0.5);
+    }
+
+    .auth-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
     .auth-nav-link {
       font-size: 13px;
       color: #9a8f85;
@@ -54,10 +68,20 @@
       border-radius: 8px;
       transition: color 0.15s;
     }
-    .auth-nav-link:hover { color: #c9b99a; }
-    .auth-page { flex: 1; min-height: 0; }
+
+    .auth-nav-link:hover {
+      color: #c9b99a;
+    }
+
+    .auth-page {
+      flex: 1;
+      min-height: 0;
+    }
+
     @media (max-width: 900px) {
-      .auth-nav { padding: 0 20px; }
+      .auth-nav {
+        padding: 0 20px;
+      }
     }
   </style>
   <script>
@@ -66,251 +90,217 @@
     }
   </script>
 </head>
+
 <body>
 
-<!-- Ambient drifting brown blobs — fixed to the viewport, behind everything -->
-<div class="ln-ambient" aria-hidden="true">
-  <span class="ln-blob ln-blob-1"></span>
-  <span class="ln-blob ln-blob-2"></span>
-  <span class="ln-blob ln-blob-3"></span>
-  <span class="ln-blob ln-blob-4"></span>
-</div>
-
-<div class="auth-page-wrap">
-
-  <!-- ── Auth Navbar ── -->
-  <nav class="auth-nav">
-    <a href="/" class="auth-nav-brand">Nivora</a>
-    <div class="auth-nav-right">
-      <a href="/login" class="auth-nav-link">Log in</a>
-      <a href="/" class="auth-nav-back">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="15 18 9 12 15 6"/>
-        </svg>
-        Back to site
-      </a>
-    </div>
-  </nav>
-
-<div class="auth-page">
-
-  <!-- ── Left: Branding ── -->
-  <div class="auth-brand">
-    <div class="brand-content">
-      <p class="brand-eyebrow">{{ "Joining a clinic" if joining_clinic else "14-day free trial" }}</p>
-      <h1 class="brand-title">Clinic<br>OS</h1>
-      <p class="brand-tagline">
-        Replace your paper register with a smart clinic system.
-        No credit card needed to get started.
-      </p>
-      <div class="brand-divider"></div>
-      <div class="brand-features">
-        <div class="brand-feature">
-          <span class="brand-feature-dot"></span>
-          <span>Full access for 14 days, free</span>
-        </div>
-        <div class="brand-feature">
-          <span class="brand-feature-dot"></span>
-          <span>Set up in under 5 minutes</span>
-        </div>
-        <div class="brand-feature">
-          <span class="brand-feature-dot"></span>
-          <span>Your patients get WhatsApp reminders</span>
-        </div>
-        <div class="brand-feature">
-          <span class="brand-feature-dot"></span>
-          <span>Works on any phone, no app needed</span>
-        </div>
-      </div>
-    </div>
+  <!-- Ambient drifting brown blobs — fixed to the viewport, behind everything -->
+  <div class="ln-ambient" aria-hidden="true">
+    <span class="ln-blob ln-blob-1"></span>
+    <span class="ln-blob ln-blob-2"></span>
+    <span class="ln-blob ln-blob-3"></span>
+    <span class="ln-blob ln-blob-4"></span>
   </div>
 
-  <!-- ── Right: Register Card ── -->
-  <div class="auth-panel">
-    <div class="auth-card">
+  <div class="auth-page-wrap">
 
-      {% if joining_clinic %}
-      <h2 class="auth-card-title">Join {{ joining_clinic.name }}</h2>
-      <p class="auth-card-sub">Create your Nivora account to accept the invite</p>
-      {% else %}
-      <h2 class="auth-card-title">Create your account</h2>
-      <p class="auth-card-sub">No credit card required</p>
-      {% endif %}
-
-      {% if joining_clinic %}
-      <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin:16px 0 20px;">
-        <div style="font-size:12px;color:var(--muted);margin-bottom:2px;">You're joining</div>
-        <div style="font-size:15px;font-weight:600;color:var(--text);">{{ joining_clinic.name }}</div>
-        {% if joining_clinic.city %}<div style="font-size:13px;color:var(--muted);">{{ joining_clinic.city }}</div>{% endif %}
+    <!-- ── Auth Navbar ── -->
+    <nav class="auth-nav">
+      <a href="/" class="auth-nav-brand">Nivora</a>
+      <div class="auth-nav-right">
+        <a href="/login" class="auth-nav-link">Log in</a>
+        <a href="/" class="auth-nav-back">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
+          Back to site
+        </a>
       </div>
-      {% endif %}
+    </nav>
 
-      {% if error %}
-      <div class="alert alert-error">{{ error }}</div>
-      {% endif %}
+    <div class="auth-page">
 
-      <form method="POST" action="/register">
-        {% if clinic_invite %}
-        <input type="hidden" name="clinic_invite" value="{{ clinic_invite }}">
-        {% endif %}
-
-        {% if not joining_clinic %}
-        <!-- Account type selector -->
-        <div style="display:flex;gap:8px;margin-bottom:20px;">
-          <button type="button" id="btnSolo" onclick="setMode('solo')"
-            style="flex:1;padding:10px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-3);color:var(--text);font-size:0.82rem;font-weight:600;cursor:pointer;transition:var(--transition-pop);"
-            class="reg-mode-btn reg-mode-btn--active">
-            Solo Doctor
-          </button>
-          <button type="button" id="btnClinic" onclick="setMode('clinic')"
-            style="flex:1;padding:10px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-3);color:var(--text);font-size:0.82rem;font-weight:600;cursor:pointer;transition:var(--transition-pop);"
-            class="reg-mode-btn">
-            Clinic Account
-          </button>
-        </div>
-        <input type="hidden" name="account_type" id="account_type" value="solo">
-        {% endif %}
-
-        <div class="form-group">
-          <label for="name">Full name *</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            placeholder="Dr. Rajesh Mehta"
-            required
-          />
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="email">Email *</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              placeholder="doctor@example.com"
-              required
-              autocomplete="email"
-            />
-          </div>
-          <div class="form-group">
-            <label for="phone">Phone *</label>
-            <input
-              type="tel"
-              id="phone"
-              name="phone"
-              placeholder="9876543210"
-              required
-            />
+      <!-- ── Left: Branding ── -->
+      <div class="auth-brand">
+        <div class="brand-content">
+          <p class="brand-eyebrow">{{ "Joining a clinic" if joining_clinic else "14-day free trial" }}</p>
+          <h1 class="brand-title">NIVORA<br></h1>
+          <p class="brand-tagline">
+            Replace your paper register with a smart clinic system.
+            No credit card needed to get started.
+          </p>
+          <div class="brand-divider"></div>
+          <div class="brand-features">
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>Full access for 14 days, free</span>
+            </div>
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>Set up in under 5 minutes</span>
+            </div>
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>Your patients get WhatsApp reminders</span>
+            </div>
+            <div class="brand-feature">
+              <span class="brand-feature-dot"></span>
+              <span>Works on any phone, no app needed</span>
+            </div>
           </div>
         </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label for="specialization">Specialization</label>
-            <input
-              type="text"
-              id="specialization"
-              name="specialization"
-              placeholder="General Physician"
-            />
-          </div>
-          <div class="form-group">
-            <label for="city">City</label>
-            <input
-              type="text"
-              id="city"
-              name="city"
-              placeholder="Nashik"
-            />
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="medical_reg_number">Medical Registration No. <span style="color:var(--dim);font-size:11px;font-weight:400;">(optional)</span></label>
-          <input type="text" id="medical_reg_number" name="medical_reg_number"
-                 placeholder="e.g. MH/12345/2019 or NMC-XXXXX" />
-        </div>
-
-        {% if not joining_clinic %}
-        <div class="form-group" id="clinicNameGroup" style="display:none;">
-          <label for="clinic_name">Clinic name *</label>
-          <input
-            type="text"
-            id="clinic_name"
-            name="clinic_name"
-            placeholder="Mehta Clinic"
-          />
-        </div>
-        {% endif %}
-
-        <div class="form-group">
-          <label for="password">Password *</label>
-          <input
-            type="password"
-            id="password"
-            name="password"
-            placeholder="At least 8 characters"
-            required
-            minlength="8"
-            autocomplete="new-password"
-          />
-        </div>
-
-        <button type="submit" class="btn btn-primary" id="registerSubmit">
-          <span class="btn-text">{% if joining_clinic %}Create account &amp; join{% else %}Start free trial{% endif %}</span>
-        </button>
-      </form>
-
-      <div class="auth-footer">
-        Already have an account? <a href="/login">Log in</a>
       </div>
 
-    </div>
-  </div>
+      <!-- ── Right: Register Card ── -->
+      <div class="auth-panel">
+        <div class="auth-card">
 
-</div><!-- /.auth-page -->
-</div><!-- /.auth-page-wrap -->
+          {% if joining_clinic %}
+          <h2 class="auth-card-title">Join {{ joining_clinic.name }}</h2>
+          <p class="auth-card-sub">Create your Nivora account to accept the invite</p>
+          {% else %}
+          <h2 class="auth-card-title">Create your account</h2>
+          <p class="auth-card-sub">No credit card required</p>
+          {% endif %}
 
-<script>
-function setMode(mode) {
-  var accountType = document.getElementById('account_type');
-  if (accountType) accountType.value = mode;
+          {% if joining_clinic %}
+          <div
+            style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;margin:16px 0 20px;">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:2px;">You're joining</div>
+            <div style="font-size:15px;font-weight:600;color:var(--text);">{{ joining_clinic.name }}</div>
+            {% if joining_clinic.city %}<div style="font-size:13px;color:var(--muted);">{{ joining_clinic.city }}</div>
+            {% endif %}
+          </div>
+          {% endif %}
 
-  var btnSolo   = document.getElementById('btnSolo');
-  var btnClinic = document.getElementById('btnClinic');
-  var clinicGrp = document.getElementById('clinicNameGroup');
-  if (!btnSolo) return;
+          {% if error %}
+          <div class="alert alert-error">{{ error }}</div>
+          {% endif %}
 
-  var activeStyle = 'border-color:var(--text);background:var(--bg-2);';
-  var idleStyle   = 'border-color:var(--border);background:var(--bg-3);';
+          <form method="POST" action="/register">
+            {% if clinic_invite %}
+            <input type="hidden" name="clinic_invite" value="{{ clinic_invite }}">
+            {% endif %}
 
-  if (mode === 'clinic') {
-    btnClinic.setAttribute('style', btnClinic.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '') + activeStyle);
-    btnSolo.setAttribute('style',   btnSolo.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '')   + idleStyle);
-    if (clinicGrp) { clinicGrp.style.display = 'block'; }
-  } else {
-    btnSolo.setAttribute('style',   btnSolo.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '')   + activeStyle);
-    btnClinic.setAttribute('style', btnClinic.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '') + idleStyle);
-    if (clinicGrp) { clinicGrp.style.display = 'none'; }
-  }
-}
-// Init with plan hint from server
-setMode('{{ plan_hint if plan_hint in ["solo","clinic"] else "solo" }}');
+            {% if not joining_clinic %}
+            <!-- Account type selector -->
+            <div style="display:flex;gap:8px;margin-bottom:20px;">
+              <button type="button" id="btnSolo" onclick="setMode('solo')"
+                style="flex:1;padding:10px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-3);color:var(--text);font-size:0.82rem;font-weight:600;cursor:pointer;transition:var(--transition-pop);"
+                class="reg-mode-btn reg-mode-btn--active">
+                Solo Doctor
+              </button>
+              <button type="button" id="btnClinic" onclick="setMode('clinic')"
+                style="flex:1;padding:10px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-3);color:var(--text);font-size:0.82rem;font-weight:600;cursor:pointer;transition:var(--transition-pop);"
+                class="reg-mode-btn">
+                Clinic Account
+              </button>
+            </div>
+            <input type="hidden" name="account_type" id="account_type" value="solo">
+            {% endif %}
 
-// Loading state on submit
-document.addEventListener('DOMContentLoaded', function () {
-  var form = document.querySelector('form[action="/register"]');
-  var btn  = document.getElementById('registerSubmit');
-  if (form && btn) {
-    form.addEventListener('submit', function () {
-      btn.classList.add('btn--loading');
-      btn.disabled = true;
+            <div class="form-group">
+              <label for="name">Full name *</label>
+              <input type="text" id="name" name="name" placeholder="Dr. Rajesh Mehta" required />
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" name="email" placeholder="doctor@example.com" required
+                  autocomplete="email" />
+              </div>
+              <div class="form-group">
+                <label for="phone">Phone *</label>
+                <input type="tel" id="phone" name="phone" placeholder="9876543210" required />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="specialization">Specialization</label>
+                <input type="text" id="specialization" name="specialization" placeholder="General Physician" />
+              </div>
+              <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city" placeholder="Nashik" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="medical_reg_number">Medical Registration No. <span
+                  style="color:var(--dim);font-size:11px;font-weight:400;">(optional)</span></label>
+              <input type="text" id="medical_reg_number" name="medical_reg_number"
+                placeholder="e.g. MH/12345/2019 or NMC-XXXXX" />
+            </div>
+
+            {% if not joining_clinic %}
+            <div class="form-group" id="clinicNameGroup" style="display:none;">
+              <label for="clinic_name">Clinic name *</label>
+              <input type="text" id="clinic_name" name="clinic_name" placeholder="Mehta Clinic" />
+            </div>
+            {% endif %}
+
+            <div class="form-group">
+              <label for="password">Password *</label>
+              <input type="password" id="password" name="password" placeholder="At least 8 characters" required
+                minlength="8" autocomplete="new-password" />
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="registerSubmit">
+              <span class="btn-text">{% if joining_clinic %}Create account &amp; join{% else %}Start free trial{% endif
+                %}</span>
+            </button>
+          </form>
+
+          <div class="auth-footer">
+            Already have an account? <a href="/login">Log in</a>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /.auth-page -->
+  </div><!-- /.auth-page-wrap -->
+
+  <script>
+    function setMode(mode) {
+      var accountType = document.getElementById('account_type');
+      if (accountType) accountType.value = mode;
+
+      var btnSolo = document.getElementById('btnSolo');
+      var btnClinic = document.getElementById('btnClinic');
+      var clinicGrp = document.getElementById('clinicNameGroup');
+      if (!btnSolo) return;
+
+      var activeStyle = 'border-color:var(--text);background:var(--bg-2);';
+      var idleStyle = 'border-color:var(--border);background:var(--bg-3);';
+
+      if (mode === 'clinic') {
+        btnClinic.setAttribute('style', btnClinic.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '') + activeStyle);
+        btnSolo.setAttribute('style', btnSolo.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '') + idleStyle);
+        if (clinicGrp) { clinicGrp.style.display = 'block'; }
+      } else {
+        btnSolo.setAttribute('style', btnSolo.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '') + activeStyle);
+        btnClinic.setAttribute('style', btnClinic.getAttribute('style').replace(/border-color:[^;]+;background:[^;]+;/, '') + idleStyle);
+        if (clinicGrp) { clinicGrp.style.display = 'none'; }
+      }
+    }
+    // Init with plan hint from server
+    setMode('{{ plan_hint if plan_hint in ["solo","clinic"] else "solo" }}');
+
+    // Loading state on submit
+    document.addEventListener('DOMContentLoaded', function () {
+      var form = document.querySelector('form[action="/register"]');
+      var btn = document.getElementById('registerSubmit');
+      if (form && btn) {
+        form.addEventListener('submit', function () {
+          btn.classList.add('btn--loading');
+          btn.disabled = true;
+        });
+      }
     });
-  }
-});
-</script>
+  </script>
 </body>
+
 </html>
