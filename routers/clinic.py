@@ -10,7 +10,7 @@ routers/clinic.py — Clinic admin routes (multi-doctor clinics only).
 import secrets
 from datetime import date, datetime, timedelta
 
-from fastapi import APIRouter, Request, Depends, Form, Query
+from fastapi import APIRouter, Request, Depends, Form, Query, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -206,6 +206,7 @@ def doctors_list_page(
 @router.post("/admin/doctors/invite", response_class=HTMLResponse)
 def send_doctor_invite(
     request: Request,
+    background_tasks: BackgroundTasks,
     invite_email: str = Form(...),
     doctor: Doctor = Depends(get_clinic_owner),
     db: Session = Depends(get_db),
@@ -272,11 +273,11 @@ def send_doctor_invite(
     ))
     db.commit()
 
-    try:
-        from services.invite_service import send_invite_email
-        send_invite_email(email, token, clinic.name, doctor.name)
-    except Exception:
-        pass
+    # Send after the response so a slow/unreachable mail provider can't stall
+    # the owner's request. send_invite_email never raises; it logs the accept
+    # URL if delivery fails so the link can be shared manually.
+    from services.invite_service import send_invite_email
+    background_tasks.add_task(send_invite_email, email, token, clinic.name, doctor.name)
 
     return _render(success=f"Invite sent to {email}. They have 7 days to accept.")
 

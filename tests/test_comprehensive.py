@@ -1943,3 +1943,83 @@ class TestClientIPExtraction:
     def test_malformed_header_falls_back(self):
         from main import _client_ip
         assert _client_ip(self._req({"x-forwarded-for": "garbage,,"})) == "100.64.0.7"
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  Email infrastructure (Phase 1)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestEmailService:
+    """send_email must never raise — a mail outage cannot 500 a request."""
+
+    def test_unconfigured_returns_false_not_raise(self):
+        from services.email_service import send_email
+        from config import settings
+        original = settings.RESEND_API_KEY
+        settings.RESEND_API_KEY = ""
+        try:
+            ok, detail = send_email("doc@example.com", "Subject", "<p>body</p>")
+        finally:
+            settings.RESEND_API_KEY = original
+        assert ok is False
+        assert detail == "not configured"
+
+    def test_empty_recipient_rejected(self):
+        from services.email_service import send_email
+        ok, detail = send_email("", "Subject", "<p>body</p>")
+        assert ok is False
+        assert detail == "no recipient"
+
+    def test_render_wraps_body(self):
+        from services.email_service import render_email
+        html = render_email("<p>hello</p>")
+        assert "<p>hello</p>" in html
+        assert "Nivora" in html
+
+    def test_code_block_renders_digits(self):
+        from services.email_service import code_block
+        assert "493018" in code_block("493018")
+
+    def test_button_includes_url_and_label(self):
+        from services.email_service import button
+        out = button("https://example.com/x", "Accept")
+        assert 'href="https://example.com/x"' in out
+        assert "Accept" in out
+
+
+class TestInviteService:
+
+    def test_invite_url_matches_real_route(self):
+        """Regression: the service built /clinic/invite/{token} while the
+        actual route is /clinic/doctor-invite/{token}, so every emailed
+        link 404'd."""
+        from services.invite_service import build_invite_url
+        url = build_invite_url("tok_abc123")
+        assert "/clinic/doctor-invite/tok_abc123" in url
+        assert "/clinic/invite/" not in url.replace("/clinic/doctor-invite/", "")
+
+    def test_send_invite_never_raises_when_unconfigured(self):
+        """Previously raised RuntimeError on every call because the SMTP_*
+        settings it read were never declared on Settings."""
+        from services.invite_service import send_invite_email
+        from config import settings
+        original = settings.RESEND_API_KEY
+        settings.RESEND_API_KEY = ""
+        try:
+            ok, detail = send_invite_email(
+                "doc@example.com", "tok_x", "Verma Clinic", "Dr Asha"
+            )
+        finally:
+            settings.RESEND_API_KEY = original
+        assert ok is False
+        assert detail == "not configured"
+
+    def test_settings_has_no_smtp_fields(self):
+        """Guards the old failure mode: invite_service used getattr(settings,
+        'SMTP_HOST', None), which silently returned None forever."""
+        from config import settings
+        for field in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "BASE_URL"):
+            assert not hasattr(settings, field), (
+                f"{field} reappeared on Settings — invite_service no longer uses "
+                f"SMTP; use PUBLIC_BASE_URL and RESEND_API_KEY instead"
+            )

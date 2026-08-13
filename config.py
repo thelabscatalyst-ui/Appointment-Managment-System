@@ -18,6 +18,14 @@ class Settings(BaseSettings):
 
     ADMIN_EMAIL: str = ""  # platform owner email — set in .env
 
+    # ── Transactional email (Resend) ──────────────────────────────────────
+    # Used for email verification codes, password resets, and clinic invites.
+    # When RESEND_API_KEY is empty, send_email() logs and no-ops rather than
+    # raising — mirrors how send_whatsapp() degrades without Twilio creds.
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "Nivora <onboarding@resend.dev>"  # override once the domain is verified
+    EMAIL_REPLY_TO: str = ""
+
     # Public base URL used to build patient-facing links (e.g. the feedback
     # link in the WhatsApp bill receipt). Override in .env for staging/local.
     PUBLIC_BASE_URL: str = "https://www.nivora.store"
