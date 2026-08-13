@@ -83,6 +83,53 @@
         padding: 0 20px;
       }
     }
+
+    /* ── Password strength feedback ── */
+    .pw-meter {
+      height: 4px;
+      border-radius: 3px;
+      background: rgba(140, 120, 95, .22);
+      margin: 8px 0 10px;
+      overflow: hidden;
+    }
+    .pw-meter span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      border-radius: 3px;
+      background: #c2554d;
+      transition: width .2s ease, background .2s ease;
+    }
+    .pw-meter.is-fair   span { background: #c98a3c; }
+    .pw-meter.is-good   span { background: #9a833a; }
+    .pw-meter.is-strong span { background: #4f8a4f; }
+
+    .pw-checks {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      font-size: 12px;
+      line-height: 1.85;
+      color: #8a7f74;
+    }
+    .pw-checks li { padding-left: 20px; position: relative; }
+    .pw-checks li::before {
+      content: '○';
+      position: absolute;
+      left: 4px;
+      color: #b6a894;
+    }
+    .pw-checks li.ok        { color: #4f8a4f; }
+    .pw-checks li.ok::before { content: '✓'; color: #4f8a4f; }
+    .pw-checks li.bad        { color: #c2554d; }
+    .pw-checks li.bad::before { content: '✕'; color: #c2554d; }
+    .pw-checks code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      background: rgba(140,120,95,.16);
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
   </style>
   <script>
     if (localStorage.getItem('theme') !== 'dark') {
@@ -243,8 +290,16 @@
 
             <div class="form-group">
               <label for="password">Password *</label>
-              <input type="password" id="password" name="password" placeholder="At least 8 characters" required
-                minlength="8" autocomplete="new-password" />
+              <input type="password" id="password" name="password" placeholder="At least 12 characters" required
+                minlength="12" autocomplete="new-password" aria-describedby="pwChecks" />
+              <div class="pw-meter" id="pwMeter" aria-hidden="true"><span id="pwMeterBar"></span></div>
+              <ul class="pw-checks" id="pwChecks">
+                <li data-rule="len">At least 12 characters</li>
+                <li data-rule="seq">No sequences like <code>1234</code> or <code>abcd</code></li>
+                <li data-rule="rep">No character repeated 4+ times</li>
+                <li data-rule="ctx">Doesn't contain your name or email</li>
+                <li data-rule="common">Not a commonly used password</li>
+              </ul>
             </div>
 
             <button type="submit" class="btn btn-primary" id="registerSubmit">
@@ -299,6 +354,93 @@
           btn.disabled = true;
         });
       }
+
+      /* ── Live password feedback ──────────────────────────────────────
+         Mirrors services/password_policy.py. This is guidance only — the
+         server is always the authority, so keep the two in sync if the
+         policy changes. */
+      var pw       = document.getElementById('password');
+      var checksEl = document.getElementById('pwChecks');
+      var meterEl  = document.getElementById('pwMeter');
+      var barEl    = document.getElementById('pwMeterBar');
+      if (!pw || !checksEl) return;
+
+      var COMMON = [
+        'password','password1','password123','passw0rd','p@ssw0rd','123456',
+        '1234567','12345678','123456789','1234567890','qwerty','qwertyuiop',
+        'asdfghjkl','zxcvbnm','qwerty123','letmein','welcome','welcome1',
+        'admin','administrator','iloveyou','monkey','dragon','sunshine',
+        'princess','abc123','abcd1234','111111','000000','123123',
+        'india123','bharat123','clinic123','doctor123','hospital123',
+        'nivora','nivora123','clinicos','clinicos123'
+      ];
+      var SEQS = ['abcdefghijklmnopqrstuvwxyz','01234567890','qwertyuiop','asdfghjkl','zxcvbnm'];
+
+      function hasSequence(v) {
+        var low = v.toLowerCase();
+        for (var i = 0; i < SEQS.length; i++) {
+          var s = SEQS[i];
+          for (var j = 0; j + 4 <= s.length; j++) {
+            var run = s.slice(j, j + 4);
+            if (low.indexOf(run) !== -1) return true;
+            if (low.indexOf(run.split('').reverse().join('')) !== -1) return true;
+          }
+        }
+        return false;
+      }
+
+      function contextTokens() {
+        var out = [];
+        [
+          (document.getElementById('name')  || {}).value || '',
+          (document.getElementById('email') || {}).value || '',
+          (document.getElementById('clinic_name') || {}).value || ''
+        ].forEach(function (val) {
+          var cleaned = val.trim().toLowerCase();
+          if (!cleaned) return;
+          if (cleaned.indexOf('@') !== -1) cleaned = cleaned.split('@')[0];
+          cleaned.split(/[^a-z0-9]+/).forEach(function (tok) {
+            if (tok.length >= 4) out.push(tok);
+          });
+        });
+        return out;
+      }
+
+      function evaluate() {
+        var v = pw.value || '';
+        var low = v.toLowerCase();
+        var results = {
+          len:    v.length >= 12,
+          seq:    v.length > 0 && !hasSequence(v),
+          rep:    v.length > 0 && !/(.)\1{3,}/.test(v),
+          ctx:    v.length > 0 && !contextTokens().some(function (t) { return low.indexOf(t) !== -1; }),
+          common: v.length > 0 && COMMON.indexOf(low) === -1
+        };
+
+        var passed = 0;
+        Object.keys(results).forEach(function (rule) {
+          var li = checksEl.querySelector('[data-rule="' + rule + '"]');
+          if (!li) return;
+          li.classList.remove('ok', 'bad');
+          if (!v.length) return;                 // neutral before typing
+          if (results[rule]) { li.classList.add('ok'); passed++; }
+          else               { li.classList.add('bad'); }
+        });
+
+        var pct = v.length ? Math.round((passed / 5) * 100) : 0;
+        barEl.style.width = pct + '%';
+        meterEl.classList.remove('is-fair', 'is-good', 'is-strong');
+        if (passed === 5)      meterEl.classList.add('is-strong');
+        else if (passed >= 4)  meterEl.classList.add('is-good');
+        else if (passed >= 3)  meterEl.classList.add('is-fair');
+      }
+
+      pw.addEventListener('input', evaluate);
+      // Name/email feed the context rule, so re-check when they change.
+      ['name', 'email', 'clinic_name'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', function () { if (pw.value) evaluate(); });
+      });
     });
   </script>
 </body>

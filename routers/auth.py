@@ -250,7 +250,18 @@ def register(
     from services.verification_service import issue_code_bg
     background_tasks.add_task(issue_code_bg, doctor.id)
 
-    return RedirectResponse(url="/login?registered=1", status_code=303)
+    # Log the doctor straight in and land them on the verification screen.
+    # Previously this redirected to /login?registered=1, so a new signup was
+    # never told a code had been sent — the verification prompt only appeared
+    # after they separately logged in, which made the whole step invisible.
+    token = create_access_token({"doctor_id": doctor.id})
+    response = RedirectResponse(url="/verify-email", status_code=303)
+    response.set_cookie(
+        key="access_token", value=token,
+        httponly=True, secure=settings.ENVIRONMENT.lower() == "production",
+        max_age=60 * 60 * 24, samesite="lax",
+    )
+    return response
 
 
 # ------------------------------------------------------------------ #
