@@ -254,7 +254,7 @@ def register(
     # Previously this redirected to /login?registered=1, so a new signup was
     # never told a code had been sent — the verification prompt only appeared
     # after they separately logged in, which made the whole step invisible.
-    token = create_access_token({"doctor_id": doctor.id})
+    token = create_access_token({"doctor_id": doctor.id, "tv": doctor.token_version or 0})
     response = RedirectResponse(url="/verify-email", status_code=303)
     response.set_cookie(
         key="access_token", value=token,
@@ -269,12 +269,16 @@ def register(
 # ------------------------------------------------------------------ #
 
 @router.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, registered: str = "", next: str = ""):
+def login_page(request: Request, registered: str = "", next: str = "", reset: str = ""):
     # Redirect already-logged-in users away from login
     token = request.cookies.get("access_token")
     if token and decode_token(token):
         return RedirectResponse(url="/dashboard", status_code=303)
-    success = "Account created! Please log in." if registered == "1" else None
+    success = None
+    if reset == "1":
+        success = "Password updated. Log in with your new password."
+    elif registered == "1":
+        success = "Account created! Please log in."
     return templates.TemplateResponse(request, "login.html", {
         "error": None, "success": success, "next": next,
     })
@@ -311,7 +315,7 @@ def login(
                 {"error": "Your account has been deactivated.", "success": None, "next": next},
                 status_code=403,
             )
-        token = create_access_token({"doctor_id": doctor.id})
+        token = create_access_token({"doctor_id": doctor.id, "tv": doctor.token_version or 0})
         # Honor the `next` param — only relative paths, no open redirect
         safe_next = next.strip() if (
             next and next.startswith("/") and not next.startswith("//")
@@ -435,3 +439,94 @@ def verify_email_change_address(
         "resend_wait": seconds_until_resend(db, doctor.id),
         "show_change": not ok,
     }, status_code=200 if ok else 400)
+
+
+# ------------------------------------------------------------------ #
+#  Forgot / reset password                                             #
+# ------------------------------------------------------------------ #
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+def forgot_password_page(request: Request):
+    token = request.cookies.get("access_token")
+    if token and decode_token(token):
+        return RedirectResponse(url="/dashboard", status_code=303)
+    return templates.TemplateResponse(request, "forgot_password.html", {
+        "error": None, "sent": False,
+    })
+
+
+@router.post("/forgot-password", response_class=HTMLResponse)
+def forgot_password_submit(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    email: str = Form(...),
+):
+    """Always renders the same confirmation.
+
+    We never reveal whether the address is registered, verified, or rate
+    limited — otherwise this endpoint becomes a probe for which doctors are
+    on Nivora. The work runs in the background so response timing can't be
+    used to infer it either.
+    """
+    from main import _client_ip
+    from services.password_reset_service import request_reset_bg
+
+    background_tasks.add_task(request_reset_bg, email, _client_ip(request))
+
+    return templates.TemplateResponse(request, "forgot_password.html", {
+        "error": None, "sent": True, "submitted_email": email.strip(),
+    })
+
+
+@router.get("/reset-password", response_class=HTMLResponse)
+def reset_password_page(
+    request: Request,
+    token: str = Query(default=""),
+    db: Session = Depends(get_db),
+):
+    from services.password_reset_service import validate_token
+
+    record = validate_token(db, token)
+    if not record:
+        return templates.TemplateResponse(request, "reset_password.html", {
+            "invalid": True, "token": "", "error": None,
+        }, status_code=400)
+
+    return templates.TemplateResponse(request, "reset_password.html", {
+        "invalid": False, "token": token, "error": None,
+    })
+
+
+@router.post("/reset-password", response_class=HTMLResponse)
+def reset_password_submit(
+    request: Request,
+    token: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    from services.password_reset_service import validate_token, consume_reset
+
+    record = validate_token(db, token)
+    if not record:
+        return templates.TemplateResponse(request, "reset_password.html", {
+            "invalid": True, "token": "", "error": None,
+        }, status_code=400)
+
+    if confirm_password and password != confirm_password:
+        return templates.TemplateResponse(request, "reset_password.html", {
+            "invalid": False, "token": token, "error": "Passwords don't match.",
+        }, status_code=400)
+
+    ok, message = consume_reset(db, record, password)
+    if not ok:
+        return templates.TemplateResponse(request, "reset_password.html", {
+            "invalid": False, "token": token, "error": message,
+        }, status_code=400)
+
+    # Every prior session is dead (token_version bumped) — clear this
+    # browser's cookies too so nothing stale lingers.
+    response = RedirectResponse(url="/login?reset=1", status_code=303)
+    for cookie in ("access_token", "pin_session", "clinic_admin_auth"):
+        response.delete_cookie(cookie)
+    return response

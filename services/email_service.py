@@ -91,7 +91,15 @@ def send_email(
         # Not an error: local dev and any environment without mail configured.
         logger.warning("Resend not configured — email to %s not sent (%s)", recipient, subject)
         if settings.ENVIRONMENT.lower() != "production":
-            # Makes OTP codes readable from the console during local dev.
+            # Outside production, surface any link in the body at WARNING.
+            # Verification codes appear in the subject line, but a password
+            # reset token lives only inside the HTML — logging it at INFO made
+            # it invisible under uvicorn's default level, so the reset flow was
+            # untestable locally. Never runs in production.
+            import re as _re
+            links = _re.findall(r'https?://[^\s"\'<>]+', html)
+            for link in dict.fromkeys(links):
+                logger.warning("[email link] %s", link)
             logger.info("[email preview] to=%s subject=%s\n%s", recipient, subject, html)
         return False, "not configured"
 

@@ -84,14 +84,14 @@ def clean_db():
             PatientNote, NoteFile, PatientDocument, PinnedPatient,
             BlockedDate, BlockedTime, DoctorSchedule, Subscription,
             Expense, RecurringExpense, PriceCatalog,
-            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, Clinic, Doctor,
+            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, PasswordReset, Clinic, Doctor,
         )
         for mdl in [
             BillItem, Bill, NotificationLog, Visit, Appointment,
             PatientNote, NoteFile, PatientDocument, PinnedPatient,
             BlockedDate, BlockedTime, DoctorSchedule, Subscription,
             Expense, RecurringExpense, PriceCatalog,
-            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, Clinic, Doctor,
+            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, PasswordReset, Clinic, Doctor,
         ]:
             db.query(mdl).delete()
         db.commit()
@@ -2209,3 +2209,215 @@ class TestEmailVerification:
         register(client, email="nogate@test.com", phone="9340000020")
         r = login(client, "nogate@test.com")
         assert r.status_code == 303, "unverified doctors must still log in"
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  Password reset (Phase 3)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestPasswordReset:
+
+    def _doctor(self, db, email, phone, slug, verified=True):
+        from services.auth_service import hash_password
+        d = Doctor(name="Dr Reset", email=email, phone=phone,
+                   password_hash=hash_password("Zx9@pLmv6Bq4Nr"), slug=slug,
+                   plan_type=PlanType.trial,
+                   trial_ends_at=datetime.utcnow() + timedelta(days=14),
+                   email_verified_at=datetime.utcnow() if verified else None,
+                   token_version=0)
+        db.add(d); db.commit(); db.refresh(d)
+        return d
+
+    def _capture(self, tokens):
+        """Wrap token generation so the test can read the plaintext token."""
+        import services.password_reset_service as prs
+        original = prs.secrets.token_urlsafe
+
+        def _wrapped(n=32):
+            t = original(n)
+            tokens.append(t)
+            return t
+        prs.secrets.token_urlsafe = _wrapped
+        return original
+
+    def test_token_stored_hashed(self, client):
+        import services.password_reset_service as prs
+        from database.models import PasswordReset
+        db = TestSession()
+        self._doctor(db, "pr1@test.com", "9350000001", "pr-1")
+        tokens = []
+        orig = self._capture(tokens)
+        try:
+            prs.request_reset(db, "pr1@test.com")
+        finally:
+            prs.secrets.token_urlsafe = orig
+        rec = db.query(PasswordReset).first()
+        db.close()
+        assert rec.token_hash.startswith("$argon2id$")
+        assert tokens[0] not in rec.token_hash
+
+    def test_unknown_email_creates_no_token_and_does_not_raise(self, client):
+        import services.password_reset_service as prs
+        from database.models import PasswordReset
+        db = TestSession()
+        prs.request_reset(db, "ghost@nowhere.com")   # must not raise
+        count = db.query(PasswordReset).count()
+        db.close()
+        assert count == 0
+
+    def test_unverified_email_gets_no_reset_link(self, client):
+        """Otherwise registering with someone else's address would be an
+        account-takeover path."""
+        import services.password_reset_service as prs
+        from database.models import PasswordReset
+        db = TestSession()
+        doc = self._doctor(db, "pr2@test.com", "9350000002", "pr-2", verified=False)
+        prs.request_reset(db, "pr2@test.com")
+        count = db.query(PasswordReset).filter_by(doctor_id=doc.id).count()
+        db.close()
+        assert count == 0
+
+    def test_valid_token_resets_password(self, client):
+        import services.password_reset_service as prs
+        from services.auth_service import verify_password
+        db = TestSession()
+        doc = self._doctor(db, "pr3@test.com", "9350000003", "pr-3")
+        tokens = []
+        orig = self._capture(tokens)
+        try:
+            prs.request_reset(db, "pr3@test.com")
+            rec = prs.validate_token(db, tokens[0])
+            ok, msg = prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+        finally:
+            prs.secrets.token_urlsafe = orig
+        db.refresh(doc)
+        new_hash = doc.password_hash
+        db.close()
+        assert ok is True
+        assert verify_password("Nw8#qRtz4Vm7Kp", new_hash)
+
+    def test_token_is_single_use(self, client):
+        import services.password_reset_service as prs
+        db = TestSession()
+        self._doctor(db, "pr4@test.com", "9350000004", "pr-4")
+        tokens = []
+        orig = self._capture(tokens)
+        try:
+            prs.request_reset(db, "pr4@test.com")
+            rec = prs.validate_token(db, tokens[0])
+            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+            replay = prs.validate_token(db, tokens[0])
+        finally:
+            prs.secrets.token_urlsafe = orig
+        db.close()
+        assert replay is None, "a consumed token must not validate again"
+
+    def test_expired_token_rejected(self, client):
+        import services.password_reset_service as prs
+        from database.models import PasswordReset
+        db = TestSession()
+        doc = self._doctor(db, "pr5@test.com", "9350000005", "pr-5")
+        tokens = []
+        orig = self._capture(tokens)
+        try:
+            prs.request_reset(db, "pr5@test.com")
+            rec = db.query(PasswordReset).filter_by(doctor_id=doc.id).first()
+            rec.expires_at = datetime.utcnow() - timedelta(minutes=1)
+            db.commit()
+            result = prs.validate_token(db, tokens[0])
+        finally:
+            prs.secrets.token_urlsafe = orig
+        db.close()
+        assert result is None
+
+    def test_reset_enforces_password_policy(self, client):
+        import services.password_reset_service as prs
+        db = TestSession()
+        self._doctor(db, "pr6@test.com", "9350000006", "pr-6")
+        tokens = []
+        orig = self._capture(tokens)
+        try:
+            prs.request_reset(db, "pr6@test.com")
+            rec = prs.validate_token(db, tokens[0])
+            ok, msg = prs.consume_reset(db, rec, "short1!")
+        finally:
+            prs.secrets.token_urlsafe = orig
+        db.close()
+        assert ok is False
+        assert "12 characters" in msg
+
+    def test_reset_bumps_token_version(self, client):
+        """This is what kills every existing session, including a stolen one."""
+        import services.password_reset_service as prs
+        db = TestSession()
+        doc = self._doctor(db, "pr7@test.com", "9350000007", "pr-7")
+        before = doc.token_version
+        tokens = []
+        orig = self._capture(tokens)
+        try:
+            prs.request_reset(db, "pr7@test.com")
+            rec = prs.validate_token(db, tokens[0])
+            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+        finally:
+            prs.secrets.token_urlsafe = orig
+        db.refresh(doc)
+        after = doc.token_version
+        db.close()
+        assert after == before + 1
+
+    def test_pre_reset_session_cookie_is_rejected(self, client):
+        """End-to-end: a cookie minted before the reset must stop working."""
+        import services.password_reset_service as prs
+        tok = auth_cookie(client, "pr8@test.com")
+        assert client.get("/dashboard", cookies={"access_token": tok}).status_code == 200
+
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "pr8@test.com").first()
+        doc.email_verified_at = datetime.utcnow()
+        db.commit()
+        tokens = []
+        orig = self._capture(tokens)
+        try:
+            prs.request_reset(db, "pr8@test.com")
+            rec = prs.validate_token(db, tokens[0])
+            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+        finally:
+            prs.secrets.token_urlsafe = orig
+        db.close()
+
+        r = client.get("/dashboard", cookies={"access_token": tok},
+                       follow_redirects=False)
+        assert r.status_code in (302, 303, 401), \
+            "session minted before the reset must be rejected"
+
+    def test_legacy_token_without_tv_still_works(self, client):
+        """Shipping token_version must NOT log out everyone already signed in."""
+        from services.auth_service import create_access_token, decode_token, _token_version_ok
+        db = TestSession()
+        doc = self._doctor(db, "pr9@test.com", "9350000009", "pr-9")
+        legacy = create_access_token({"doctor_id": doc.id})   # no "tv" claim
+        assert _token_version_ok(decode_token(legacy), doc) is True
+        doc.token_version = 1
+        db.commit()
+        assert _token_version_ok(decode_token(legacy), doc) is False
+        db.close()
+
+    def test_forgot_password_does_not_enumerate(self, client):
+        """Known and unknown addresses must be indistinguishable."""
+        register(client, email="known@test.com", phone="9350000020")
+        r_known = client.post("/forgot-password", data={"email": "known@test.com"},
+                              follow_redirects=False)
+        r_unknown = client.post("/forgot-password", data={"email": "nobody@nowhere.com"},
+                                follow_redirects=False)
+        assert r_known.status_code == r_unknown.status_code == 200
+        norm_k = r_known.text.replace("known@test.com", "X")
+        norm_u = r_unknown.text.replace("nobody@nowhere.com", "X")
+        assert norm_k == norm_u, "responses must not reveal whether the account exists"
+
+    def test_login_page_has_forgot_link(self, client):
+        # The shared client is session-scoped and carries cookies from earlier
+        # tests; a live session makes /login redirect to /dashboard. Send an
+        # empty token so the login page actually renders.
+        r = client.get("/login", cookies={"access_token": ""})
+        assert r.status_code == 200
+        assert "/forgot-password" in r.text

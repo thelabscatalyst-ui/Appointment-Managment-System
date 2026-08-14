@@ -481,3 +481,15 @@ def _run_migrations():
             conn.commit()
         except Exception:
             conn.rollback()
+
+        # ── v4: session invalidation on password reset ───────────────────────
+        # INTEGER DEFAULT 0 is safe on both engines (the DEFAULT 0 trap is
+        # BOOLEAN-specific). password_resets table comes from create_all().
+        _add_column(conn, "ALTER TABLE doctors ADD COLUMN token_version INTEGER DEFAULT 0")
+        try:
+            conn.execute(text(
+                "UPDATE doctors SET token_version = 0 WHERE token_version IS NULL"
+            ))
+            conn.commit()
+        except Exception:
+            conn.rollback()

@@ -192,6 +192,31 @@ class EmailVerification(Base):
     doctor = relationship("Doctor")
 
 
+class PasswordReset(Base):
+    """One-time link letting a doctor set a new password.
+
+    A link rather than a 6-digit code: reset happens on whatever device holds
+    the inbox, so a single click beats transcribing digits. (A code earns its
+    place when the user is already in a session — the opposite of this case.)
+
+    The token is generated with secrets.token_urlsafe(32) and stored HASHED;
+    only the emailed URL carries the plaintext. A leaked database therefore
+    cannot be used to seize accounts.
+    """
+    __tablename__ = "password_resets"
+
+    id          = Column(Integer, primary_key=True, index=True)
+    doctor_id   = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
+    token_hash  = Column(String(255), nullable=False)
+    expires_at  = Column(DateTime, nullable=False)
+    consumed_at = Column(DateTime, nullable=True)
+    # Recorded for audit — a reset is a security-sensitive event.
+    requested_ip = Column(String(64), nullable=True)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+    doctor = relationship("Doctor")
+
+
 # --------------------------------------------------------------------------- #
 #  Doctor                                                                       #
 # --------------------------------------------------------------------------- #
@@ -228,6 +253,10 @@ class Doctor(Base):
     # audit trail needs, and avoids the Postgres "BOOLEAN DEFAULT 0" trap that
     # silently drops the column (see database/connection.py:_add_column).
     email_verified_at  = Column(DateTime, nullable=True)
+    # v4: bumped on password reset to invalidate every existing JWT. Without
+    # this a stolen session would survive the very reset meant to kill it.
+    # Carried in the token as "tv" and compared in get_current_doctor().
+    token_version      = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     appointments       = relationship("Appointment", back_populates="doctor", cascade="all, delete-orphan")

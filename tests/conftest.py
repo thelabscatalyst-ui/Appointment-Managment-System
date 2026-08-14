@@ -59,14 +59,14 @@ def clean_tables():
             Appointment, PatientNote, NoteFile, PatientDocument,
             PinnedPatient, BlockedDate, BlockedTime, DoctorSchedule,
             Subscription, Expense, RecurringExpense, PriceCatalog,
-            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, Clinic, Doctor,
+            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, PasswordReset, Clinic, Doctor,
         )
         for model in [
             BillItem, Bill, NotificationLog, Visit,
             Appointment, PatientNote, NoteFile, PatientDocument,
             PinnedPatient, BlockedDate, BlockedTime, DoctorSchedule,
             Subscription, Expense, RecurringExpense, PriceCatalog,
-            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, Clinic, Doctor,
+            Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, PasswordReset, Clinic, Doctor,
         ]:
             db.query(model).delete()
         db.commit()

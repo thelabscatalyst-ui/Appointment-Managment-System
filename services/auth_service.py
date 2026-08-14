@@ -81,6 +81,17 @@ def decode_token(token: str) -> dict | None:
         return None
 
 
+def _token_version_ok(payload: dict, doctor) -> bool:
+    """Reject sessions issued before the doctor's last password reset.
+
+    Tokens minted before this feature existed carry no "tv" claim, so they are
+    treated as version 0 rather than rejected outright — shipping this does NOT
+    log out every doctor currently signed in. Once a reset bumps the doctor to
+    version 1, those legacy tokens stop matching and die, which is the intent.
+    """
+    return int(payload.get("tv", 0)) == int(getattr(doctor, "token_version", 0) or 0)
+
+
 def get_current_doctor(request: Request, db: Session = Depends(get_db)):
     from database.models import Doctor
     token = request.cookies.get("access_token")
@@ -92,6 +103,11 @@ def get_current_doctor(request: Request, db: Session = Depends(get_db)):
     doctor = db.query(Doctor).filter(Doctor.id == payload.get("doctor_id")).first()
     if not doctor or not doctor.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found")
+    if not _token_version_ok(payload, doctor):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session ended — your password was changed",
+        )
     return doctor
 
 
