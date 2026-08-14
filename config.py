@@ -5,7 +5,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    # 60 minutes. Short by design — sliding renewal in main.py keeps an
+    # active doctor signed in through a full clinic, while an abandoned
+    # session dies within the hour.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     # DEPRECATED — Twilio fields kept so existing .env files don't break on startup
     TWILIO_ACCOUNT_SID: str = ""

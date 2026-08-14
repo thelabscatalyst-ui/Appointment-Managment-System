@@ -22,7 +22,9 @@ import collections
 from database.connection import create_tables
 from routers import auth, appointments, doctors, patients, public, admin, clinic, visits, billing_ops, income, prescriptions, feedback
 from services.scheduler_service import start_scheduler, stop_scheduler
-from services.auth_service import PlanExpired, PinRequired, decode_token
+from services.auth_service import (
+    PlanExpired, PinRequired, decode_token, create_access_token, should_renew,
+)
 from config import settings
 
 # ── Auth rate limiter — max 10 attempts per client IP per 15 minutes ────────
@@ -181,6 +183,7 @@ async def inject_clinic_owner_state(request: Request, call_next):
     # through every route context — same pattern as is_clinic_owner.
     request.state.support_whatsapp = settings.SUPPORT_WHATSAPP
     token = request.cookies.get("access_token")
+    payload = None      # must exist for the renewal check below, even if logged out
     if token:
         payload = decode_token(token)
         if payload and payload.get("doctor_id"):
@@ -206,6 +209,34 @@ async def inject_clinic_owner_state(request: Request, call_next):
             except Exception:
                 pass
     response = await call_next(request)
+
+    # ── Sliding session renewal ──────────────────────────────────────────
+    # Sessions are short (ACCESS_TOKEN_EXPIRE_MINUTES), but a doctor runs a
+    # 3-4 hour clinic — a hard logout mid-consultation is unacceptable. So an
+    # active session gets a fresh expiry once it's over halfway through, while
+    # an abandoned one still dies on schedule. should_renew() enforces a
+    # 12-hour absolute cap so this can't extend a session forever.
+    if token and payload and payload.get("doctor_id"):
+        # Only on GET. Auth routes mint their own cookies, and renewing on
+        # /logout would re-set the cookie the route just deleted — silently
+        # breaking logout.
+        already_set = any(
+            "access_token=" in h
+            for h in response.headers.getlist("set-cookie")
+        )
+        if request.method == "GET" and not already_set and should_renew(payload):
+            renewed = create_access_token({
+                k: payload[k]
+                for k in ("doctor_id", "tv", "iat", "jti")
+                if k in payload
+            })
+            response.set_cookie(
+                key="access_token", value=renewed,
+                httponly=True,
+                secure=settings.ENVIRONMENT.lower() == "production",
+                max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+                samesite="lax",
+            )
     return response
 
 templates = Jinja2Templates(directory="templates")

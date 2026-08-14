@@ -2421,3 +2421,138 @@ class TestPasswordReset:
         r = client.get("/login", cookies={"access_token": ""})
         assert r.status_code == 200
         assert "/forgot-password" in r.text
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  Session hardening (Phase 4)
+# ══════════════════════════════════════════════════════════════════════
+
+class TestSessionHardening:
+
+    def _aged_token(self, doctor_id, *, age_min, life_min=60, tv=0):
+        """Mint a token that is `age_min` into a `life_min` life."""
+        from datetime import timezone
+        from jose import jwt
+        from config import settings
+        now = datetime.now(timezone.utc).timestamp()
+        iat = int(now - age_min * 60)
+        payload = {"doctor_id": doctor_id, "tv": tv, "iat": iat,
+                   "jti": "testjti", "exp": int(iat + life_min * 60)}
+        return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+    def test_token_lifetime_matches_config(self):
+        """Regression: datetime.utcnow().timestamp() treats naive values as
+        LOCAL time, and main.py forces TZ=Asia/Kolkata. That shifted iat 5.5h
+        into the past and inflated the apparent lifetime to 390 minutes, so
+        the renewal threshold sat past the token's own expiry and sliding
+        renewal never fired."""
+        from services.auth_service import create_access_token, decode_token
+        from config import settings
+        p = decode_token(create_access_token({"doctor_id": 1, "tv": 0}))
+        lifetime_min = (p["exp"] - p["iat"]) / 60
+        assert abs(lifetime_min - settings.ACCESS_TOKEN_EXPIRE_MINUTES) < 1, \
+            f"lifetime {lifetime_min}min != configured {settings.ACCESS_TOKEN_EXPIRE_MINUTES}min"
+
+    def test_iat_has_no_timezone_drift(self):
+        from datetime import timezone
+        from services.auth_service import create_access_token, decode_token
+        p = decode_token(create_access_token({"doctor_id": 1}))
+        now = datetime.now(timezone.utc).timestamp()
+        assert abs(now - p["iat"]) < 30, "iat drifted — timezone handling is wrong"
+
+    def test_token_carries_iat_jti_tv(self):
+        from services.auth_service import create_access_token, decode_token
+        p = decode_token(create_access_token({"doctor_id": 1, "tv": 3}))
+        assert "iat" in p and "jti" in p
+        assert p["tv"] == 3
+
+    def test_fresh_session_not_renewed(self):
+        from services.auth_service import decode_token, should_renew
+        p = decode_token(self._aged_token(1, age_min=5))
+        assert should_renew(p) is False
+
+    def test_session_past_halfway_is_renewed(self):
+        from services.auth_service import decode_token, should_renew
+        p = decode_token(self._aged_token(1, age_min=40))
+        assert should_renew(p) is True
+
+    def test_absolute_cap_stops_renewal(self):
+        """Sliding renewal must not let a session live forever.
+
+        Payloads are built directly rather than encoded/decoded: a token this
+        old is already past `exp`, so decode_token() would return None and the
+        test would assert nothing about the cap.
+        """
+        from datetime import timezone
+        from services.auth_service import should_renew, SESSION_ABSOLUTE_MAX_HOURS
+
+        now = datetime.now(timezone.utc).timestamp()
+
+        def payload(age_hours):
+            iat = int(now - age_hours * 3600)
+            # Still-live token (renewal only ever runs on a valid session).
+            return {"doctor_id": 1, "tv": 0, "iat": iat, "exp": int(now + 20 * 60)}
+
+        assert should_renew(payload(SESSION_ABSOLUTE_MAX_HOURS - 1)) is True
+        assert should_renew(payload(SESSION_ABSOLUTE_MAX_HOURS + 1)) is False
+
+    def test_should_renew_handles_none(self):
+        """decode_token returns None for an expired/invalid token."""
+        from services.auth_service import should_renew
+        assert should_renew(None) is False
+
+    def test_legacy_token_without_iat_is_renewed(self):
+        """Tokens minted before this feature carry no iat; renewing them once
+        stamps one and starts the cap from that point."""
+        from datetime import timezone
+        from services.auth_service import should_renew
+        exp = int(datetime.now(timezone.utc).timestamp()) + 600
+        assert should_renew({"doctor_id": 1, "exp": exp}) is True
+
+    def test_malformed_payload_not_renewed(self):
+        from services.auth_service import should_renew
+        assert should_renew({"doctor_id": 1}) is False       # no exp
+        assert should_renew({}) is False
+
+    def test_renewal_preserves_iat_so_cap_cannot_reset(self, client):
+        """If renewal reset iat, the 12h cap would never be reached."""
+        from services.auth_service import create_access_token, decode_token
+        original = decode_token(self._aged_token(1, age_min=40))
+        renewed = decode_token(create_access_token({
+            k: original[k] for k in ("doctor_id", "tv", "iat", "jti") if k in original
+        }))
+        assert renewed["iat"] == original["iat"]
+        assert renewed["exp"] > original["exp"]
+
+    def test_aged_session_gets_renewed_over_http(self, client):
+        """The middleware must actually re-issue the cookie."""
+        tok = auth_cookie(client, "sess1@test.com")
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "sess1@test.com").first()
+        doc_id, tv = doc.id, doc.token_version or 0
+        db.close()
+
+        aged = self._aged_token(doc_id, age_min=40, tv=tv)
+        r = client.get("/dashboard", cookies={"access_token": aged})
+        assert r.status_code == 200
+        cookies = " ".join(r.headers.get_list("set-cookie"))
+        assert "access_token=" in cookies, "aged session should have been renewed"
+
+    def test_logout_is_not_undone_by_renewal(self, client):
+        """Renewal runs in middleware AFTER the route. If it re-set the cookie
+        on /logout it would silently break logging out."""
+        tok = auth_cookie(client, "sess2@test.com")
+        db = TestSession()
+        doc = db.query(Doctor).filter(Doctor.email == "sess2@test.com").first()
+        doc_id, tv = doc.id, doc.token_version or 0
+        db.close()
+
+        aged = self._aged_token(doc_id, age_min=40, tv=tv)
+        r = client.get("/logout", cookies={"access_token": aged},
+                       follow_redirects=False)
+        cookies = r.headers.get_list("set-cookie")
+        access = [c for c in cookies if c.startswith("access_token=")]
+        assert access, "logout should clear access_token"
+        for c in access:
+            assert "Max-Age=0" in c or "01 Jan 1970" in c, \
+                f"logout re-issued a live cookie: {c}"

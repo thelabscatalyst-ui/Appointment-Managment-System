@@ -67,11 +67,76 @@ def verify_and_rehash(plain: str, hashed: str) -> tuple[bool, str | None]:
         return False, None
 
 
+# How long a session may live in total, however active the doctor is. Sliding
+# renewal keeps an in-use session alive, but not past this — after it, a real
+# re-login is required. 12h comfortably covers the longest clinic day.
+SESSION_ABSOLUTE_MAX_HOURS = 12
+
+
+def _utc_timestamp() -> float:
+    """Current time as a true UTC epoch.
+
+    Do NOT use `datetime.utcnow().timestamp()` here. utcnow() returns a NAIVE
+    datetime, and .timestamp() interprets naive values as LOCAL time — and
+    main.py forces TZ=Asia/Kolkata. That shifted `iat` 5.5 hours into the past
+    while python-jose wrote `exp` correctly as UTC, inflating the apparent
+    token lifetime to 390 minutes. The renewal threshold then sat past the
+    token's own expiry, so sliding renewal never fired and doctors were hard
+    logged out mid-clinic.
+    """
+    from datetime import timezone
+    return datetime.now(timezone.utc).timestamp()
+
+
 def create_access_token(data: dict) -> str:
+    """Mint a session JWT.
+
+    `iat` and `jti` are set only if the caller hasn't supplied them. That
+    matters for sliding renewal: a renewed token must carry the ORIGINAL iat,
+    otherwise the absolute cap resets on every renewal and the session could
+    live forever.
+    """
+    import secrets
+
     payload = data.copy()
-    expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload.update({"exp": expire})
+    now_ts = _utc_timestamp()
+    payload.setdefault("iat", int(now_ts))
+    payload.setdefault("jti", secrets.token_urlsafe(8))   # for audit correlation
+    payload["exp"] = int(now_ts + settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def should_renew(payload: dict) -> bool:
+    """True when a session should get a fresh expiry.
+
+    Renews once more than half the token's life has elapsed — so an active
+    doctor is never logged out mid-consultation, while an abandoned session
+    still dies within ACCESS_TOKEN_EXPIRE_MINUTES.
+
+    Returns False past the absolute cap, so renewal cannot extend a session
+    indefinitely. Tokens minted before this feature carry no `iat`; those are
+    renewed once, which stamps one and starts the cap from that point.
+    """
+    if not payload:
+        return False
+    exp = payload.get("exp")
+    if not exp:
+        return False
+
+    now = _utc_timestamp()
+    iat = payload.get("iat")
+
+    if iat:
+        if now - float(iat) > SESSION_ABSOLUTE_MAX_HOURS * 3600:
+            return False   # past the absolute cap — let it expire
+        lifetime = float(exp) - float(iat)
+        # Guard against a malformed/instant lifetime.
+        if lifetime <= 0:
+            return False
+        return (now - float(iat)) > (lifetime / 2)
+
+    # Legacy token (no iat): renew so it picks one up, migrating it forward.
+    return True
 
 
 def decode_token(token: str) -> dict | None:

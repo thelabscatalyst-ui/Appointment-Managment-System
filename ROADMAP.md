@@ -2,7 +2,7 @@
 
 Working document for feature-by-feature execution. Reflects verified repo state as of **2026-08-13**.
 
-**Current state:** live at [nivora.store](https://www.nivora.store) on Railway + PostgreSQL · 108 tests passing · 130 routes · 13 routers.
+**Current state:** live at [nivora.store](https://www.nivora.store) on Railway + PostgreSQL · 173 tests passing · 138 routes · 13 routers.
 
 ---
 
@@ -33,10 +33,10 @@ Checkout now opens correctly (the CSP fix landed), but the account is still in t
 
 *Fix:* complete KYC → swap `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` in Railway. No code change needed.
 
-### 3. Support contact is a placeholder
-`templates/plan_lapsed.html` links to `wa.me/919999999999` — a fake number shown to doctors **at the exact moment their plan lapses and they want to pay**.
+### 3. Support contact is a placeholder — *now configurable*
+Was hardcoded as `wa.me/919999999999` in `templates/plan_lapsed.html`. It is now the `SUPPORT_WHATSAPP` config field, surfaced via `request.state` and used by both the lapsed-plan and email-verification pages.
 
-*Fix:* one-line replacement with the real support number.
+*Remaining:* set the real number in `.env` / Railway — the fallback still reaches nobody.
 
 ### 4. Patient vault files are on ephemeral disk
 Uploads live in `uploads/` on Railway's container filesystem and are **lost on every redeploy**. Doctors are storing lab reports and x-rays there.
@@ -99,6 +99,8 @@ Context for what has just landed, so we don't re-litigate it.
 
 | Area | What shipped |
 |---|---|
+| **Auth** | Phases 0-4: 12-char password policy w/ live feedback, argon2id (bcrypt auto-upgrades on login), email verification via one-time codes, forgot-password with session invalidation, 60-min sessions with sliding renewal + 12h cap |
+| **Email** | Resend integration — first working email transport in the app; also fixed clinic invites that had never sent |
 | **Branding** | Full rename ClinicOS → Nivora across 43 templates, `main.py`, `config.py`, README; domain moved to `nivora.store` |
 | **Queue** | Hold/Resume — park a patient mid-consult and auto-call the next; resume to front of queue |
 | **Feedback** | Tokenised public rating page, feedback link appended to WhatsApp receipts, ★ badge in patients list |

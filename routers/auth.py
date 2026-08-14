@@ -259,7 +259,7 @@ def register(
     response.set_cookie(
         key="access_token", value=token,
         httponly=True, secure=settings.ENVIRONMENT.lower() == "production",
-        max_age=60 * 60 * 24, samesite="lax",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, samesite="lax",
     )
     return response
 
@@ -325,7 +325,7 @@ def login(
         response = RedirectResponse(url=redirect_url, status_code=303)
         response.set_cookie(
             key="access_token", value=token,
-            httponly=True, secure=settings.ENVIRONMENT.lower() == "production", max_age=60 * 60 * 24, samesite="lax",
+            httponly=True, secure=settings.ENVIRONMENT.lower() == "production", max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60, samesite="lax",
         )
         return response
 
