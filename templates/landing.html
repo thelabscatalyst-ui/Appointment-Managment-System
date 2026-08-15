@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MedTrack · Clinic Management for Indian Doctors</title>
+  <title>Med Track · Clinic Management for Indian Doctors</title>
   <meta name="description"
     content="Digitize your entire workflow in minutes. From managing live walk-ins and automated WhatsApp alerts to instant access to patient vaults—everything you need to run a modern practice, seamlessly covering the gap for doctors and small clinics helping them digitalizing and organizing patients records." />
 
@@ -18,22 +18,22 @@
   </script>
 
   <!-- Canonical -->
-  <link rel="canonical" href="https://www.MedTrack.store/" />
+  <link rel="canonical" href="https://www.medtrack.life/" />
 
   <!-- Open Graph (WhatsApp / LinkedIn share previews) -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://www.MedTrack.store/" />
-  <meta property="og:title" content="MedTrack · Clinic Management for Indian Doctors" />
+  <meta property="og:url" content="https://www.medtrack.life/" />
+  <meta property="og:title" content="Med Track · Clinic Management for Indian Doctors" />
   <meta property="og:description"
     content="Digitize your entire workflow in minutes. From managing live walk-ins and automated WhatsApp alerts to instant access to patient vaults—everything you need to run a modern practice, seamlessly covering the gap for doctors and small clinics helping them digitalizing and organizing patients records." />
-  <meta property="og:image" content="https://www.MedTrack.store/static/og-image.png" />
+  <meta property="og:image" content="https://www.medtrack.life/static/og-image.png" />
   <meta property="og:locale" content="en_IN" />
 
   <!-- Twitter / X card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="MedTrack · Clinic Management for Indian Doctors" />
+  <meta name="twitter:title" content="Med Track · Clinic Management for Indian Doctors" />
   <meta name="twitter:description" content="The simplest clinic software for independent doctors in India." />
-  <meta name="twitter:image" content="https://www.MedTrack.store/static/og-image.png" />
+  <meta name="twitter:image" content="https://www.medtrack.life/static/og-image.png" />
 
   <!-- Robots -->
   <meta name="robots" content="index, follow" />
@@ -43,8 +43,8 @@
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "MedTrack",
-    "url": "https://www.MedTrack.store",
+    "name": "Med Track",
+    "url": "https://www.medtrack.life",
     "applicationCategory": "HealthApplication",
     "operatingSystem": "Web",
     "description": "Clinic management software for independent doctors in India. Appointment booking, walk-in queue, WhatsApp reminders, billing and patient records.",
@@ -57,8 +57,8 @@
     },
     "provider": {
       "@type": "Organization",
-      "name": "MedTrack",
-      "url": "https://www.MedTrack.store"
+      "name": "Med Track",
+      "url": "https://www.medtrack.life"
     }
   }
   </script>
@@ -106,7 +106,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 60px;
+      padding: 0 25px;
       height: 56px;
       border-bottom: 1px solid rgba(255, 255, 255, .06);
     }
@@ -236,6 +236,27 @@
     .ln-video-head .ln-section-sub {
       margin-bottom: 28px;
     }
+
+    /* ══════════════════════════════════════════════════════════════════
+       MacBook mockup — the real photo (static/img/macbook-mockup.png),
+       kept exactly as the design asset it is.
+
+       The white fringe reported earlier was traced to one specific spot:
+       macbook-mockup.png's inner screen cutout was cut from a white
+       backdrop, so the single ring of anti-aliased pixels right at that
+       cutout kept a near-white tint at partial alpha (e.g. rgba(202,202,202,72)
+       one pixel in from the bezel). Sitting directly over the dark video, that
+       ring reads as a thin white/grey outline no matter what the page
+       background is. Everything else in the photo — the aluminium body, the
+       outer silhouette, the deck — is fully opaque and unaffected.
+
+       Fix applied to the PNG itself (not this markup): un-premultiplied every
+       partial-alpha pixel assuming a white backdrop (fg = (observed -
+       255*(1-a)) / a), which recovers the true dark bezel colour under the
+       fringe instead of the white contamination. Same photo, same every
+       other pixel — just the cutout edge decontaminated. The .macbook-screen-
+       border below is kept as a second line of defence.
+    ══════════════════════════════════════════════════════════════════ */
 
     .macbook-container {
       position: relative;
@@ -1329,22 +1350,6 @@
         text-align: center;
       }
 
-      .macbook-screen {
-        border-width: 6px;
-        border-bottom-width: 10px;
-        border-radius: 12px 12px 0 0;
-      }
-
-      .macbook-screen::before {
-        top: -4px;
-        width: 3px;
-        height: 3px;
-      }
-
-      .macbook-base {
-        height: 8px;
-      }
-
       .ln-section-title {
         font-size: 26px;
       }
@@ -1544,7 +1549,7 @@
      NAVBAR
 ══════════════════════════════════════════════════════════ -->
   <nav class="ln-nav">
-    <a href="/" class="ln-brand">MedTrack</a>
+    <a href="/" class="ln-brand">Med Track</a>
     <div class="ln-nav-right">
       <button type="button" class="ln-theme-btn" id="themeToggle" title="Toggle theme" onclick="toggleTheme()">
         <svg id="themeIconSun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1595,11 +1600,7 @@
         Digitize your clinic in minutes. Live walk-in queues and WhatsApp alerts,
         seamlessly organize your practice and leave paperwork behind.
       </p>
-      <div class="ln-hero-pills">
-        <span class="ln-hero-pill">WhatsApp Reciepts & Notifications</span>
-        <span class="ln-hero-pill">Digital Records</span>
-        <span class="ln-hero-pill">Zero Setup</span>
-      </div>
+
       <div class="ln-hero-actions">
         <a href="/register" class="ln-btn-primary">
           Start Free Trial
@@ -1709,11 +1710,11 @@
       <div class="macbook-container">
         <!-- Blurred background behind the macbook -->
         <div class="macbook-bg-blur"></div>
-        
+
         <!-- Video screen area behind the frame overlay -->
         <div class="macbook-video-wrapper">
           <div class="ln-video-frame" id="videoFrame" onclick="loadDemoVideo()" role="button" tabindex="0"
-            aria-label="Play MedTrack demo video" style="width: 100%; height: 100%; border-radius: 0; box-shadow: none;">
+            aria-label="Play Med Track demo video" style="width: 100%; height: 100%; border-radius: 0; box-shadow: none;">
             <div class="ln-video-poster" id="videoPoster">
               <div class="ln-video-play">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="#f5f0ea" aria-hidden="true">
@@ -1727,15 +1728,16 @@
 
         <!-- Opaque Macbook screen bezel & keyboard frame overlay -->
         <div class="macbook-frame"></div>
-        
-        <!-- Inner black border mask to hide anti-aliasing halo -->
+
+        <!-- Inner black border mask: extra safety margin around the screen
+             cutout, on top of the decontaminated PNG -->
         <div class="macbook-screen-border"></div>
       </div>
 
       <!-- RIGHT: text -->
       <div class="ln-video-head">
         <div class="ln-section-label">See it in action</div>
-        <h2 class="ln-section-title">Watch how MedTrack works</h2>
+        <h2 class="ln-section-title">Watch how Med Track works</h2>
         <p class="ln-section-sub">A quick walkthrough of the live queue, billing, patient records, and income dashboard
           · page by page, so you know exactly what to expect.</p>
         <a href="#" class="ln-btn-primary" onclick="loadDemoVideo(); return false;"
@@ -1920,7 +1922,7 @@
 ══════════════════════════════════════════════════════════ -->
   <footer class="ln-footer">
     <div>
-      <div class="ln-footer-brand">MedTrack</div>
+      <div class="ln-footer-brand">Med Track</div>
       <div class="ln-footer-tagline">Clinic management built for independent doctors in India.</div>
     </div>
     <div class="ln-footer-links">
@@ -1929,7 +1931,7 @@
       <a href="/register" class="ln-footer-link">Register</a>
       <a href="mailto:thelabscatalyst@gmail.com" class="ln-footer-link">Support</a>
     </div>
-    <div class="ln-footer-copy">© <span id="footerYear">2026</span> MedTrack. All rights reserved.</div>
+    <div class="ln-footer-copy">© <span id="footerYear">2026</span> Med Track. All rights reserved.</div>
   </footer>
 
   <script>
@@ -2001,7 +2003,7 @@
     // Optional custom thumbnail. Leave '' to auto-use YouTube's thumbnail.
     // To use a custom image: drop it in static/img/ and set e.g.
     //   var DEMO_THUMBNAIL = '/static/img/demo-thumb.jpg';
-    var DEMO_THUMBNAIL = '';
+    var DEMO_THUMBNAIL = '/static/img/demo-thumb.jpg';
 
     // Set the poster background: custom image → YouTube thumbnail → amber gradient
     (function setDemoPoster() {
@@ -2034,7 +2036,7 @@
       var frame = document.getElementById('videoFrame');
       frame.innerHTML =
         '<iframe src="https://www.youtube.com/embed/' + DEMO_VIDEO_ID +
-        '?autoplay=1&rel=0&modestbranding=1" title="MedTrack Product Demo" ' +
+        '?autoplay=1&rel=0&modestbranding=1" title="Med Track Product Demo" ' +
         'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ' +
         'allowfullscreen></iframe>';
     }

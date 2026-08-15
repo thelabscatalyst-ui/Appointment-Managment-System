@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% block title %}Dashboard · Nivora{% endblock %}
+{% block title %}Dashboard · Med Track{% endblock %}
 {% block content %}
 
 {% if show_welcome %}
 <!-- ── First-run welcome / onboarding overlay (first 2 days) ──────────── -->
 <div class="welcome-overlay" id="welcomeOverlay" style="display:none;">
   <div class="welcome-card">
-    <div class="welcome-badge">Welcome to Nivora</div>
+    <div class="welcome-badge">Welcome to Med Track</div>
     <h2 class="welcome-title">Let's get your clinic ready, Dr. {{ doctor.name.split()[-1] }}</h2>
     <p class="welcome-sub">A few quick steps and you're good to go. It takes about 5 minutes · all from the Settings page.</p>
 
@@ -49,7 +49,7 @@
 </div>
 <script>
 (function () {
-  var KEY = 'nivora_welcome_seen';
+  var KEY = 'medtrack_welcome_seen';
   var overlay = document.getElementById('welcomeOverlay');
   if (!overlay) return;
   // Show once per browser session · if already seen this session, just drop it
@@ -73,7 +73,7 @@
   }
 })();
 function dismissWelcome() {
-  try { sessionStorage.setItem('nivora_welcome_seen', '1'); } catch (e) {}
+  try { sessionStorage.setItem('medtrack_welcome_seen', '1'); } catch (e) {}
   var o = document.getElementById('welcomeOverlay');
   if (o) { o.classList.add('welcome-hide'); setTimeout(function () { if (o.parentNode) o.remove(); }, 250); }
   document.body.style.overflow = '';

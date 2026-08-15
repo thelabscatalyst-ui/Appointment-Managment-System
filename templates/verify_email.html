@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Verify your email · Nivora{% endblock %}
+{% block title %}Verify your email · Med Track{% endblock %}
 
 {% block content %}
 <div class="ve-wrap">
@@ -78,12 +78,10 @@
 
     <p class="ve-support">
       Still stuck? Message us on
-      <a href="https://wa.me/{{ request.state.support_whatsapp }}?text=Hi%2C+I+can%27t+receive+my+Nivora+verification+code."
+      <a href="https://wa.me/{{ request.state.support_whatsapp }}?text=Hi%2C+I+can%27t+receive+my+Med Track+verification+code."
          target="_blank" rel="noopener">WhatsApp</a>
       and we'll verify you manually.
     </p>
-
-    <a href="/dashboard" class="ve-skip">Skip for now →</a>
   </div>
 </div>
 
@@ -155,11 +153,6 @@
   }
   .ve-support a { color:var(--muted); }
 
-  .ve-skip {
-    display:inline-block; margin-top:14px; font-size:12px;
-    color:var(--dim); text-decoration:none;
-  }
-  .ve-skip:hover { color:var(--muted); }
 </style>
 
 <script>

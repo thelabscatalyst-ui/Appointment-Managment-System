@@ -1,5 +1,5 @@
 """
-conftest.py — shared fixtures for Nivora test suite.
+conftest.py — shared fixtures for Med Track test suite.
 """
 import os
 import sys
@@ -90,9 +90,15 @@ def client():
 
 # ── helpers ─────────────────────────────────────────────────────────────────
 
-def register_doctor(client, *, name, email, phone, password="Wq7$mzKp9Xv2Ld", city="TestCity", clinic_name="Test Clinic"):
-    """Register a doctor and return the response."""
-    return client.post("/register", data={
+def register_doctor(client, *, name, email, phone, password="Kv9$mPq2#Zx8L", city="TestCity", clinic_name="Test Clinic"):
+    """Register a doctor and return the response.
+
+    Auto-verifies the email in the DB afterward. Email verification is now
+    mandatory (get_paying_doctor raises EmailNotVerified until it's set), and
+    it has its own dedicated coverage — other tests that just need a working
+    logged-in doctor shouldn't have to route around that gate.
+    """
+    resp = client.post("/register", data={
         "name": name,
         "email": email,
         "phone": phone,
@@ -102,9 +108,20 @@ def register_doctor(client, *, name, email, phone, password="Wq7$mzKp9Xv2Ld", ci
         "specialization": "General",
         "clinic_invite": "",
     }, follow_redirects=False)
+    if resp.status_code in (200, 302, 303):
+        from database.models import Doctor
+        db = TestSessionLocal()
+        try:
+            doc = db.query(Doctor).filter(Doctor.email == email.strip().lower()).first()
+            if doc and not doc.email_verified_at:
+                doc.email_verified_at = datetime.utcnow()
+                db.commit()
+        finally:
+            db.close()
+    return resp
 
 
-def login_doctor(client, email, password="Wq7$mzKp9Xv2Ld"):
+def login_doctor(client, email, password="Kv9$mPq2#Zx8L"):
     """Login and return the response (has Set-Cookie if successful)."""
     return client.post("/login", data={
         "email": email,
@@ -112,7 +129,7 @@ def login_doctor(client, email, password="Wq7$mzKp9Xv2Ld"):
     }, follow_redirects=False)
 
 
-def get_auth_client(client, email, password="Wq7$mzKp9Xv2Ld"):
+def get_auth_client(client, email, password="Kv9$mPq2#Zx8L"):
     """Login and return (client, cookie_dict) with auth cookie set."""
     resp = login_doctor(client, email, password)
     assert resp.status_code == 303, f"Login failed for {email}: {resp.status_code}"

@@ -19,7 +19,7 @@ templates = Jinja2Templates(directory="templates")
 
 # Generic message for duplicate email OR phone. Deliberately does not reveal
 # which field collided, or whether the account exists at all — otherwise
-# /register becomes a probe for "is this doctor on Nivora?".
+# /register becomes a probe for "is this doctor on Med Track?".
 _DUPLICATE_MSG = (
     "That email or phone number is already registered. "
     "Try logging in, or reset your password."
@@ -354,11 +354,11 @@ def logout():
 # ------------------------------------------------------------------ #
 #  Email verification                                                  #
 # ------------------------------------------------------------------ #
-# Verification is NOT a login gate. An unverified doctor is alone in their
-# own tenant, so blocking login would be disproportionate — and if mail
-# delivery hiccups it would lock them out of software they may have paid
-# for. Instead they log in normally, see a persistent banner, and certain
-# actions (notably password reset) require a verified address.
+# Verification is MANDATORY — there is no skip option. get_paying_doctor()
+# and get_appt_doctor() both call _require_verified() ahead of the plan
+# check, so every protected route redirects here until the code is entered.
+# Login itself still succeeds (a doctor needs a session to reach this page
+# at all) but nothing past it is reachable while unverified.
 
 @router.get("/verify-email", response_class=HTMLResponse)
 def verify_email_page(
@@ -465,7 +465,7 @@ def forgot_password_submit(
 
     We never reveal whether the address is registered, verified, or rate
     limited — otherwise this endpoint becomes a probe for which doctors are
-    on Nivora. The work runs in the background so response timing can't be
+    on Med Track. The work runs in the background so response timing can't be
     used to infer it either.
     """
     from main import _client_ip

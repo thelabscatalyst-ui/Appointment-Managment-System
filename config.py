@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     # When RESEND_API_KEY is empty, send_email() logs and no-ops rather than
     # raising — mirrors how send_whatsapp() degrades without Twilio creds.
     RESEND_API_KEY: str = ""
-    EMAIL_FROM: str = "Nivora <onboarding@resend.dev>"  # override once the domain is verified
+    EMAIL_FROM: str = "Med Track <onboarding@resend.dev>"  # override once the domain is verified
     EMAIL_REPLY_TO: str = ""
 
     # Support WhatsApp number in E.164 WITHOUT the leading '+' (wa.me format),
@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     # Public base URL used to build patient-facing links (e.g. the feedback
     # link in the WhatsApp bill receipt). Override in .env for staging/local.
-    PUBLIC_BASE_URL: str = "https://www.nivora.store"
+    PUBLIC_BASE_URL: str = "https://www.medtrack.life"
 
     # Set ENVIRONMENT=development in local .env to allow http:// cookies.
     # In production (Railway) leave unset — defaults to "production" so

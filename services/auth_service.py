@@ -176,6 +176,21 @@ def get_current_doctor(request: Request, db: Session = Depends(get_db)):
     return doctor
 
 
+class EmailNotVerified(Exception):
+    """Raised when a doctor tries to use the app before confirming their
+    email. Verification is mandatory — there is no skip option. Raised
+    ahead of the plan check in get_paying_doctor()/get_appt_doctor() so an
+    unverified doctor always lands on /verify-email, not a plan-billing
+    page that would be confusing before they've even confirmed who they are.
+    """
+    pass
+
+
+def _require_verified(doctor) -> None:
+    if not doctor.email_verified_at:
+        raise EmailNotVerified()
+
+
 class PlanExpired(Exception):
     """Raised when a doctor's trial and paid plan have both expired.
     reason = 'personal' → show /billing (they can renew themselves)
@@ -233,7 +248,12 @@ def get_paying_doctor(doctor=Depends(get_current_doctor), db: Session = Depends(
     A clinic is considered active if:
       (a) it has a paid plan_expires_at in the future, OR
       (b) the clinic owner still has an active trial or plan (clinic is in trial mode)
+
+    Verification is checked FIRST, ahead of the plan check — email confirmation
+    is mandatory to use the software at all, not something a lapsed-plan doctor
+    should see instead of.
     """
+    _require_verified(doctor)
     now = datetime.utcnow()
     trial_ok = doctor.trial_ends_at and doctor.trial_ends_at > now
     plan_ok  = doctor.plan_expires_at and doctor.plan_expires_at > now
@@ -336,6 +356,8 @@ def get_appt_doctor(appt_id: int, request: Request, db: Session = Depends(get_db
     doctor = db.query(DoctorModel).filter(DoctorModel.id == payload.get("doctor_id")).first()
     if not doctor or not doctor.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found")
+
+    _require_verified(doctor)
 
     # Plan gate (mirrors get_paying_doctor logic)
     now = datetime.utcnow()

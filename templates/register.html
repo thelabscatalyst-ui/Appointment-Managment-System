@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Create Account — Nivora</title>
+  <title>Create Account — Med Track</title>
   <link rel="stylesheet" href="/static/css/main.css?v=147" />
   <style>
     .auth-page-wrap {
@@ -152,7 +152,7 @@
 
     <!-- ── Auth Navbar ── -->
     <nav class="auth-nav">
-      <a href="/" class="auth-nav-brand">Nivora</a>
+      <a href="/" class="auth-nav-brand">Med Track</a>
       <div class="auth-nav-right">
         <a href="/login" class="auth-nav-link">Log in</a>
         <a href="/" class="auth-nav-back">
@@ -171,7 +171,7 @@
       <div class="auth-brand">
         <div class="brand-content">
           <p class="brand-eyebrow">{{ "Joining a clinic" if joining_clinic else "14-day free trial" }}</p>
-          <h1 class="brand-title">NIVORA<br></h1>
+          <h1 class="brand-title">MED TRACK<br></h1>
           <p class="brand-tagline">
             Replace your paper register with a smart clinic system.
             No credit card needed to get started.
@@ -204,7 +204,7 @@
 
           {% if joining_clinic %}
           <h2 class="auth-card-title">Join {{ joining_clinic.name }}</h2>
-          <p class="auth-card-sub">Create your Nivora account to accept the invite</p>
+          <p class="auth-card-sub">Create your Med Track account to accept the invite</p>
           {% else %}
           <h2 class="auth-card-title">Create your account</h2>
           <p class="auth-card-sub">No credit card required</p>
@@ -295,6 +295,7 @@
               <div class="pw-meter" id="pwMeter" aria-hidden="true"><span id="pwMeterBar"></span></div>
               <ul class="pw-checks" id="pwChecks">
                 <li data-rule="len">At least 12 characters</li>
+                <li data-rule="special">At least 2 symbols (e.g. <code>! @ # $ %</code>)</li>
                 <li data-rule="seq">No sequences like <code>1234</code> or <code>abcd</code></li>
                 <li data-rule="rep">No character repeated 4+ times</li>
                 <li data-rule="ctx">Doesn't contain your name or email</li>
@@ -372,7 +373,7 @@
         'admin','administrator','iloveyou','monkey','dragon','sunshine',
         'princess','abc123','abcd1234','111111','000000','123123',
         'india123','bharat123','clinic123','doctor123','hospital123',
-        'nivora','nivora123','clinicos','clinicos123'
+        'medtrack','medtrack123','clinicos','clinicos123'
       ];
       var SEQS = ['abcdefghijklmnopqrstuvwxyz','01234567890','qwertyuiop','asdfghjkl','zxcvbnm'];
 
@@ -409,15 +410,18 @@
       function evaluate() {
         var v = pw.value || '';
         var low = v.toLowerCase();
+        var specialCount = (v.match(/[^a-zA-Z0-9]/g) || []).length;
         var results = {
-          len:    v.length >= 12,
-          seq:    v.length > 0 && !hasSequence(v),
-          rep:    v.length > 0 && !/(.)\1{3,}/.test(v),
-          ctx:    v.length > 0 && !contextTokens().some(function (t) { return low.indexOf(t) !== -1; }),
-          common: v.length > 0 && COMMON.indexOf(low) === -1
+          len:     v.length >= 12,
+          special: specialCount >= 2,
+          seq:     v.length > 0 && !hasSequence(v),
+          rep:     v.length > 0 && !/(.)\1{3,}/.test(v),
+          ctx:     v.length > 0 && !contextTokens().some(function (t) { return low.indexOf(t) !== -1; }),
+          common:  v.length > 0 && COMMON.indexOf(low) === -1
         };
 
         var passed = 0;
+        var total = Object.keys(results).length;
         Object.keys(results).forEach(function (rule) {
           var li = checksEl.querySelector('[data-rule="' + rule + '"]');
           if (!li) return;
@@ -427,11 +431,11 @@
           else               { li.classList.add('bad'); }
         });
 
-        var pct = v.length ? Math.round((passed / 5) * 100) : 0;
+        var pct = v.length ? Math.round((passed / total) * 100) : 0;
         barEl.style.width = pct + '%';
         meterEl.classList.remove('is-fair', 'is-good', 'is-strong');
-        if (passed === 5)      meterEl.classList.add('is-strong');
-        else if (passed >= 4)  meterEl.classList.add('is-good');
+        if (passed === total)  meterEl.classList.add('is-strong');
+        else if (passed >= 5)  meterEl.classList.add('is-good');
         else if (passed >= 3)  meterEl.classList.add('is-fair');
       }
 

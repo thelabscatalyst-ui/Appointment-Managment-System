@@ -22,13 +22,13 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-# Wrapped in the shared shell so every email looks like it came from Nivora.
+# Wrapped in the shared shell so every email looks like it came from Med Track.
 # Inline styles only — Gmail/Outlook strip <style> blocks.
 _LAYOUT = """\
 <div style="background:#f5f2ec;padding:32px 16px;font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
   <div style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #e4dbcd;border-radius:16px;overflow:hidden;">
     <div style="background:#2e1e0c;padding:20px 28px;">
-      <span style="color:#f5ead8;font-size:20px;font-weight:700;letter-spacing:-0.2px;">Nivora</span>
+      <span style="color:#f5ead8;font-size:20px;font-weight:700;letter-spacing:-0.2px;">Med Track</span>
     </div>
     <div style="padding:28px;color:#1a1410;font-size:15px;line-height:1.6;">
       {body}
@@ -41,13 +41,13 @@ _LAYOUT = """\
 
 _DEFAULT_FOOTER = (
     "You're receiving this because someone used this address to sign up for "
-    "Nivora, clinic management software for doctors in India. "
+    "Med Track, clinic management software for doctors in India. "
     "If that wasn't you, you can safely ignore this email."
 )
 
 
 def render_email(body_html: str, footer_html: str = _DEFAULT_FOOTER) -> str:
-    """Wrap message-specific HTML in the shared Nivora shell."""
+    """Wrap message-specific HTML in the shared Med Track shell."""
     return _LAYOUT.format(body=body_html, footer=footer_html)
 
 

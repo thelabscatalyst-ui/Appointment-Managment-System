@@ -1,5 +1,5 @@
 """
-test_comprehensive.py — Full integration + unit test suite for Nivora.
+test_comprehensive.py — Full integration + unit test suite for Med Track.
 
 Coverage areas:
   A. Authentication
@@ -123,23 +123,37 @@ def _next_phone() -> str:
 
 
 def register(client, *, name="Dr Test", email="test@example.com",
-             phone=None, password="Wq7$mzKp9Xv2Ld", city="Mumbai",
+             phone=None, password="Kv9$mPq2#Zx8L", city="Mumbai",
              clinic_name="Test Clinic"):
     if phone is None:
         phone = _next_phone()
-    return client.post("/register", data={
+    resp = client.post("/register", data={
         "name": name, "email": email, "phone": phone,
         "password": password, "clinic_name": clinic_name,
         "city": city, "specialization": "General", "clinic_invite": "",
     }, follow_redirects=False)
+    # Auto-verify: verification is mandatory now (get_paying_doctor raises
+    # EmailNotVerified until it's set) and has its own dedicated coverage in
+    # TestEmailVerification. Tests that just need a working logged-in doctor
+    # shouldn't have to route around that gate.
+    if resp.status_code in (200, 302, 303):
+        db = TestSession()
+        try:
+            doc = db.query(Doctor).filter(Doctor.email == email.strip().lower()).first()
+            if doc and not doc.email_verified_at:
+                doc.email_verified_at = datetime.utcnow()
+                db.commit()
+        finally:
+            db.close()
+    return resp
 
 
-def login(client, email, password="Wq7$mzKp9Xv2Ld"):
+def login(client, email, password="Kv9$mPq2#Zx8L"):
     return client.post("/login", data={"email": email, "password": password},
                        follow_redirects=False)
 
 
-def auth_cookie(client, email, password="Wq7$mzKp9Xv2Ld", **reg_kwargs):
+def auth_cookie(client, email, password="Kv9$mPq2#Zx8L", **reg_kwargs):
     """Register + login, return access_token cookie string."""
     register(client, email=email, **reg_kwargs)
     r = login(client, email, password)
@@ -1763,6 +1777,18 @@ class TestPasswordPolicy:
         assert r.status_code == 400
         assert b"must not contain your name" in r.content
 
+    def test_password_without_symbols_rejected(self, client):
+        r = register(client, email="pw2b@test.com", phone="9310000012",
+                     password="NoSymbolsHere99")
+        assert r.status_code == 400
+        assert b"special characters or symbols" in r.content
+
+    def test_password_with_one_symbol_rejected(self, client):
+        r = register(client, email="pw2c@test.com", phone="9310000013",
+                     password="OnlyOneSymbol9!")
+        assert r.status_code == 400
+        assert b"special characters or symbols" in r.content
+
     def test_password_containing_email_localpart_rejected(self, client):
         r = register(client, email="drsunita@test.com", phone="9310000003",
                      password="drsunitaClinic9")
@@ -1791,7 +1817,7 @@ class TestPasswordPolicy:
 
     def test_valid_password_accepted(self, client):
         r = register(client, email="pw7@test.com", phone="9310000007",
-                     password="Zx9@pLmv6Bq4Nr")
+                     password="Zx9@pLmv6Bq4Nr#")
         assert r.status_code in (200, 302, 303)
         db = TestSession()
         doc = db.query(Doctor).filter(Doctor.email == "pw7@test.com").first()
@@ -1806,15 +1832,15 @@ class TestRegistrationHardening:
         lowercased it, so a case-variant slipped through to the DB unique
         constraint and surfaced as a 500."""
         r1 = register(client, email="Case@Test.com", phone="9320000001",
-                      password="Zx9@pLmv6Bq4Nr")
+                      password="Zx9@pLmv6Bq4Nr#")
         assert r1.status_code in (200, 302, 303)
         r2 = register(client, email="case@test.com", phone="9320000002",
-                      password="Zx9@pLmv6Bq4Nr")
+                      password="Zx9@pLmv6Bq4Nr#")
         assert r2.status_code == 400, "case-variant duplicate must be a friendly 400"
 
     def test_email_stored_lowercased(self, client):
         register(client, email="MiXeD@Test.com", phone="9320000003",
-                 password="Zx9@pLmv6Bq4Nr")
+                 password="Zx9@pLmv6Bq4Nr#")
         db = TestSession()
         doc = db.query(Doctor).filter(Doctor.email == "mixed@test.com").first()
         db.close()
@@ -1822,31 +1848,31 @@ class TestRegistrationHardening:
 
     def test_case_variant_can_log_in(self, client):
         register(client, email="Login@Test.com", phone="9320000004",
-                 password="Zx9@pLmv6Bq4Nr")
-        r = login(client, "LOGIN@TEST.COM", "Zx9@pLmv6Bq4Nr")
+                 password="Zx9@pLmv6Bq4Nr#")
+        r = login(client, "LOGIN@TEST.COM", "Zx9@pLmv6Bq4Nr#")
         assert r.status_code == 303
 
     def test_no_user_enumeration_between_email_and_phone(self, client):
         """A duplicate email and a duplicate phone must be indistinguishable,
-        otherwise /register becomes a probe for who is on Nivora."""
+        otherwise /register becomes a probe for who is on Med Track."""
         register(client, email="enum@test.com", phone="9320000010",
-                 password="Zx9@pLmv6Bq4Nr")
+                 password="Zx9@pLmv6Bq4Nr#")
         dup_email = register(client, email="enum@test.com", phone="9320000011",
-                             password="Zx9@pLmv6Bq4Nr")
+                             password="Zx9@pLmv6Bq4Nr#")
         dup_phone = register(client, email="other@test.com", phone="9320000010",
-                             password="Zx9@pLmv6Bq4Nr")
+                             password="Zx9@pLmv6Bq4Nr#")
         assert dup_email.status_code == dup_phone.status_code == 400
         assert dup_email.content == dup_phone.content, \
             "responses must be byte-identical to prevent enumeration"
 
     def test_short_phone_rejected(self, client):
         r = register(client, email="ph1@test.com", phone="12345",
-                     password="Zx9@pLmv6Bq4Nr")
+                     password="Zx9@pLmv6Bq4Nr#")
         assert r.status_code == 400
 
     def test_invalid_email_rejected(self, client):
         r = register(client, email="not-an-email", phone="9320000020",
-                     password="Zx9@pLmv6Bq4Nr")
+                     password="Zx9@pLmv6Bq4Nr#")
         assert r.status_code == 400
 
 
@@ -1854,7 +1880,7 @@ class TestPasswordHashing:
 
     def test_new_passwords_use_argon2id(self, client):
         register(client, email="hash1@test.com", phone="9330000001",
-                 password="Zx9@pLmv6Bq4Nr")
+                 password="Zx9@pLmv6Bq4Nr#")
         db = TestSession()
         doc = db.query(Doctor).filter(Doctor.email == "hash1@test.com").first()
         db.close()
@@ -1865,7 +1891,7 @@ class TestPasswordHashing:
         argon2id transparently on their next successful login."""
         from passlib.context import CryptContext
         bcrypt_only = CryptContext(schemes=["bcrypt"])
-        legacy_hash = bcrypt_only.hash("Zx9@pLmv6Bq4Nr")
+        legacy_hash = bcrypt_only.hash("Zx9@pLmv6Bq4Nr#")
 
         db = TestSession()
         doc = Doctor(
@@ -1880,7 +1906,7 @@ class TestPasswordHashing:
 
         assert legacy_hash.startswith("$2b$")
 
-        r = login(client, "legacy@test.com", "Zx9@pLmv6Bq4Nr")
+        r = login(client, "legacy@test.com", "Zx9@pLmv6Bq4Nr#")
         assert r.status_code == 303, "legacy bcrypt doctor must still log in"
 
         db = TestSession()
@@ -1974,7 +2000,7 @@ class TestEmailService:
         from services.email_service import render_email
         html = render_email("<p>hello</p>")
         assert "<p>hello</p>" in html
-        assert "Nivora" in html
+        assert "Med Track" in html
 
     def test_code_block_renders_digits(self):
         from services.email_service import code_block
@@ -2034,7 +2060,7 @@ class TestEmailVerification:
     def _doctor(self, db, email, phone, slug):
         from services.auth_service import hash_password
         d = Doctor(name="Dr Verify", email=email, phone=phone,
-                   password_hash=hash_password("Zx9@pLmv6Bq4Nr"), slug=slug,
+                   password_hash=hash_password("Zx9@pLmv6Bq4Nr#"), slug=slug,
                    plan_type=PlanType.trial,
                    trial_ends_at=datetime.utcnow() + timedelta(days=14))
         db.add(d); db.commit(); db.refresh(d)
@@ -2203,6 +2229,55 @@ class TestEmailVerification:
         assert r.status_code == 303
         assert "/dashboard" in r.headers.get("location", "")
 
+    def test_unverified_doctor_blocked_from_dashboard(self, client):
+        """Verification is mandatory — no skip. get_paying_doctor() must
+        bounce an unverified doctor to /verify-email instead of rendering."""
+        from services.auth_service import create_access_token
+        db = TestSession()
+        doc = self._doctor(db, "gate1@test.com", "9340000011", "v-gate1")
+        doc_id = doc.id
+        db.close()
+        tok = create_access_token({"doctor_id": doc_id, "tv": 0})
+        r = client.get("/dashboard", cookies={"access_token": tok}, follow_redirects=False)
+        assert r.status_code == 303
+        assert "/verify-email" in r.headers.get("location", "")
+
+    def test_unverified_doctor_blocked_from_appointment_detail(self, client):
+        """get_appt_doctor() duplicates the plan gate and must carry the same
+        verification check — it doesn't sit behind get_paying_doctor()."""
+        from services.auth_service import create_access_token
+        db = TestSession()
+        doc = self._doctor(db, "gate2@test.com", "9340000012", "v-gate2")
+        doc_id = doc.id
+        db.close()
+        tok = create_access_token({"doctor_id": doc_id, "tv": 0})
+        r = client.get("/appointments/1", cookies={"access_token": tok}, follow_redirects=False)
+        assert r.status_code == 303
+        assert "/verify-email" in r.headers.get("location", "")
+
+    def test_verified_doctor_reaches_dashboard(self, client):
+        from services.auth_service import create_access_token
+        db = TestSession()
+        doc = self._doctor(db, "gate3@test.com", "9340000013", "v-gate3")
+        doc.email_verified_at = datetime.utcnow()
+        db.commit()
+        doc_id = doc.id
+        db.close()
+        tok = create_access_token({"doctor_id": doc_id, "tv": 0})
+        r = client.get("/dashboard", cookies={"access_token": tok}, follow_redirects=False)
+        assert r.status_code == 200
+
+    def test_no_skip_option_on_verify_page(self, client):
+        from services.auth_service import create_access_token
+        db = TestSession()
+        doc = self._doctor(db, "gate4@test.com", "9340000014", "v-gate4")
+        doc_id = doc.id
+        db.close()
+        tok = create_access_token({"doctor_id": doc_id, "tv": 0})
+        r = client.get("/verify-email", cookies={"access_token": tok})
+        assert b"Skip for now" not in r.content
+        assert b"ve-skip" not in r.content
+
     def test_registration_does_not_block_login(self, client):
         """Verification must NOT gate login — otherwise a mail outage locks
         doctors out, and every existing test would break."""
@@ -2220,7 +2295,7 @@ class TestPasswordReset:
     def _doctor(self, db, email, phone, slug, verified=True):
         from services.auth_service import hash_password
         d = Doctor(name="Dr Reset", email=email, phone=phone,
-                   password_hash=hash_password("Zx9@pLmv6Bq4Nr"), slug=slug,
+                   password_hash=hash_password("Zx9@pLmv6Bq4Nr#"), slug=slug,
                    plan_type=PlanType.trial,
                    trial_ends_at=datetime.utcnow() + timedelta(days=14),
                    email_verified_at=datetime.utcnow() if verified else None,
@@ -2287,14 +2362,14 @@ class TestPasswordReset:
         try:
             prs.request_reset(db, "pr3@test.com")
             rec = prs.validate_token(db, tokens[0])
-            ok, msg = prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+            ok, msg = prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp!")
         finally:
             prs.secrets.token_urlsafe = orig
         db.refresh(doc)
         new_hash = doc.password_hash
         db.close()
         assert ok is True
-        assert verify_password("Nw8#qRtz4Vm7Kp", new_hash)
+        assert verify_password("Nw8#qRtz4Vm7Kp!", new_hash)
 
     def test_token_is_single_use(self, client):
         import services.password_reset_service as prs
@@ -2305,7 +2380,7 @@ class TestPasswordReset:
         try:
             prs.request_reset(db, "pr4@test.com")
             rec = prs.validate_token(db, tokens[0])
-            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp!")
             replay = prs.validate_token(db, tokens[0])
         finally:
             prs.secrets.token_urlsafe = orig
@@ -2357,7 +2432,7 @@ class TestPasswordReset:
         try:
             prs.request_reset(db, "pr7@test.com")
             rec = prs.validate_token(db, tokens[0])
-            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp!")
         finally:
             prs.secrets.token_urlsafe = orig
         db.refresh(doc)
@@ -2380,7 +2455,7 @@ class TestPasswordReset:
         try:
             prs.request_reset(db, "pr8@test.com")
             rec = prs.validate_token(db, tokens[0])
-            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp")
+            prs.consume_reset(db, rec, "Nw8#qRtz4Vm7Kp!")
         finally:
             prs.secrets.token_urlsafe = orig
         db.close()

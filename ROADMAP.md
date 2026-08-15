@@ -1,8 +1,8 @@
-# Nivora — Roadmap
+# Med Track — Roadmap
 
 Working document for feature-by-feature execution. Reflects verified repo state as of **2026-08-13**.
 
-**Current state:** live at [nivora.store](https://www.nivora.store) on Railway + PostgreSQL · 173 tests passing · 138 routes · 13 routers.
+**Current state:** live at [medtrack.life](https://www.medtrack.life) on Railway + PostgreSQL · 173 tests passing · 138 routes · 13 routers.
 
 ---
 
@@ -101,7 +101,7 @@ Context for what has just landed, so we don't re-litigate it.
 |---|---|
 | **Auth** | Phases 0-4: 12-char password policy w/ live feedback, argon2id (bcrypt auto-upgrades on login), email verification via one-time codes, forgot-password with session invalidation, 60-min sessions with sliding renewal + 12h cap |
 | **Email** | Resend integration — first working email transport in the app; also fixed clinic invites that had never sent |
-| **Branding** | Full rename ClinicOS → Nivora across 43 templates, `main.py`, `config.py`, README; domain moved to `nivora.store` |
+| **Branding** | Full rename ClinicOS → Med Track across 43 templates, `main.py`, `config.py`, README; domain moved to `medtrack.life` |
 | **Queue** | Hold/Resume — park a patient mid-consult and auto-call the next; resume to front of queue |
 | **Feedback** | Tokenised public rating page, feedback link appended to WhatsApp receipts, ★ badge in patients list |
 | **Mobile/Tablet** | Phone bottom nav, two-row queue cards, 767px breakpoint so tablets keep the desktop UI; verified at 375/768/1024px |

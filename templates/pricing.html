@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pricing · Nivora</title>
+  <title>Pricing · Med Track</title>
   <meta name="description" content="Simple, honest pricing for Indian clinics. Starts at ₹599/month." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -621,7 +621,7 @@
         </svg>
         Back
       </a>
-      <a href="/" class="pn-brand">Nivora</a>
+      <a href="/" class="pn-brand">Med Track</a>
     </div>
     <div class="pn-actions">
       {% if doctor %}
@@ -775,7 +775,7 @@
           <li>Dedicated account manager</li>
           <li>White-glove onboarding</li>
         </ul>
-        <a href="mailto:support@nivora.in" class="pc-btn">Contact us</a>
+        <a href="mailto:support@medtrack.life" class="pc-btn">Contact us</a>
       </div>
 
     </div>
@@ -832,7 +832,7 @@
           amount: data.amount,
           currency: data.currency,
           order_id: data.order_id,
-          name: 'Nivora',
+          name: 'Med Track',
           description: plan.charAt(0).toUpperCase() + plan.slice(1) + ' Plan · 1 Month',
           prefill: { name: '{{ doctor.name }}', email: '{{ doctor.email }}', contact: '{{ doctor.phone }}' },
           theme: { color: '#b48230' },

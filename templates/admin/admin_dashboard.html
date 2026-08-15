@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Admin Dashboard · Nivora{% endblock %}
+{% block title %}Admin Dashboard · Med Track{% endblock %}
 
 {% block navbar %}
 <nav class="navbar">
-  <a href="/admin/dashboard" class="navbar-brand">🏥 Nivora <span style="font-size:12px;color:var(--muted);font-family:Inter,sans-serif;">Admin</span></a>
+  <a href="/admin/dashboard" class="navbar-brand">🏥 Med Track <span style="font-size:12px;color:var(--muted);font-family:Inter,sans-serif;">Admin</span></a>
   <ul class="navbar-nav">
     <li><a href="/admin/dashboard" class="{% if active == 'admin_dashboard' %}active{% endif %}">Dashboard</a></li>
     <li><a href="/admin/doctors" class="{% if active == 'admin_doctors' %}active{% endif %}">Doctors</a></li>

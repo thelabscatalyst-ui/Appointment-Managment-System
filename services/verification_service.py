@@ -132,20 +132,20 @@ def _send_code_email(to_email: str, name: str, code: str) -> None:
         Confirm your email
       </h2>
       <p style="margin:0 0 4px;color:#5c5148;">
-        Hi {first_name}, enter this code in Nivora to verify your email address:
+        Hi {first_name}, enter this code in Med Track to verify your email address:
       </p>
       {code_block(code)}
       <p style="margin:0;color:#5c5148;">
         This code expires in {CODE_TTL_MINUTES} minutes and can only be used once.
       </p>
       <p style="margin:14px 0 0;font-size:13px;color:#8a7f74;">
-        If you didn't create a Nivora account, you can ignore this email —
+        If you didn't create a Med Track account, you can ignore this email —
         no account will be activated without this code.
       </p>
     """
     send_email(
         to=to_email,
-        subject=f"{code} is your Nivora verification code",
+        subject=f"{code} is your Med Track verification code",
         html=render_email(body),
     )
 

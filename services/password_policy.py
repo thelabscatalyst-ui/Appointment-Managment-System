@@ -1,14 +1,22 @@
 """
 Password policy — server-side validation for account passwords.
 
-Grounded in NIST SP 800-63B §5.1.1.2 and OWASP ASVS v4 §2.1.
+Grounded in NIST SP 800-63B §5.1.1.2 and OWASP ASVS v4 §2.1, with one
+deliberate deviation from NIST below.
 
 Deliberate design notes:
 
-  * We enforce **length** (12+), not composition classes. NIST explicitly
-    recommends against mandating symbols/digits — they push users toward
-    predictable patterns ("P@ssw0rd1!") that add little real entropy while
-    hurting usability. Length plus blocklisting is the stronger lever.
+  * We enforce **length** (12+). NIST recommends against mandating symbols —
+    they push users toward predictable patterns ("P@ssw0rd1!") that add
+    little real entropy while hurting usability.
+
+  * **Symbol requirement is a product decision, not a NIST recommendation.**
+    Med Track requires at least 2 symbols/special characters on top of the
+    12-char minimum. This is an intentional override of the NIST-only
+    stance for defense-in-depth on a medical-records product — length alone
+    was judged insufficient here. Kept as a *count* (2+ from anywhere in the
+    password), not a positional rule, so it doesn't push toward the
+    "Capital-first, symbol-last" pattern NIST warns about.
 
   * We block context-specific values (the doctor's own name / email local
     part / clinic name) and a small set of well-known weak passwords. ASVS
@@ -27,6 +35,11 @@ MIN_LENGTH = 12
 # NIST §5.1.1.2 requires accepting at least 64 characters.
 MAX_LENGTH = 128
 
+# Minimum count of symbol/special characters required (product decision,
+# see module docstring). Any non-alphanumeric ASCII character counts.
+MIN_SPECIAL_CHARS = 2
+_SPECIAL_RE = re.compile(r"[^a-zA-Z0-9]")
+
 # Small embedded blocklist. This is intentionally short — it catches the
 # lazy cases without pretending to be a breach corpus. For real coverage,
 # enable check_breached() (HaveIBeenPwned k-anonymity).
@@ -39,7 +52,7 @@ _COMMON_PASSWORDS = {
     "abc123", "abcd1234", "111111", "000000", "123123",
     # India / product specific
     "india123", "bharat123", "clinic123", "doctor123", "hospital123",
-    "nivora", "nivora123", "clinicos", "clinicos123",
+    "medtrack", "medtrack123", "clinicos", "clinicos123",
 }
 
 # Sequential runs we treat as filler rather than entropy.
@@ -114,6 +127,14 @@ def validate_password(
 
     if len(password) > MAX_LENGTH:
         problems.append(f"Password must be {MAX_LENGTH} characters or fewer.")
+
+    special_count = len(_SPECIAL_RE.findall(password))
+    if special_count < MIN_SPECIAL_CHARS:
+        problems.append(
+            f"Password must include at least {MIN_SPECIAL_CHARS} special "
+            f"characters or symbols (e.g. ! @ # $ % & * -) "
+            f"(currently {special_count})."
+        )
 
     if password.lower() in _COMMON_PASSWORDS:
         problems.append("That password is too common. Choose something less predictable.")

@@ -23,7 +23,7 @@ from database.connection import create_tables
 from routers import auth, appointments, doctors, patients, public, admin, clinic, visits, billing_ops, income, prescriptions, feedback
 from services.scheduler_service import start_scheduler, stop_scheduler
 from services.auth_service import (
-    PlanExpired, PinRequired, decode_token, create_access_token, should_renew,
+    PlanExpired, PinRequired, EmailNotVerified, decode_token, create_access_token, should_renew,
 )
 from config import settings
 
@@ -98,7 +98,7 @@ async def lifespan(app: FastAPI):
     stop_scheduler()
 
 
-app = FastAPI(title="Nivora", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Med Track", version="1.0.0", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -260,22 +260,22 @@ def sitemap():
     content = """<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://www.nivora.store/</loc>
+    <loc>https://www.medtrack.life/</loc>
     <priority>1.0</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://www.nivora.store/register</loc>
+    <loc>https://www.medtrack.life/register</loc>
     <priority>0.9</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.nivora.store/login</loc>
+    <loc>https://www.medtrack.life/login</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.nivora.store/pricing</loc>
+    <loc>https://www.medtrack.life/pricing</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
@@ -301,7 +301,7 @@ Disallow: /billing
 Disallow: /queue
 Disallow: /admin
 
-Sitemap: https://www.nivora.store/sitemap.xml"""
+Sitemap: https://www.medtrack.life/sitemap.xml"""
     return PlainTextResponse(content=content)
 
 
@@ -328,6 +328,13 @@ async def auth_check(request: Request):
 @app.exception_handler(403)
 async def forbidden_handler(request: Request, exc: HTTPException):
     return RedirectResponse(url="/dashboard", status_code=303)
+
+
+@app.exception_handler(EmailNotVerified)
+async def email_not_verified_handler(request: Request, exc: EmailNotVerified):
+    # Verification is mandatory — no skip option. Every protected route
+    # bounces here until the doctor confirms their email.
+    return RedirectResponse(url="/verify-email", status_code=303)
 
 
 @app.exception_handler(PlanExpired)

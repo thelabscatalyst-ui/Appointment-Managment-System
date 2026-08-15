@@ -49,7 +49,7 @@ def send_invite_email(
       </h2>
       <p style="margin:0 0 16px;color:#5c5148;">
         <strong>{invited_by}</strong> has invited you to join
-        <strong>{clinic_name}</strong> on Nivora, where you'll be able to manage
+        <strong>{clinic_name}</strong> on Med Track, where you'll be able to manage
         your own appointments, patients, and billing under the clinic's plan.
       </p>
       {button(accept_url, "Accept invitation")}
@@ -62,12 +62,12 @@ def send_invite_email(
 
     ok, detail = send_email(
         to=to_email,
-        subject=f"You're invited to join {clinic_name} on Nivora",
+        subject=f"You're invited to join {clinic_name} on Med Track",
         html=render_email(
             body,
             footer_html=(
                 f"You received this because {invited_by} invited you to "
-                f"{clinic_name} on Nivora. If you weren't expecting it, you "
+                f"{clinic_name} on Med Track. If you weren't expecting it, you "
                 f"can safely ignore this email."
             ),
         ),

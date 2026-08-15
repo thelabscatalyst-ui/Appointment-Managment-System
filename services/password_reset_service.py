@@ -106,7 +106,7 @@ def _send_reset_email(to_email: str, name: str, token: str) -> None:
         Reset your password
       </h2>
       <p style="margin:0 0 16px;color:#5c5148;">
-        Hi {first}, use the button below to choose a new Nivora password.
+        Hi {first}, use the button below to choose a new Med Track password.
       </p>
       {button(url, "Set a new password")}
       <p style="margin:18px 0 0;font-size:13px;color:#8a7f74;">
@@ -118,7 +118,7 @@ def _send_reset_email(to_email: str, name: str, token: str) -> None:
         Didn't request this? Ignore this email — your password stays as it is.
       </p>
     """
-    send_email(to=to_email, subject="Reset your Nivora password", html=render_email(body))
+    send_email(to=to_email, subject="Reset your Med Track password", html=render_email(body))
 
 
 def _send_unverified_notice(to_email: str) -> None:
@@ -142,7 +142,7 @@ def _send_unverified_notice(to_email: str) -> None:
     """
     send_email(
         to=to_email,
-        subject="About your Nivora password reset",
+        subject="About your Med Track password reset",
         html=render_email(body),
     )
 
@@ -213,7 +213,7 @@ def _send_changed_notice(to_email: str, name: str) -> None:
         Your password was changed
       </h2>
       <p style="margin:0 0 12px;color:#5c5148;">
-        Hi {first}, your Nivora password was just reset and you've been signed
+        Hi {first}, your Med Track password was just reset and you've been signed
         out on all devices.
       </p>
       <p style="margin:0;color:#5c5148;">
@@ -221,7 +221,7 @@ def _send_changed_notice(to_email: str, name: str) -> None:
         else may have access to your email account.
       </p>
     """
-    send_email(to=to_email, subject="Your Nivora password was changed", html=render_email(body))
+    send_email(to=to_email, subject="Your Med Track password was changed", html=render_email(body))
 
 
 # ------------------------------------------------------------------ #

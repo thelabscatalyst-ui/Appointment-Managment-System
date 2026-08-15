@@ -57,19 +57,6 @@
 {% endblock %}
 
 <div class="main-content">
-  {# Unverified-email nudge. Verification is not a login gate, so this is the
-     standing reminder. Hidden on the verify page itself. #}
-  {% if doctor is defined and doctor and not doctor.email_verified_at
-        and request.url.path != '/verify-email' %}
-  <a href="/verify-email" class="verify-banner">
-    <span class="verify-banner-dot"></span>
-    <span>
-      <strong>Confirm your email</strong> — we sent a code to {{ doctor.email }}.
-      Verifying keeps password reset available if you're ever locked out.
-    </span>
-    <span class="verify-banner-cta">Verify →</span>
-  </a>
-  {% endif %}
   {% block content %}{% endblock %}
 </div>
 
