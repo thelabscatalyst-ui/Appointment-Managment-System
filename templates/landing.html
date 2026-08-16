@@ -238,24 +238,21 @@
     }
 
     /* ══════════════════════════════════════════════════════════════════
-       MacBook mockup — the real photo (static/img/macbook-mockup.png),
-       kept exactly as the design asset it is.
+       MacBook mockup — static/img/apple-macbookpro14-front.png, a fresh
+       asset replacing the earlier macbook-mockup.png (2026-08-16).
 
-       The white fringe reported earlier was traced to one specific spot:
-       macbook-mockup.png's inner screen cutout was cut from a white
-       backdrop, so the single ring of anti-aliased pixels right at that
-       cutout kept a near-white tint at partial alpha (e.g. rgba(202,202,202,72)
-       one pixel in from the bezel). Sitting directly over the dark video, that
-       ring reads as a thin white/grey outline no matter what the page
-       background is. Everything else in the photo — the aluminium body, the
-       outer silhouette, the deck — is fully opaque and unaffected.
+       Checked before wiring it in: the old PNG had 94% of its anti-aliased
+       edge pixels contaminated near-white (cut from a white backdrop). This
+       one measures ~30% — real fringe still exists at the pixel level, but a
+       visual composite over both the dark page and a dark video background
+       showed no visible halo at either the outer silhouette or the inner
+       screen cutout. .macbook-screen-border stays on as a cheap safety
+       margin regardless, same as before.
 
-       Fix applied to the PNG itself (not this markup): un-premultiplied every
-       partial-alpha pixel assuming a white backdrop (fg = (observed -
-       255*(1-a)) / a), which recovers the true dark bezel colour under the
-       fringe instead of the white contamination. Same photo, same every
-       other pixel — just the cutout edge decontaminated. The .macbook-screen-
-       border below is kept as a second line of defence.
+       Geometry (container aspect-ratio, screen-hole box) was re-measured
+       from this image's own alpha channel — it is NOT the same crop as the
+       old 1024×622 photo, so the old percentages would have misplaced the
+       video.
     ══════════════════════════════════════════════════════════════════ */
 
     .macbook-container {
@@ -263,7 +260,7 @@
       width: 100%;
       max-width: 900px;
       margin: 0 auto;
-      aspect-ratio: 1024 / 622;
+      aspect-ratio: 3944 / 2564;
     }
 
     .macbook-bg-blur {
@@ -281,7 +278,7 @@
     .macbook-frame {
       position: absolute;
       inset: 0;
-      background-image: url("/static/img/macbook-mockup.png");
+      background-image: url("/static/img/apple-macbookpro14-front.png");
       background-size: 100% 100%;
       background-position: center;
       background-repeat: no-repeat;
@@ -291,10 +288,10 @@
 
     .macbook-video-wrapper {
       position: absolute;
-      left: 10.84%;
-      top: 3.5%;
-      width: 78.0%;
-      height: 83.7%;
+      left: 11.71%;
+      top: 11.74%;
+      width: 76.55%;
+      height: 76.48%;
       z-index: 2;
       overflow: hidden;
       background: #000;
@@ -302,10 +299,10 @@
 
     .macbook-screen-border {
       position: absolute;
-      left: 10.0%;
-      top: 2.7%;
-      width: 79.6%;
-      height: 85.3%;
+      left: 10.91%;
+      top: 10.94%;
+      width: 78.15%;
+      height: 78.08%;
       z-index: 4;
       border: 6px solid #000000;
       border-radius: 12px;
