@@ -266,9 +266,10 @@
     .macbook-bg-blur {
       position: absolute;
       inset: 4%;
-      background-image: url("/static/img/macbook-bg-blur.png");
-      background-size: cover;
-      background-position: center;
+      /* CSS gradient glow — macbook-bg-blur.png (a blurred screenshot behind
+         the mockup) was removed; this reproduces the same ambient warmth
+         without needing an image asset. */
+      background: radial-gradient(ellipse at center, rgba(180, 130, 60, .28), transparent 70%);
       filter: blur(40px);
       opacity: 0.8;
       z-index: 1;
@@ -2000,15 +2001,24 @@
     // Optional custom thumbnail. Leave '' to auto-use YouTube's thumbnail.
     // To use a custom image: drop it in static/img/ and set e.g.
     //   var DEMO_THUMBNAIL = '/static/img/demo-thumb.jpg';
-    var DEMO_THUMBNAIL = '/static/img/demo-thumb.jpg';
+    // The ?v= is a cache-buster — bump it any time a thumbnail's CONTENT
+    // changes (same filename, new bytes), otherwise browsers keep showing
+    // the old cached image indefinitely.
+    var DEMO_THUMBNAIL = '/static/img/demo-thumb.jpg?v=2';
+    // Separate art for dark theme — swapped live by setDemoPoster() below,
+    // called both on load and from toggleTheme(), since theme switches
+    // client-side without a page reload.
+    var DEMO_THUMBNAIL_DARK = '/static/img/demo-thumb-dark.jpg?v=1';
 
     // Set the poster background: custom image → YouTube thumbnail → amber gradient
-    (function setDemoPoster() {
+    function setDemoPoster() {
       var poster = document.getElementById('videoPoster');
       if (!poster) return;
+      var isLight = document.documentElement.classList.contains('light');
+      var thumb = (isLight || !DEMO_THUMBNAIL_DARK) ? DEMO_THUMBNAIL : DEMO_THUMBNAIL_DARK;
       var bg = '';
-      if (DEMO_THUMBNAIL) {
-        bg = DEMO_THUMBNAIL;
+      if (thumb) {
+        bg = thumb;
       } else if (DEMO_VIDEO_ID && DEMO_VIDEO_ID !== 'YOUR_VIDEO_ID') {
         bg = 'https://img.youtube.com/vi/' + DEMO_VIDEO_ID + '/maxresdefault.jpg';
       }
@@ -2023,7 +2033,8 @@
         poster.style.backgroundRepeat = 'no-repeat';
         poster.classList.add('ln-video-poster--has-thumb');
       }
-    })();
+    }
+    setDemoPoster();
 
     function loadDemoVideo() {
       if (!DEMO_VIDEO_ID || DEMO_VIDEO_ID === 'YOUR_VIDEO_ID') {
@@ -2043,6 +2054,7 @@
       localStorage.setItem('theme', isLight ? 'light' : 'dark');
       document.getElementById('themeIconSun').style.display = isLight ? 'block' : 'none';
       document.getElementById('themeIconMoon').style.display = isLight ? 'none' : 'block';
+      setDemoPoster();
     }
     // Set correct icon on load
     (function () {
