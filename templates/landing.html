@@ -917,6 +917,224 @@
       border: 1px solid rgba(180, 130, 60, .2);
     }
 
+    /* ── Feature carousel ──────────────────────────────────────────────
+       One floating mock window per feature (reuses .ln-mock-* verbatim —
+       same visual language as the hero mock), text on one side, auto-
+       advancing with bubble dots below.
+
+       No clipping wrapper, no sliding track — that boxed/scrolling look
+       (a small rectangular panel with a visible edge shadow) was the whole
+       problem with the first pass. Slides are absolutely stacked in one
+       fixed-height stage and crossfade via opacity; only .active is
+       visible/interactive. The floating mock card sits directly on the
+       page background, same as the hero mock — nothing clips it. */
+    .ln-fcarousel {
+      position: relative;
+      max-width: 1320px;
+      margin: 16px auto 0;
+      min-height: 480px;
+    }
+
+    .ln-fcarousel-slide {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 64px;
+      align-items: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .6s ease;
+    }
+
+    .ln-fcarousel-slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .ln-fcarousel-icon {
+      width: 44px;
+      height: 44px;
+      background: rgba(180, 130, 60, .1);
+      border: 1px solid rgba(180, 130, 60, .2);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      color: var(--amber);
+    }
+
+    /* Deliberately smaller than .ln-section-title (32px) so the section
+       heading and each slide's own heading read as two clear tiers, not
+       one merged block. */
+    .ln-fcarousel-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+
+    .ln-fcarousel-desc {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.7;
+      max-width: 420px;
+    }
+
+    /* The floating window itself — same recipe as .ln-hero-mock, minus the
+       mouse-tilt (that's a hero-only flourish; 8 auto-rotating copies of it
+       would be visual noise). Sized up from the first pass, with more
+       breathing room for the extra content each mock now carries. */
+    .ln-fcarousel-mock {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, .5);
+    }
+
+    /* Reusable mock body primitives — new ones only where .ln-mock-row /
+       .ln-mock-serving don't already fit the shape (chat bubble, bar chart,
+       avatar, stat tiles). Everything else below reuses those verbatim. */
+    .ln-mock-serving--total {
+      background: rgba(180, 130, 60, .1);
+      border-color: rgba(180, 130, 60, .25);
+    }
+
+    .ln-mock-serving--total .ln-mock-serving-label {
+      color: var(--amber);
+    }
+
+    .ln-mock-chat {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .ln-mock-bubble {
+      background: rgba(34, 197, 94, .12);
+      border: 1px solid rgba(34, 197, 94, .25);
+      border-radius: 12px 12px 2px 12px;
+      padding: 12px 14px;
+      max-width: 78%;
+      font-size: 13px;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .ln-mock-bubble-meta {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 4px;
+      margin-top: 6px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .ln-mock-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      height: 90px;
+      padding: 0 4px;
+    }
+
+    .ln-mock-bar-col {
+      flex: 1;
+      background: linear-gradient(180deg, var(--amber), rgba(180, 130, 60, .35));
+      border-radius: 4px 4px 0 0;
+      min-height: 6px;
+    }
+
+    .ln-mock-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(180, 130, 60, .16);
+      border: 1px solid rgba(180, 130, 60, .3);
+      color: var(--amber);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ln-mock-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    .ln-mock-stat {
+      background: var(--bg-3, var(--bg));
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 10px;
+      text-align: center;
+    }
+
+    .ln-mock-stat-val {
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--amber);
+    }
+
+    .ln-mock-stat-label {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .ln-fcarousel-dots {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 36px;
+    }
+
+    .ln-fcarousel-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      transition: width .3s cubic-bezier(.22, 1, .36, 1), background .3s ease;
+    }
+
+    .ln-fcarousel-dot:hover {
+      background: rgba(180, 130, 60, .5);
+    }
+
+    .ln-fcarousel-dot.active {
+      width: 24px;
+      border-radius: 4px;
+      background: var(--amber);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .ln-fcarousel-slide {
+        transition: none !important;
+      }
+    }
+
+    @media (max-width: 860px) {
+      .ln-fcarousel {
+        min-height: 760px;
+      }
+
+      .ln-fcarousel-slide {
+        grid-template-columns: 1fr;
+        gap: 28px;
+      }
+    }
+
     /* ── Social proof strip ────────────────────────────────── */
     .ln-strip {
       background: transparent;
@@ -947,54 +1165,6 @@
       width: 1px;
       height: 14px;
       background: var(--border);
-    }
-
-    /* ── Features ──────────────────────────────────────────── */
-    .ln-features-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 20px;
-    }
-
-    .ln-feat {
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 28px 24px;
-      box-shadow: var(--glow);
-      transition: var(--transition-pop);
-    }
-
-    .ln-feat:hover {
-      transform: translateY(-4px) scale(1.01);
-      border-color: var(--amber);
-      box-shadow: 0 8px 32px rgba(180, 130, 60, .15);
-    }
-
-    .ln-feat-icon {
-      width: 44px;
-      height: 44px;
-      background: rgba(180, 130, 60, .1);
-      border: 1px solid rgba(180, 130, 60, .2);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 18px;
-      color: var(--amber);
-    }
-
-    .ln-feat-name {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      margin-bottom: 8px;
-    }
-
-    .ln-feat-desc {
-      font-size: 13px;
-      color: var(--muted);
-      line-height: 1.6;
     }
 
     /* ── How it works ──────────────────────────────────────── */
@@ -1311,12 +1481,6 @@
     }
 
     /* ── Responsive ────────────────────────────────────────── */
-    @media (max-width: 1100px) {
-      .ln-features-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-
     @media (max-width: 860px) {
       .ln-hero {
         grid-template-columns: 1fr;
@@ -1385,10 +1549,6 @@
     }
 
     @media (max-width: 540px) {
-      .ln-features-grid {
-        grid-template-columns: 1fr;
-      }
-
       .ln-hero-title {
         font-size: 30px;
       }
@@ -1487,14 +1647,6 @@
 
       .ln-strip {
         padding: 12px 14px;
-      }
-
-      .ln-features-grid {
-        gap: 10px;
-      }
-
-      .ln-feat {
-        padding: 18px 16px;
       }
 
       .ln-how-grid {
@@ -1758,64 +1910,464 @@
     <h2 class="ln-section-title">What's in every plan</h2>
     <p class="ln-section-sub">All features are available on every plan. You only pay more as your practice grows with
       more doctors.</p>
-    <div class="ln-features-grid">
 
-      <div class="ln-feat">
-        <div class="ln-feat-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
+    <div class="ln-fcarousel">
+
+        <!-- 1. Appointments & Walk-ins -->
+        <div class="ln-fcarousel-slide active">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">Appointments &amp; Walk-ins</h3>
+            <p class="ln-fcarousel-desc">Token-based queue for walk-ins. Online booking for scheduled patients. Live
+              display screen for the waiting room — patients see exactly where they stand without asking the front
+              desk.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">Today's Queue · Dr. Mehta</span>
+            </div>
+            <div class="ln-mock-serving">
+              <div>
+                <div class="ln-mock-serving-label">Now Serving</div>
+                <div class="ln-mock-serving-name">Ramesh Patil</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">Walk-in · 10:15 AM</div>
+              </div>
+              <div class="ln-mock-token">03</div>
+            </div>
+            <div class="ln-mock-queue">
+              <div class="ln-mock-row">
+                <div class="ln-mock-num">04</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Sunita Desai</div>
+                  <div class="ln-mock-ptime">Walk-in · ~8 min wait</div>
+                </div>
+                <span class="ln-mock-badge ln-mock-badge--wait">Waiting</span>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-num">05</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Arjun Sharma</div>
+                  <div class="ln-mock-ptime">10:30 AM slot · ~18 min</div>
+                </div>
+                <span class="ln-mock-badge ln-mock-badge--wait">Waiting</span>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-num">06</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Priya Kulkarni</div>
+                  <div class="ln-mock-ptime">Walk-in · ~28 min wait</div>
+                </div>
+                <span class="ln-mock-badge ln-mock-badge--wait">Waiting</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="ln-feat-name">Appointments &amp; Walk-ins</div>
-        <div class="ln-feat-desc">Token-based queue for walk-ins. Online booking for scheduled patients. Live display
-          screen for the waiting room.</div>
-      </div>
 
-      <div class="ln-feat">
-        <div class="ln-feat-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
+        <!-- 2. e-Prescriptions -->
+        <div class="ln-fcarousel-slide">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="16" y1="17" x2="8" y2="17" />
+                <line x1="10" y1="9" x2="8" y2="9" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">e-Prescriptions</h3>
+            <p class="ln-fcarousel-desc">Digital prescriptions with a 787-drug autocomplete, generic and Indian brand
+              names. Print-ready in one click.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">Rx · Ramesh Patil</span>
+            </div>
+            <div class="ln-mock-queue">
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Amoxicillin 500mg</div>
+                  <div class="ln-mock-ptime">1-0-1 · after food · 5 days</div>
+                </div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Paracetamol 650mg</div>
+                  <div class="ln-mock-ptime">SOS · for fever</div>
+                </div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Cetirizine 10mg</div>
+                  <div class="ln-mock-ptime">0-0-1 · at night · 3 days</div>
+                </div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Vitamin D3 60K</div>
+                  <div class="ln-mock-ptime">Once weekly · 4 weeks</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
+              <span style="font-size:11px;color:var(--muted);">787-drug database · generic + brand</span>
+              <span class="ln-mock-badge ln-mock-badge--wait">Print-ready</span>
+            </div>
+          </div>
         </div>
-        <div class="ln-feat-name">WhatsApp Reminders</div>
-        <div class="ln-feat-desc">Automatic booking confirmations and 2-hour reminders sent to patients. No manual
-          follow-up needed.</div>
-      </div>
 
-      <div class="ln-feat">
-        <div class="ln-feat-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-          </svg>
+        <!-- 3. Billing & GST -->
+        <div class="ln-fcarousel-slide">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z" />
+                <path d="M16 8h-6" />
+                <path d="M16 12h-6" />
+                <path d="M13 16h-3" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">Billing &amp; GST</h3>
+            <p class="ln-fcarousel-desc">Line-item billing with discounts, GST, and every payment mode — cash, UPI,
+              card, insurance. PDF receipts generated instantly.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">Bill #1042 · Ramesh Patil</span>
+            </div>
+            <div class="ln-mock-queue" style="margin-bottom:12px;">
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Consultation</div>
+                </div>
+                <div class="ln-mock-pname">₹500</div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Dressing</div>
+                </div>
+                <div class="ln-mock-pname">₹200</div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">GST (18%)</div>
+                </div>
+                <div class="ln-mock-pname">₹126</div>
+              </div>
+            </div>
+            <div class="ln-mock-serving ln-mock-serving--total" style="margin-bottom:14px;">
+              <div class="ln-mock-serving-label">Total · Paid via UPI</div>
+              <div class="ln-mock-token" style="color:var(--amber);">₹826</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Cash</span>
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">UPI</span>
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Card</span>
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Insurance</span>
+            </div>
+          </div>
         </div>
-        <div class="ln-feat-name">Patient Records &amp; Vault</div>
-        <div class="ln-feat-desc">Full visit history, doctor notes, lab reports, prescriptions, and documents · all in
-          one secure place.</div>
-      </div>
 
-      <div class="ln-feat">
-        <div class="ln-feat-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10" />
-            <line x1="12" y1="20" x2="12" y2="4" />
-            <line x1="6" y1="20" x2="6" y2="14" />
-          </svg>
+        <!-- 4. WhatsApp Reminders -->
+        <div class="ln-fcarousel-slide">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">WhatsApp Reminders</h3>
+            <p class="ln-fcarousel-desc">Automatic booking confirmations and 2-hour reminders sent to patients. No
+              manual follow-up needed.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">WhatsApp · Ramesh Patil</span>
+            </div>
+            <div class="ln-mock-chat" style="margin-bottom:10px;">
+              <div>
+                <div class="ln-mock-bubble">
+                  Hi Ramesh, reminder for your appointment with Dr. Mehta today at 10:15 AM. Reply CONFIRM to keep
+                  your slot.
+                </div>
+                <div class="ln-mock-bubble-meta">10:08 AM
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div class="ln-mock-chat" style="margin-bottom:14px;">
+              <div>
+                <div class="ln-mock-bubble">Thank you for visiting! Here's your receipt and feedback link. Get well
+                  soon 🙂</div>
+                <div class="ln-mock-bubble-meta">11:42 AM
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-size:11px;color:var(--muted);">Confirmations · reminders · receipts</span>
+              <span class="ln-mock-badge ln-mock-badge--wait">Zero manual follow-up</span>
+            </div>
+          </div>
         </div>
-        <div class="ln-feat-name">Reports &amp; Analytics</div>
-        <div class="ln-feat-desc">Daily revenue, top patients, visit trends, and completion rates. Know exactly how your
-          practice is performing.</div>
-      </div>
 
+        <!-- 5. Patient Records & Vault -->
+        <div class="ln-fcarousel-slide">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">Patient Records &amp; Vault</h3>
+            <p class="ln-fcarousel-desc">Full visit history, doctor notes, lab reports, prescriptions, and documents ·
+              all in one secure place.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">Patient Vault</span>
+            </div>
+            <div class="ln-mock-serving" style="background:var(--bg-3, var(--bg));border-color:var(--border);margin-bottom:14px;">
+              <div>
+                <div class="ln-mock-serving-name">Ramesh Patil</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:2px;">42 yrs · 7 visits · since Jan 2025</div>
+              </div>
+            </div>
+            <div class="ln-mock-queue" style="margin-bottom:14px;">
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Doctor's note · 12 Aug</div>
+                  <div class="ln-mock-ptime">Mild fever, prescribed antibiotics, review in 5 days</div>
+                </div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Allergies</div>
+                  <div class="ln-mock-ptime">Penicillin — flagged on every future visit</div>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">📄 Lab Report.pdf</span>
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">💊 Prescription.pdf</span>
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">🩻 X-Ray.jpg</span>
+              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">🧾 Bill.pdf</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. Income & Expenses -->
+        <div class="ln-fcarousel-slide">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                <polyline points="16 7 22 7 22 13" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">Income &amp; Expenses</h3>
+            <p class="ln-fcarousel-desc">Track daily and monthly revenue, log clinic expenses by category, and see
+              net profit — no separate accounting tool needed.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">Income · This month</span>
+            </div>
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+              <div class="ln-mock-serving-name" style="font-size:20px;">₹1,84,200</div>
+              <span class="ln-mock-badge ln-mock-badge--wait">↑ 12% vs last month</span>
+            </div>
+            <div class="ln-mock-bars" style="margin-bottom:16px;">
+              <div class="ln-mock-bar-col" style="height:45%;"></div>
+              <div class="ln-mock-bar-col" style="height:65%;"></div>
+              <div class="ln-mock-bar-col" style="height:52%;"></div>
+              <div class="ln-mock-bar-col" style="height:80%;"></div>
+              <div class="ln-mock-bar-col" style="height:70%;"></div>
+              <div class="ln-mock-bar-col" style="height:95%;"></div>
+              <div class="ln-mock-bar-col" style="height:60%;"></div>
+            </div>
+            <div class="ln-mock-queue">
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Rent &amp; utilities</div>
+                </div>
+                <div class="ln-mock-ptime">− ₹32,000</div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Net profit this month</div>
+                </div>
+                <div class="ln-mock-pname" style="color:#4ade80;">₹1,41,800</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7. Multi-Doctor Clinics -->
+        <div class="ln-fcarousel-slide">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="16" y="16" width="6" height="6" rx="1" />
+                <rect x="2" y="16" width="6" height="6" rx="1" />
+                <rect x="9" y="2" width="6" height="6" rx="1" />
+                <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+                <path d="M12 12V8" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">Multi-Doctor Clinics</h3>
+            <p class="ln-fcarousel-desc">Invite associate doctors under one clinic. Shared scheduling, shared
+              billing, one dashboard for the owner.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">Mehta Clinic · Team</span>
+            </div>
+            <div class="ln-mock-queue">
+              <div class="ln-mock-row">
+                <div class="ln-mock-avatar">SM</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Dr. Sunil Mehta</div>
+                  <div class="ln-mock-ptime">General Physician</div>
+                </div>
+                <span class="ln-mock-badge ln-mock-badge--wait">Owner</span>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-avatar">AK</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Dr. Anjali Kapoor</div>
+                  <div class="ln-mock-ptime">Dermatologist</div>
+                </div>
+                <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Associate</span>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-avatar">RV</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Dr. Rohan Verma</div>
+                  <div class="ln-mock-ptime">Orthopedic</div>
+                </div>
+                <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Associate</span>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
+              <span style="font-size:11px;color:var(--muted);">Shared calendar · shared billing</span>
+              <span class="ln-mock-badge ln-mock-badge--wait">1 dashboard</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 8. Reports & Analytics -->
+        <div class="ln-fcarousel-slide">
+          <div>
+            <div class="ln-fcarousel-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="20" x2="18" y2="10" />
+                <line x1="12" y1="20" x2="12" y2="4" />
+                <line x1="6" y1="20" x2="6" y2="14" />
+              </svg>
+            </div>
+            <h3 class="ln-fcarousel-title">Reports &amp; Analytics</h3>
+            <p class="ln-fcarousel-desc">Daily revenue, top patients, visit trends, and completion rates. Know
+              exactly how your practice is performing.</p>
+          </div>
+          <div class="ln-fcarousel-mock">
+            <div class="ln-mock-bar">
+              <div class="ln-mock-dot" style="background:#f87171;"></div>
+              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
+              <div class="ln-mock-dot" style="background:#4ade80;"></div>
+              <span class="ln-mock-title">Reports · Today</span>
+            </div>
+            <div class="ln-mock-stats">
+              <div class="ln-mock-stat">
+                <div class="ln-mock-stat-val">24</div>
+                <div class="ln-mock-stat-label">Visits</div>
+              </div>
+              <div class="ln-mock-stat">
+                <div class="ln-mock-stat-val">₹12.4k</div>
+                <div class="ln-mock-stat-label">Revenue</div>
+              </div>
+              <div class="ln-mock-stat">
+                <div class="ln-mock-stat-val">92%</div>
+                <div class="ln-mock-stat-label">Completed</div>
+              </div>
+              <div class="ln-mock-stat">
+                <div class="ln-mock-stat-val">4.8★</div>
+                <div class="ln-mock-stat-label">Avg. rating</div>
+              </div>
+            </div>
+            <div class="ln-mock-queue" style="margin-top:14px;">
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Top patient</div>
+                  <div class="ln-mock-ptime">Sunita Desai · 9 visits this year</div>
+                </div>
+              </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Busiest slot</div>
+                  <div class="ln-mock-ptime">10:00 AM – 12:00 PM · weekdays</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+    </div>
+
+    <div class="ln-fcarousel-dots" id="fcarouselDots">
+      <button type="button" class="ln-fcarousel-dot active" data-index="0" aria-label="Appointments &amp; Walk-ins"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="1" aria-label="e-Prescriptions"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="2" aria-label="Billing &amp; GST"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="3" aria-label="WhatsApp Reminders"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="4" aria-label="Patient Records &amp; Vault"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="5" aria-label="Income &amp; Expenses"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="6" aria-label="Multi-Doctor Clinics"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="7" aria-label="Reports &amp; Analytics"></button>
     </div>
   </section>
 
@@ -2066,6 +2618,55 @@
     (function () {
       var y = document.getElementById('footerYear');
       if (y) y.textContent = new Date().getFullYear();
+    })();
+
+    // Feature carousel: crossfades between slides (no scrolling/sliding —
+    // each is an absolutely-stacked, independently floating mock, only
+    // .active is visible), auto-advances, pauses on hover, and stays put
+    // (still dot-navigable) under prefers-reduced-motion.
+    (function () {
+      var stage = document.querySelector('.ln-fcarousel');
+      var slides = document.querySelectorAll('.ln-fcarousel-slide');
+      var dots = document.querySelectorAll('.ln-fcarousel-dot');
+      if (!stage || !slides.length || !dots.length) return;
+
+      var total = slides.length;
+      var index = 0;
+      var timer = null;
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function go(i) {
+        index = (i + total) % total;
+        slides.forEach(function (s, si) {
+          s.classList.toggle('active', si === index);
+        });
+        dots.forEach(function (d, di) {
+          d.classList.toggle('active', di === index);
+        });
+      }
+
+      function start() {
+        if (reduce) return;
+        stop();
+        timer = setInterval(function () { go(index + 1); }, 4500);
+      }
+
+      function stop() {
+        if (timer) { clearInterval(timer); timer = null; }
+      }
+
+      dots.forEach(function (dot, i) {
+        dot.addEventListener('click', function () {
+          go(i);
+          start(); // restart the countdown so a manual pick doesn't get cut short
+        });
+      });
+
+      stage.addEventListener('mouseenter', stop);
+      stage.addEventListener('mouseleave', start);
+
+      go(0);
+      start();
     })();
   </script>
 </body>
