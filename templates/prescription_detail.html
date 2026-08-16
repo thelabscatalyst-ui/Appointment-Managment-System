@@ -92,10 +92,10 @@
   </div>
   {% endif %}
 
-  <!-- Rx drug table -->
+  <!-- Drug table -->
   {% if prescription.items %}
   <div style="padding:20px 0 0 0;">
-    <div style="font-family:'Playfair Display',Georgia,serif;font-size:22px;font-weight:700;color:var(--text);margin-bottom:14px;">℞</div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);margin-bottom:14px;">Medications</div>
 
     <!-- Table header -->
     <div class="rx-detail-head">
@@ -103,7 +103,7 @@
       <span>Drug</span>
       <span>Dosage</span>
       <span>Frequency</span>
-      <span>Duration</span>
+      <span>Days</span>
       <span>Instructions</span>
     </div>
 
@@ -115,6 +115,9 @@
       <span class="rx-detail-cell">{{ item.frequency or '—' }}</span>
       <span class="rx-detail-cell">{{ item.duration or '—' }}</span>
       <span class="rx-detail-cell rx-detail-cell--instructions">{{ item.instructions or '—' }}</span>
+      {% if item.notes %}
+      <span class="rx-detail-notes">{{ item.notes }}</span>
+      {% endif %}
     </div>
     {% endfor %}
   </div>
@@ -222,6 +225,12 @@
   font-style: italic;
   font-size: 12px;
   color: var(--dim);
+}
+.rx-detail-notes {
+  grid-column: 2 / -1;
+  font-size: 12px;
+  color: var(--dim);
+  margin-top: -2px;
 }
 
 @media (max-width: 640px) {

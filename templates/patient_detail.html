@@ -434,7 +434,7 @@
       {% if rx_count %}<span style="font-size:11px;color:var(--dim);">{{ rx_count }} total</span>{% endif %}
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <a href="/prescriptions/new?patient_id={{ patient.id }}" class="btn btn-secondary btn-xs">+ Write Rx</a>
+      <a href="/prescriptions/new?patient_id={{ patient.id }}" class="btn btn-secondary btn-xs">+ Write Prescription</a>
       {% if rx_count > 0 %}
       <a href="/patients/{{ patient.id }}/prescriptions" style="font-size:12px;color:var(--muted);text-decoration:none;">View all →</a>
       {% endif %}

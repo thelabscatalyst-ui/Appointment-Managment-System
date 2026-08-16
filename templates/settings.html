@@ -639,6 +639,26 @@
 
 {% block scripts %}
 <script>
+/* ── Preserve scroll position across save-and-reload ─────────────────
+   Every save button here is a plain form POST that redirects back to
+   this same page — simplest and most robust way to stop that reload
+   from dumping the doctor back at the top is to remember where they
+   were and jump straight back, rather than turning ~10 separate save
+   routes into a JSON API. */
+document.querySelectorAll('form').forEach(function(form) {
+  form.addEventListener('submit', function() {
+    sessionStorage.setItem('settingsScrollY', String(window.scrollY));
+  });
+});
+(function restoreSettingsScroll() {
+  const y = sessionStorage.getItem('settingsScrollY');
+  if (y === null) return;
+  sessionStorage.removeItem('settingsScrollY');
+  const jump = () => window.scrollTo(0, parseInt(y, 10));
+  jump();
+  window.addEventListener('load', jump);
+})();
+
 function toggleRow(index, isActive) {
   document.getElementById('row-' + index)
           .classList.toggle('schedule-row--off', !isActive);

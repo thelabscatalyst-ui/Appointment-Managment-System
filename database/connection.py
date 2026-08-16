@@ -493,3 +493,6 @@ def _run_migrations():
             conn.commit()
         except Exception:
             conn.rollback()
+
+        # ── v5: optional per-drug prescription notes ──────────────────────────
+        _add_column(conn, "ALTER TABLE prescription_items ADD COLUMN notes TEXT")

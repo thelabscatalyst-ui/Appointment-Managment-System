@@ -190,7 +190,7 @@
               </span>
               <select id="appointment_type" name="appointment_type" class="apn-input-icon-field">
                 {% for t in appointment_types %}
-                <option value="{{ t }}" {% if form_data.get('appointment_type', 'follow_up') == t %}selected{% endif %}>
+                <option value="{{ t }}" {% if form_data.get('appointment_type', 'new_patient') == t %}selected{% endif %}>
                   {{ t.replace('_', ' ').title() }}
                 </option>
                 {% endfor %}
@@ -206,8 +206,8 @@
                 </svg>
               </span>
               <select id="booked_by_field" name="booked_by_field" class="apn-input-icon-field">
-                <option value="doctor" selected>Doctor</option>
-                <option value="staff_shared">Receptionist (phone call)</option>
+                <option value="doctor">Doctor</option>
+                <option value="staff_shared" selected>Receptionist (phone call)</option>
               </select>
             </div>
           </div>

@@ -112,13 +112,14 @@
       line-height: 1.6;
     }
 
-    /* ── Rx symbol + drug list ──────────────────────── */
-    .rx-ph-symbol {
-      font-family: 'Playfair Display', Georgia, serif;
-      font-size: 28px;
+    /* ── Drug list ──────────────────────────────── */
+    .rx-ph-meds-label {
+      font-size: 10px;
       font-weight: 700;
-      color: #1a1410;
-      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #9a8f85;
+      margin-bottom: 8px;
     }
     .rx-ph-drug-list {
       list-style: none;
@@ -165,6 +166,12 @@
       font-size: 12px;
       color: #7a6f65;
       font-style: italic;
+      margin-top: 2px;
+      padding-left: 22px;
+    }
+    .rx-ph-drug-notes {
+      font-size: 12px;
+      color: #9a8f85;
       margin-top: 2px;
       padding-left: 22px;
     }
@@ -291,9 +298,9 @@
   </div>
   {% endif %}
 
-  <!-- ── ℞ Drug list ──────────────────────────────── -->
+  <!-- ── Drug list ──────────────────────────────── -->
   {% if prescription.items %}
-  <div class="rx-ph-symbol">℞</div>
+  <div class="rx-ph-meds-label">Medications</div>
   <ol class="rx-ph-drug-list">
     {% for item in prescription.items %}
     <li class="rx-ph-drug-item">
@@ -306,6 +313,9 @@
       </div>
       {% if item.instructions %}
       <div class="rx-ph-drug-instructions">{{ item.instructions }}</div>
+      {% endif %}
+      {% if item.notes %}
+      <div class="rx-ph-drug-notes">{{ item.notes }}</div>
       {% endif %}
     </li>
     {% endfor %}

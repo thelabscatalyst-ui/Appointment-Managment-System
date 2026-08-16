@@ -1,14 +1,105 @@
 {% extends "base.html" %}
-{% block title %}{% if prescription %}Edit Prescription{% else %}Write Prescription{% endif %} — Med Track{% endblock %}
+{% block title %}{% if prescription and (prescription.diagnosis or prescription.advice or prescription.follow_up or prescription.items) %}Edit Prescription{% else %}Write Prescription{% endif %} — Med Track{% endblock %}
 
 {% block content %}
+{% set freq_options = ["Once daily","Twice daily","Three times daily","Four times daily","At bedtime","Every 8 hours","Every 6 hours","SOS / As needed"] %}
+{% set dosage_options = ["1 tablet","2 tablets","1/2 tablet","1 capsule","2 capsules","5 ml","10 ml","15 ml","1 sachet","1 drop","2 drops","250 mg","500 mg","1000 mg"] %}
+{% set duration_options = ["1 day","2 days","3 days","4 days","5 days","6 days","7 days","8 days","9 days","10 days","15 days","20 days"] %}
+{% set instructions_options = ["Before food","After food","With food","Empty stomach","With plenty of water","With milk","Avoid alcohol","May cause drowsiness — avoid driving","Do not lie down after taking","As directed by physician"] %}
+
+{% macro drug_row(item=None) %}
+<div class="rx-drug-row">
+  <div class="rx-drug-field rx-drug-field--name" style="position:relative;">
+    <input type="text" name="drug_name" value="{{ (item.drug_name or '') if item else '' }}"
+           placeholder="Drug name" autocomplete="off"
+           class="rx-input" oninput="drugAutocomplete(this)">
+    <div class="rx-autocomplete-dropdown" style="display:none;"></div>
+  </div>
+
+  <div class="rx-drug-field rx-dropdown-field">
+    <select name="dosage" class="rx-input rx-select" onchange="onDropdownChange(this)">
+      <option value="">— Select —</option>
+      {% for opt in dosage_options %}
+      <option value="{{ opt }}" {% if item and item.dosage == opt %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+      <option value="__custom__">Custom…</option>
+      {% if item and item.dosage and item.dosage not in dosage_options %}
+      <option value="{{ item.dosage }}" selected data-custom="1">{{ item.dosage }}</option>
+      {% endif %}
+    </select>
+    <input type="text" class="rx-input rx-custom-input"
+           style="display:{% if item and item.dosage and item.dosage not in dosage_options %}block{% else %}none{% endif %};"
+           value="{% if item and item.dosage and item.dosage not in dosage_options %}{{ item.dosage }}{% endif %}"
+           placeholder="Enter dosage" oninput="onCustomInput(this)">
+  </div>
+
+  <div class="rx-drug-field">
+    <select name="frequency" class="rx-input rx-select">
+      <option value="">— Select —</option>
+      {% for opt in freq_options %}
+      <option value="{{ opt }}" {% if item and item.frequency == opt %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+      {% if item and item.frequency and item.frequency not in freq_options %}
+      <option value="{{ item.frequency }}" selected>{{ item.frequency }}</option>
+      {% endif %}
+    </select>
+  </div>
+
+  <div class="rx-drug-field rx-dropdown-field">
+    <select name="duration" class="rx-input rx-select" onchange="onDropdownChange(this)">
+      <option value="">— Select —</option>
+      {% for opt in duration_options %}
+      <option value="{{ opt }}" {% if item and item.duration == opt %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+      <option value="__custom__">Custom…</option>
+      {% if item and item.duration and item.duration not in duration_options %}
+      <option value="{{ item.duration }}" selected data-custom="1">{{ item.duration }}</option>
+      {% endif %}
+    </select>
+    <input type="text" class="rx-input rx-custom-input"
+           style="display:{% if item and item.duration and item.duration not in duration_options %}block{% else %}none{% endif %};"
+           value="{% if item and item.duration and item.duration not in duration_options %}{{ item.duration }}{% endif %}"
+           placeholder="Enter days" oninput="onCustomInput(this)">
+  </div>
+
+  <div class="rx-drug-field rx-dropdown-field">
+    <select name="instructions" class="rx-input rx-select" onchange="onDropdownChange(this)">
+      <option value="">— Select —</option>
+      {% for opt in instructions_options %}
+      <option value="{{ opt }}" {% if item and item.instructions == opt %}selected{% endif %}>{{ opt }}</option>
+      {% endfor %}
+      <option value="__custom__">Custom…</option>
+      {% if item and item.instructions and item.instructions not in instructions_options %}
+      <option value="{{ item.instructions }}" selected data-custom="1">{{ item.instructions }}</option>
+      {% endif %}
+    </select>
+    <input type="text" class="rx-input rx-custom-input"
+           style="display:{% if item and item.instructions and item.instructions not in instructions_options %}block{% else %}none{% endif %};"
+           value="{% if item and item.instructions and item.instructions not in instructions_options %}{{ item.instructions }}{% endif %}"
+           placeholder="Enter instructions" oninput="onCustomInput(this)">
+  </div>
+
+  <div class="rx-drug-field rx-drug-field--remove">
+    <button type="button" class="rx-remove-btn" onclick="removeDrugRow(this)" title="Remove drug">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+
+  <div class="rx-drug-field--notes">
+    <textarea name="notes" class="rx-input rx-notes" rows="1"
+              placeholder="Notes for this drug (optional)"
+              oninput="autoGrowNotes(this)">{{ (item.notes or '') if item else '' }}</textarea>
+  </div>
+</div>
+{% endmacro %}
+
 <div class="page-header">
   <div>
     <a href="/patients/{{ patient.id }}" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);text-decoration:none;margin-bottom:6px;transition:color 0.15s;">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
       {{ patient.name }}
     </a>
-    <h1 class="page-title">{% if prescription %}Edit Prescription{% else %}Write Prescription{% endif %}</h1>
+    <h1 class="page-title">{% if prescription and (prescription.diagnosis or prescription.advice or prescription.follow_up or prescription.items) %}Edit Prescription{% else %}Write Prescription{% endif %}</h1>
     <div class="page-sub">{{ patient.name }}{% if patient.age %} · {{ patient.age }} yrs{% endif %}{% if patient.gender %} · {{ patient.gender | title }}{% endif %}</div>
   </div>
 </div>
@@ -28,10 +119,7 @@
 </div>
 {% endif %}
 
-<form method="POST" action="{% if prescription %}/prescriptions/{{ prescription.id }}/edit{% else %}/prescriptions/new{% endif %}">
-  <input type="hidden" name="patient_id" value="{{ patient.id }}">
-  <input type="hidden" name="visit_id" value="{{ visit.id if visit else '' }}">
-
+<form id="rxForm">
   <!-- ── Section 1: Diagnosis ──────────────────────────────────────── -->
   <div class="settings-card" style="margin-bottom:20px;">
     <div class="settings-card-title" style="margin-bottom:16px;">
@@ -42,7 +130,7 @@
       <label class="form-label">Diagnosis / Chief Complaint</label>
       <textarea name="diagnosis" rows="2"
                 style="width:100%;box-sizing:border-box;padding:11px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:14px;font-family:inherit;resize:vertical;line-height:1.5;transition:border-color 0.15s,box-shadow 0.15s;"
-                placeholder="e.g. Acute pharyngitis, fever for 3 days…">{{ prescription.diagnosis if prescription else '' }}</textarea>
+                placeholder="e.g. Acute pharyngitis, fever for 3 days…">{{ (prescription.diagnosis or '') if prescription else '' }}</textarea>
     </div>
   </div>
 
@@ -50,7 +138,7 @@
   <div class="settings-card" style="margin-bottom:20px;">
     <div class="settings-card-title" style="margin-bottom:16px;">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px;opacity:0.7;"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
-      Medications (℞)
+      Medications
     </div>
 
     <!-- Column headers -->
@@ -58,7 +146,7 @@
       <span>Drug Name</span>
       <span>Dosage</span>
       <span>Frequency</span>
-      <span>Duration</span>
+      <span>Days</span>
       <span>Instructions</span>
       <span></span>
     </div>
@@ -67,93 +155,10 @@
     <div id="drugRowsContainer">
       {% if prescription and prescription.items %}
         {% for item in prescription.items %}
-        <div class="rx-drug-row">
-          <div class="rx-drug-field rx-drug-field--name" style="position:relative;">
-            <input type="text" name="drug_name" value="{{ item.drug_name }}"
-                   placeholder="Drug name" autocomplete="off"
-                   class="rx-input" oninput="drugAutocomplete(this)">
-            <div class="rx-autocomplete-dropdown" style="display:none;"></div>
-          </div>
-          <div class="rx-drug-field">
-            <input type="text" name="dosage" value="{{ item.dosage }}"
-                   placeholder="e.g. 500mg" class="rx-input">
-          </div>
-          <div class="rx-drug-field">
-            <div style="position:relative;">
-              <select name="frequency" class="rx-input rx-select">
-                <option value="">— Select —</option>
-                {% set freq_options = ["Once daily","Twice daily","Three times daily","Four times daily","At bedtime","Every 8 hours","Every 6 hours","SOS / As needed","Before food","After food"] %}
-                {% for opt in freq_options %}
-                <option value="{{ opt }}" {% if item.frequency == opt %}selected{% endif %}>{{ opt }}</option>
-                {% endfor %}
-                <option value="{{ item.frequency }}"
-                  {% if item.frequency and item.frequency not in freq_options %}selected{% endif %}>
-                  {% if item.frequency and item.frequency not in freq_options %}{{ item.frequency }}{% endif %}
-                </option>
-              </select>
-              <svg style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;" width="12" height="7" viewBox="0 0 12 7" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>
-            </div>
-          </div>
-          <div class="rx-drug-field">
-            <input type="text" name="duration" value="{{ item.duration }}"
-                   placeholder="e.g. 5 days" class="rx-input">
-          </div>
-          <div class="rx-drug-field">
-            <input type="text" name="instructions" value="{{ item.instructions }}"
-                   placeholder="e.g. with food" class="rx-input">
-          </div>
-          <div class="rx-drug-field rx-drug-field--remove">
-            <button type="button" class="rx-remove-btn" onclick="removeDrugRow(this)" title="Remove drug">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        </div>
+          {{ drug_row(item) }}
         {% endfor %}
       {% else %}
-        <!-- Default empty row for create mode -->
-        <div class="rx-drug-row">
-          <div class="rx-drug-field rx-drug-field--name" style="position:relative;">
-            <input type="text" name="drug_name" value=""
-                   placeholder="Drug name" autocomplete="off"
-                   class="rx-input" oninput="drugAutocomplete(this)">
-            <div class="rx-autocomplete-dropdown" style="display:none;"></div>
-          </div>
-          <div class="rx-drug-field">
-            <input type="text" name="dosage" value=""
-                   placeholder="e.g. 500mg" class="rx-input">
-          </div>
-          <div class="rx-drug-field">
-            <div style="position:relative;">
-              <select name="frequency" class="rx-input rx-select">
-                <option value="">— Select —</option>
-                <option>Once daily</option>
-                <option>Twice daily</option>
-                <option>Three times daily</option>
-                <option>Four times daily</option>
-                <option>At bedtime</option>
-                <option>Every 8 hours</option>
-                <option>Every 6 hours</option>
-                <option>SOS / As needed</option>
-                <option>Before food</option>
-                <option>After food</option>
-              </select>
-              <svg style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;" width="12" height="7" viewBox="0 0 12 7" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>
-            </div>
-          </div>
-          <div class="rx-drug-field">
-            <input type="text" name="duration" value=""
-                   placeholder="e.g. 5 days" class="rx-input">
-          </div>
-          <div class="rx-drug-field">
-            <input type="text" name="instructions" value=""
-                   placeholder="e.g. with food" class="rx-input">
-          </div>
-          <div class="rx-drug-field rx-drug-field--remove">
-            <button type="button" class="rx-remove-btn" onclick="removeDrugRow(this)" title="Remove drug">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          </div>
-        </div>
+        {{ drug_row() }}
       {% endif %}
     </div>
 
@@ -175,29 +180,30 @@
       <label class="form-label">General Advice / Instructions to patient</label>
       <textarea name="advice" rows="3"
                 style="width:100%;box-sizing:border-box;padding:11px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:14px;font-family:inherit;resize:vertical;line-height:1.5;transition:border-color 0.15s,box-shadow 0.15s;"
-                placeholder="e.g. Rest well, drink plenty of fluids, avoid cold foods…">{{ prescription.advice if prescription else '' }}</textarea>
+                placeholder="e.g. Rest well, drink plenty of fluids, avoid cold foods…">{{ (prescription.advice or '') if prescription else '' }}</textarea>
     </div>
     <div class="form-group" style="margin-bottom:0;">
       <label class="form-label">Follow-up in <span style="font-weight:400;color:var(--dim);font-size:12px;">(e.g. 7 days, 2 weeks)</span></label>
       <input type="text" name="follow_up"
-             value="{{ prescription.follow_up if prescription else '' }}"
+             value="{{ (prescription.follow_up or '') if prescription else '' }}"
              placeholder="e.g. 7 days"
              style="width:100%;max-width:260px;box-sizing:border-box;padding:11px 14px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-size:14px;font-family:inherit;transition:border-color 0.15s,box-shadow 0.15s;">
     </div>
   </div>
 
   <div style="display:flex;gap:10px;align-items:center;">
-    <button type="submit" class="btn btn-primary">Save Prescription</button>
-    <a href="/patients/{{ patient.id }}" class="btn btn-secondary btn-sm">Cancel</a>
+    <a href="/prescriptions/{{ prescription.id }}" class="btn btn-primary" id="rxDoneBtn">Done</a>
+    <a href="/patients/{{ patient.id }}" class="btn btn-secondary btn-sm" id="rxCancelBtn">Cancel</a>
+    <span id="autosaveStatus" style="font-size:12px;color:var(--muted);margin-left:auto;">All changes saved</span>
   </div>
 
 </form>
 
 <style>
-/* ── Rx table layout ─────────────────────────────── */
+/* ── Medications table layout ─────────────────────── */
 .rx-table-head {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.6fr 1fr 1.4fr 36px;
+  grid-template-columns: 2fr 1.3fr 1.6fr 1.1fr 1.6fr 36px;
   gap: 8px;
   padding: 0 0 8px 0;
   border-bottom: 1px solid var(--border);
@@ -210,7 +216,7 @@
 }
 .rx-drug-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.6fr 1fr 1.4fr 36px;
+  grid-template-columns: 2fr 1.3fr 1.6fr 1.1fr 1.6fr 36px;
   gap: 8px;
   align-items: start;
   padding: 8px 0;
@@ -220,6 +226,7 @@
 .rx-drug-field { position: relative; }
 .rx-drug-field--name { }
 .rx-drug-field--remove { display:flex; align-items:center; justify-content:center; padding-top:1px; }
+.rx-drug-field--notes { grid-column: 1 / -1; margin-top: 2px; }
 .rx-input {
   width: 100%;
   box-sizing: border-box;
@@ -240,6 +247,15 @@
   box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
 }
 .rx-select { padding-right: 28px; cursor: pointer; }
+.rx-dropdown-field .rx-custom-input { margin-top: 6px; }
+.rx-notes {
+  resize: none;
+  overflow: hidden;
+  min-height: 34px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.rx-notes:focus { color: var(--text); }
 .rx-remove-btn {
   width: 28px;
   height: 28px;
@@ -300,6 +316,7 @@
 <script src="/static/js/drugs.js?v=1"></script>
 <script>
 /* DRUG_LIST is loaded from /static/js/drugs.js */
+const RX_ID = {{ prescription.id }};
 
 /* ── Drug autocomplete ─────────────────────── */
 function drugAutocomplete(input) {
@@ -322,6 +339,7 @@ function drugAutocomplete(input) {
       e.preventDefault();          // keep the text input focused
       input.value = drugName;
       dropdown.style.display = 'none';
+      scheduleAutosave();
     });
     dropdown.appendChild(item);
   });
@@ -335,16 +353,67 @@ document.addEventListener('click', function(e) {
   }
 });
 
+/* ── Dosage / Days / Instructions "Custom…" handling ─────────────── */
+function onDropdownChange(select) {
+  const wrap = select.closest('.rx-dropdown-field');
+  const customInput = wrap.querySelector('.rx-custom-input');
+  if (select.value === '__custom__') {
+    customInput.style.display = 'block';
+    customInput.value = '';
+    customInput.focus();
+  } else {
+    customInput.style.display = 'none';
+  }
+}
+
+function onCustomInput(input) {
+  const wrap = input.closest('.rx-dropdown-field');
+  const select = wrap.querySelector('select');
+  let opt = select.querySelector('option[data-custom="1"]');
+  if (!opt) {
+    opt = document.createElement('option');
+    opt.dataset.custom = '1';
+    select.appendChild(opt);
+  }
+  opt.value = input.value;
+  opt.textContent = input.value;
+  opt.selected = true;
+}
+
+/* ── Notes textarea auto-grow ──────────────────────────────────── */
+function autoGrowNotes(textarea) {
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+}
+document.querySelectorAll('.rx-notes').forEach(autoGrowNotes);
+
 /* ── Add / Remove drug rows ────────────────── */
 function buildDrugRow() {
-  const freq_options = [
+  const freqOptions = [
     "Once daily","Twice daily","Three times daily","Four times daily",
-    "At bedtime","Every 8 hours","Every 6 hours","SOS / As needed",
-    "Before food","After food"
+    "At bedtime","Every 8 hours","Every 6 hours","SOS / As needed"
   ];
-  const opts = ['<option value="">— Select —</option>']
-    .concat(freq_options.map(o => `<option value="${o}">${o}</option>`))
-    .join('');
+  const dosageOptions = [
+    "1 tablet","2 tablets","1/2 tablet","1 capsule","2 capsules","5 ml","10 ml",
+    "15 ml","1 sachet","1 drop","2 drops","250 mg","500 mg","1000 mg"
+  ];
+  const durationOptions = [
+    "1 day","2 days","3 days","4 days","5 days","6 days","7 days","8 days",
+    "9 days","10 days","15 days","20 days"
+  ];
+  const instructionsOptions = [
+    "Before food","After food","With food","Empty stomach","With plenty of water",
+    "With milk","Avoid alcohol","May cause drowsiness — avoid driving",
+    "Do not lie down after taking","As directed by physician"
+  ];
+
+  function opts(list) {
+    return ['<option value="">— Select —</option>']
+      .concat(list.map(o => `<option value="${o}">${o}</option>`))
+      .join('');
+  }
+
+  const chevron = '<svg style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;" width="12" height="7" viewBox="0 0 12 7" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>';
 
   const div = document.createElement('div');
   div.className = 'rx-drug-row';
@@ -354,25 +423,31 @@ function buildDrugRow() {
              autocomplete="off" class="rx-input" oninput="drugAutocomplete(this)">
       <div class="rx-autocomplete-dropdown" style="display:none;"></div>
     </div>
-    <div class="rx-drug-field">
-      <input type="text" name="dosage" value="" placeholder="e.g. 500mg" class="rx-input">
+    <div class="rx-drug-field rx-dropdown-field">
+      <select name="dosage" class="rx-input rx-select" onchange="onDropdownChange(this)">${opts(dosageOptions)}<option value="__custom__">Custom…</option></select>
+      <input type="text" class="rx-input rx-custom-input" style="display:none;" placeholder="Enter dosage" oninput="onCustomInput(this)">
     </div>
     <div class="rx-drug-field">
       <div style="position:relative;">
-        <select name="frequency" class="rx-input rx-select">${opts}</select>
-        <svg style="position:absolute;right:10px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:0.5;" width="12" height="7" viewBox="0 0 12 7" fill="none" stroke="#555555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1l5 5 5-5"/></svg>
+        <select name="frequency" class="rx-input rx-select">${opts(freqOptions)}</select>
+        ${chevron}
       </div>
     </div>
-    <div class="rx-drug-field">
-      <input type="text" name="duration" value="" placeholder="e.g. 5 days" class="rx-input">
+    <div class="rx-drug-field rx-dropdown-field">
+      <select name="duration" class="rx-input rx-select" onchange="onDropdownChange(this)">${opts(durationOptions)}<option value="__custom__">Custom…</option></select>
+      <input type="text" class="rx-input rx-custom-input" style="display:none;" placeholder="Enter days" oninput="onCustomInput(this)">
     </div>
-    <div class="rx-drug-field">
-      <input type="text" name="instructions" value="" placeholder="e.g. with food" class="rx-input">
+    <div class="rx-drug-field rx-dropdown-field">
+      <select name="instructions" class="rx-input rx-select" onchange="onDropdownChange(this)">${opts(instructionsOptions)}<option value="__custom__">Custom…</option></select>
+      <input type="text" class="rx-input rx-custom-input" style="display:none;" placeholder="Enter instructions" oninput="onCustomInput(this)">
     </div>
     <div class="rx-drug-field rx-drug-field--remove">
       <button type="button" class="rx-remove-btn" onclick="removeDrugRow(this)" title="Remove drug">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
+    </div>
+    <div class="rx-drug-field--notes">
+      <textarea name="notes" class="rx-input rx-notes" rows="1" placeholder="Notes for this drug (optional)" oninput="autoGrowNotes(this)"></textarea>
     </div>`;
   return div;
 }
@@ -382,12 +457,109 @@ function addDrugRow() {
   const row = buildDrugRow();
   container.appendChild(row);
   row.querySelector('input[name="drug_name"]').focus();
+  scheduleAutosave();
 }
 
 function removeDrugRow(btn) {
   const container = document.getElementById('drugRowsContainer');
   if (container.querySelectorAll('.rx-drug-row').length <= 1) return;
   btn.closest('.rx-drug-row').remove();
+  scheduleAutosave();
 }
+
+/* ── Autosave — fires continuously while writing, like Google Docs ── */
+let autosaveTimer = null;
+let autosaveInFlight = false;
+let autosavePending = false;
+
+function collectRxPayload() {
+  const rows = document.querySelectorAll('#drugRowsContainer .rx-drug-row');
+  const items = [];
+  rows.forEach(function(row) {
+    const drugName = row.querySelector('input[name="drug_name"]').value.trim();
+    if (!drugName) return;
+    items.push({
+      drug_name:    drugName,
+      dosage:       row.querySelector('select[name="dosage"]').value,
+      frequency:    row.querySelector('select[name="frequency"]').value,
+      duration:     row.querySelector('select[name="duration"]').value,
+      instructions: row.querySelector('select[name="instructions"]').value,
+      notes:        row.querySelector('textarea[name="notes"]').value,
+    });
+  });
+  return {
+    diagnosis: document.querySelector('#rxForm textarea[name="diagnosis"]').value,
+    advice:    document.querySelector('#rxForm textarea[name="advice"]').value,
+    follow_up: document.querySelector('#rxForm input[name="follow_up"]').value,
+    items:     items,
+  };
+}
+
+function setAutosaveStatus(text) {
+  const el = document.getElementById('autosaveStatus');
+  if (el) el.textContent = text;
+}
+
+function scheduleAutosave() {
+  setAutosaveStatus('Saving…');
+  clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(doAutosave, 800);
+}
+
+async function doAutosave() {
+  if (autosaveInFlight) { autosavePending = true; return; }
+  autosaveInFlight = true;
+  setAutosaveStatus('Saving…');
+  try {
+    const res = await fetch(`/prescriptions/${RX_ID}/autosave`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(collectRxPayload()),
+      credentials: 'same-origin',
+    });
+    setAutosaveStatus(res.ok ? 'All changes saved' : 'Save failed — retrying…');
+    if (!res.ok) autosavePending = true;
+  } catch (e) {
+    setAutosaveStatus('Save failed — retrying…');
+    autosavePending = true;
+  } finally {
+    autosaveInFlight = false;
+    if (autosavePending) {
+      autosavePending = false;
+      scheduleAutosave();
+    }
+  }
+}
+
+async function flushAutosave() {
+  clearTimeout(autosaveTimer);
+  await doAutosave();
+}
+
+const rxForm = document.getElementById('rxForm');
+rxForm.addEventListener('submit', function(e) { e.preventDefault(); });
+rxForm.addEventListener('input', function(e) {
+  if (e.target.matches('input, textarea')) scheduleAutosave();
+});
+rxForm.addEventListener('change', function(e) {
+  if (e.target.matches('select')) scheduleAutosave();
+});
+
+window.addEventListener('beforeunload', function() {
+  if (autosaveTimer) {
+    clearTimeout(autosaveTimer);
+    const payload = JSON.stringify(collectRxPayload());
+    navigator.sendBeacon(`/prescriptions/${RX_ID}/autosave`, new Blob([payload], { type: 'application/json' }));
+  }
+});
+
+['rxDoneBtn', 'rxCancelBtn'].forEach(function(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('click', function(e) {
+    e.preventDefault();
+    flushAutosave().finally(function() { window.location.href = el.href; });
+  });
+});
 </script>
 {% endblock %}

@@ -405,7 +405,7 @@ class Appointment(Base):
     doctor_notes = Column(Text, nullable=True)
     reminder_24h_sent = Column(Boolean, default=False)
     reminder_2h_sent = Column(Boolean, default=False)
-    booked_by = Column(SAEnum(BookedBy), default=BookedBy.doctor)
+    booked_by = Column(SAEnum(BookedBy), default=BookedBy.staff_shared)
     is_emergency = Column(Boolean, default=False)   # bypasses quota/hours checks
     # v2: link to Visit once patient checks in
     visit_id         = Column(Integer, ForeignKey("visits.id"), nullable=True)
@@ -711,6 +711,7 @@ class PrescriptionItem(Base):
     frequency    = Column(String(80), nullable=True)    # "Twice daily", "SOS", "At bedtime"
     duration     = Column(String(60), nullable=True)    # "5 days", "2 weeks"
     instructions = Column(String(200), nullable=True)   # "After food", "With milk"
+    notes        = Column(Text, nullable=True)          # optional free-text, per drug
 
     prescription = relationship("Prescription", back_populates="items")
 

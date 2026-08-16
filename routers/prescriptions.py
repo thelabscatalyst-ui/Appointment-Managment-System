@@ -16,7 +16,7 @@ from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Request, Depends, Form, Query
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -46,13 +46,15 @@ def _parse_rx_items(
     frequencies: List[str],
     durations: List[str],
     instructions_list: List[str],
+    notes_list: List[str] = None,
 ) -> List[dict]:
     """Zip multi-value form fields into a list of item dicts, skipping blank rows."""
+    notes_list = notes_list or []
     items = []
     # Pad shorter lists to match the longest
     max_len = max(
         len(drug_names), len(dosages), len(frequencies),
-        len(durations), len(instructions_list),
+        len(durations), len(instructions_list), len(notes_list),
         1,
     )
     def _pad(lst, length):
@@ -63,6 +65,7 @@ def _parse_rx_items(
     frequencies        = _pad(frequencies, max_len)
     durations          = _pad(durations, max_len)
     instructions_list  = _pad(instructions_list, max_len)
+    notes_list         = _pad(notes_list, max_len)
 
     for i in range(max_len):
         name = drug_names[i].strip()
@@ -74,6 +77,7 @@ def _parse_rx_items(
             "frequency":    frequencies[i].strip() or None,
             "duration":     durations[i].strip() or None,
             "instructions": instructions_list[i].strip() or None,
+            "notes":        notes_list[i].strip() or None,
         })
     return items
 
@@ -110,13 +114,23 @@ def prescription_new_form(
             Patient.doctor_id == doctor.id,
         ).first()
 
-    return templates.TemplateResponse(request, "prescription_new.html", {
-        "doctor":      doctor,
-        "patient":     patient,
-        "visit":       visit,
-        "prescription": None,   # None = create mode
-        "active":      "patients",
-    })
+    if not patient:
+        return RedirectResponse(url="/patients", status_code=303)
+
+    # Autosave model: the instance is created the moment the doctor opens
+    # this screen — like a new Google Doc — so nothing is ever lost even if
+    # they never click an explicit save button. Editing then continues on
+    # the /edit route, which this immediately redirects to.
+    rx = Prescription(
+        doctor_id  = doctor.id,
+        patient_id = patient.id,
+        visit_id   = visit.id if visit else None,
+    )
+    db.add(rx)
+    db.commit()
+    db.refresh(rx)
+
+    return RedirectResponse(url=f"/prescriptions/{rx.id}/edit", status_code=303)
 
 
 # --------------------------------------------------------------------------- #
@@ -136,6 +150,7 @@ async def prescription_create(
     frequency: List[str]       = Form(default=[]),
     duration: List[str]        = Form(default=[]),
     instructions: List[str]    = Form(default=[]),
+    notes: List[str]           = Form(default=[]),
     doctor: Doctor             = Depends(get_paying_doctor),
     db: Session                = Depends(get_db),
 ):
@@ -167,7 +182,7 @@ async def prescription_create(
     db.add(rx)
     db.flush()   # get rx.id before inserting items
 
-    items = _parse_rx_items(drug_name, dosage, frequency, duration, instructions)
+    items = _parse_rx_items(drug_name, dosage, frequency, duration, instructions, notes)
     for item in items:
         db.add(PrescriptionItem(
             prescription_id = rx.id,
@@ -176,6 +191,7 @@ async def prescription_create(
             frequency       = item["frequency"],
             duration        = item["duration"],
             instructions    = item["instructions"],
+            notes           = item["notes"],
         ))
 
     db.commit()
@@ -278,6 +294,7 @@ async def prescription_edit_save(
     frequency: List[str]    = Form(default=[]),
     duration: List[str]     = Form(default=[]),
     instructions: List[str] = Form(default=[]),
+    notes: List[str]        = Form(default=[]),
     doctor: Doctor          = Depends(get_paying_doctor),
     db: Session             = Depends(get_db),
 ):
@@ -295,7 +312,7 @@ async def prescription_edit_save(
         PrescriptionItem.prescription_id == rx.id
     ).delete(synchronize_session=False)
 
-    items = _parse_rx_items(drug_name, dosage, frequency, duration, instructions)
+    items = _parse_rx_items(drug_name, dosage, frequency, duration, instructions, notes)
     for item in items:
         db.add(PrescriptionItem(
             prescription_id = rx.id,
@@ -304,10 +321,60 @@ async def prescription_edit_save(
             frequency       = item["frequency"],
             duration        = item["duration"],
             instructions    = item["instructions"],
+            notes           = item["notes"],
         ))
 
     db.commit()
     return RedirectResponse(url=f"/prescriptions/{rx.id}", status_code=303)
+
+
+# --------------------------------------------------------------------------- #
+#  Autosave — POST (JSON, fired continuously while writing)                   #
+# --------------------------------------------------------------------------- #
+
+@router.post("/prescriptions/{rx_id}/autosave")
+async def prescription_autosave(
+    rx_id: int,
+    request: Request,
+    doctor: Doctor = Depends(get_paying_doctor),
+    db: Session = Depends(get_db),
+):
+    rx = _get_prescription_or_404(rx_id, doctor.id, db)
+    if not rx:
+        return JSONResponse({"ok": False, "error": "not_found"}, status_code=404)
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "bad_json"}, status_code=400)
+
+    rx.diagnosis  = (payload.get("diagnosis") or "").strip() or None
+    rx.advice     = (payload.get("advice") or "").strip() or None
+    rx.follow_up  = (payload.get("follow_up") or "").strip() or None
+    rx.updated_at = datetime.now()
+
+    db.query(PrescriptionItem).filter(
+        PrescriptionItem.prescription_id == rx.id
+    ).delete(synchronize_session=False)
+
+    for raw_item in (payload.get("items") or []):
+        if not isinstance(raw_item, dict):
+            continue
+        name = (raw_item.get("drug_name") or "").strip()
+        if not name:
+            continue
+        db.add(PrescriptionItem(
+            prescription_id = rx.id,
+            drug_name       = name,
+            dosage          = (raw_item.get("dosage") or "").strip() or None,
+            frequency       = (raw_item.get("frequency") or "").strip() or None,
+            duration        = (raw_item.get("duration") or "").strip() or None,
+            instructions    = (raw_item.get("instructions") or "").strip() or None,
+            notes           = (raw_item.get("notes") or "").strip() or None,
+        ))
+
+    db.commit()
+    return JSONResponse({"ok": True, "saved_at": rx.updated_at.isoformat()})
 
 
 # --------------------------------------------------------------------------- #

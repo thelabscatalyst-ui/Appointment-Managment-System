@@ -316,10 +316,10 @@ async def create_appointment(
     patient_gender: str = Form(""),
     appt_date: str = Form(...),
     appt_time: str = Form(...),
-    appointment_type: str = Form("follow_up"),
+    appointment_type: str = Form("new_patient"),
     duration: int = Form(15),
     patient_notes: str = Form(""),
-    booked_by_field: str = Form("doctor"),
+    booked_by_field: str = Form("staff_shared"),
     for_doctor_id: int = Form(0),
     referral_source: str = Form(""),
     referral_source_other: str = Form(""),
@@ -403,11 +403,11 @@ async def create_appointment(
     try:
         appt_type = AppointmentType(appointment_type)
     except ValueError:
-        appt_type = AppointmentType.follow_up
+        appt_type = AppointmentType.new_patient
 
     # Map booked_by field — only accept valid logged-in booking channels
     booked_by_map = {"doctor": BookedBy.doctor, "staff_shared": BookedBy.staff_shared}
-    booked_by_val = booked_by_map.get(booked_by_field, BookedBy.doctor)
+    booked_by_val = booked_by_map.get(booked_by_field, BookedBy.staff_shared)
 
     # Create the appointment
     appt = Appointment(
