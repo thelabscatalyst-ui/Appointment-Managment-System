@@ -1082,6 +1082,11 @@
       min-height: 0;
       display: grid;
       grid-template-columns: repeat(3, 1fr);
+      /* A single implicit row auto-sizes to content height by default,
+         leaving the rest of the card's fixed height empty below it —
+         forcing it to 1fr makes the row (and so each stretched column)
+         fill the full available height instead. */
+      grid-template-rows: 1fr;
       gap: 12px;
     }
     .ln-mock-bubble--wa {
@@ -1150,6 +1155,10 @@
     .ln-mock-chat {
       display: flex;
       flex-direction: column;
+      /* Spread label / bubble / timestamp across the column's full
+         stretched height so the timestamp sits at the true bottom of the
+         card instead of leaving dead space below a short bubble. */
+      justify-content: space-between;
       min-width: 0;
       min-height: 0;
     }
