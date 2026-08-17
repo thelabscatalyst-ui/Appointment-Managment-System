@@ -932,7 +932,9 @@
       position: relative;
       max-width: 1320px;
       margin: 16px auto 0;
-      min-height: 480px;
+      min-height: 560px;
+      touch-action: pan-y;
+      user-select: none;
     }
 
     .ln-fcarousel-slide {
@@ -993,6 +995,130 @@
       border-radius: var(--radius);
       padding: 28px;
       box-shadow: 0 24px 64px rgba(0, 0, 0, .5);
+      height: 500px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Content below the title bar stretches to fill the fixed card height,
+       distributing extra space between its children so shorter content
+       (fewer rows, no chart) still reaches the same bottom edge as the
+       fullest card instead of leaving a dead gap. */
+    .ln-mock-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 0;
+    }
+
+    /* E-Prescriptions only: this one shows the actual printed letterhead
+       output (paper, not app chrome) — it's what the doctor hands the
+       patient, so it deliberately breaks from the dark-chrome mock style
+       used everywhere else. */
+    .ln-fcarousel-mock--paper {
+      background: #f4efe7;
+      color: #2a2420;
+      padding: 26px 28px;
+    }
+    .ln-paper-clinic { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; color: #1a1410; }
+    .ln-paper-doctor { font-size: 12.5px; color: #5c5148; margin-top: 3px; }
+    .ln-paper-addr { font-size: 11px; color: #8a7f74; margin-top: 2px; }
+    .ln-paper-hr { border: none; border-top: 1px solid #ddd2c4; margin: 14px 0; }
+    .ln-paper-row { display: flex; justify-content: space-between; align-items: baseline; }
+    .ln-paper-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #9a8f85; }
+    .ln-paper-patient { font-size: 15px; font-weight: 700; color: #1a1410; margin-top: 2px; }
+    .ln-paper-sub { font-size: 11.5px; color: #6b6058; margin-top: 1px; }
+    .ln-paper-date { font-size: 13px; font-weight: 700; color: #1a1410; }
+    .ln-paper-value { font-size: 13.5px; color: #2a2420; margin-top: 4px; }
+    .ln-paper-med-table { margin-top: 4px; }
+    .ln-paper-med-head {
+      display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1.2fr;
+      font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+      color: #9a8f85; padding-bottom: 6px; border-bottom: 1px solid #ddd2c4;
+    }
+    .ln-paper-med-row {
+      display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1.2fr;
+      font-size: 12.5px; color: #2a2420; padding: 9px 0; border-bottom: 1px solid #ede6db;
+      align-items: center;
+    }
+    .ln-paper-med-row strong { font-size: 13px; }
+    .ln-paper-sig { text-align: right; margin-top: auto; padding-top: 10px; }
+    .ln-paper-sig-line { color: #b8ab9c; font-size: 12px; }
+    .ln-paper-sig-name { font-size: 13px; font-weight: 700; color: #1a1410; margin-top: 2px; }
+    .ln-paper-sig-spec { font-size: 11px; color: #8a7f74; }
+
+    /* Billing card: payment-mode pills + quick price-catalog buttons */
+    .ln-mock-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ln-mock-pill {
+      font-size: 11px; padding: 6px 12px; border-radius: 20px;
+      border: 1px solid var(--border); color: var(--muted); background: var(--bg-3, var(--bg));
+    }
+    .ln-mock-pill--active { border-color: var(--amber); color: var(--amber); background: rgba(180,130,60,.1); font-weight: 700; }
+
+    /* Patient Vault: prominent name header + small plain file chips (no emoji) */
+    .ln-mock-vault-name { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; color: var(--text); }
+    .ln-mock-filechips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ln-mock-filechip {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10.5px; padding: 5px 9px; border-radius: 7px;
+      background: var(--bg-3, var(--bg)); border: 1px solid var(--border); color: var(--muted);
+    }
+    .ln-mock-filechip svg { flex-shrink: 0; opacity: .7; }
+
+    /* WhatsApp card: 3 real message bubbles, scrolls internally so exact
+       text isn't truncated while still matching every other card's height */
+    .ln-mock-chatscroll {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 4px;
+      -ms-overflow-style: none;
+      scrollbar-width: thin;
+    }
+    .ln-mock-bubble--wa { font-size: 12px; line-height: 1.55; max-width: 88%; }
+    .ln-mock-bubble--wa strong { color: var(--text); }
+
+    /* 3-column stat row (Income & Expenses) */
+    .ln-mock-stats--3 { grid-template-columns: repeat(3, 1fr); }
+
+    /* Small nav arrows either side of the stage */
+    .ln-fcarousel-arrow {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: color .15s ease, border-color .15s ease, background .15s ease;
+      z-index: 5;
+    }
+    .ln-fcarousel-arrow:hover { color: var(--amber); border-color: var(--amber); background: rgba(180,130,60,.08); }
+    /* Flank the mock card, not the whole two-column stage — the mock is
+       the last grid track (1.1fr of 1fr+1.1fr), so its left edge sits at
+       roughly the 50% mark regardless of stage width. Anchoring "prev" to
+       the stage's own left edge instead would land it on top of the
+       running description text. */
+    .ln-fcarousel-arrow--prev { left: calc(50% - 17px); }
+    .ln-fcarousel-arrow--next { right: -17px; }
+    @media (max-width: 1380px) {
+      .ln-fcarousel-arrow--next { right: 4px; }
+    }
+    @media (max-width: 860px) {
+      /* Stacked single-column layout — text and mock share the full
+         width, so a left/right flank has nothing safe to sit beside.
+         Touch swipe and the dots cover navigation here instead. */
+      .ln-fcarousel-arrow { display: none; }
     }
 
     /* Reusable mock body primitives — new ones only where .ln-mock-row /
@@ -1126,12 +1252,16 @@
 
     @media (max-width: 860px) {
       .ln-fcarousel {
-        min-height: 760px;
+        min-height: 840px;
       }
 
       .ln-fcarousel-slide {
         grid-template-columns: 1fr;
         gap: 28px;
+      }
+
+      .ln-fcarousel-mock {
+        height: 480px;
       }
     }
 
@@ -1907,11 +2037,16 @@
 ══════════════════════════════════════════════════════════ -->
   <section class="ln-section">
     <div class="ln-section-label">Everything included</div>
-    <h2 class="ln-section-title">What's in every plan</h2>
     <p class="ln-section-sub">All features are available on every plan. You only pay more as your practice grows with
       more doctors.</p>
 
     <div class="ln-fcarousel">
+      <button type="button" class="ln-fcarousel-arrow ln-fcarousel-arrow--prev" id="fcarouselPrev" aria-label="Previous feature">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+      </button>
+      <button type="button" class="ln-fcarousel-arrow ln-fcarousel-arrow--next" id="fcarouselNext" aria-label="Next feature">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+      </button>
 
         <!-- 1. Appointments & Walk-ins -->
         <div class="ln-fcarousel-slide active">
@@ -1937,6 +2072,7 @@
               <div class="ln-mock-dot" style="background:#4ade80;"></div>
               <span class="ln-mock-title">Today's Queue · Dr. Mehta</span>
             </div>
+            <div class="ln-mock-body">
             <div class="ln-mock-serving">
               <div>
                 <div class="ln-mock-serving-label">Now Serving</div>
@@ -1970,11 +2106,20 @@
                 </div>
                 <span class="ln-mock-badge ln-mock-badge--wait">Waiting</span>
               </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-num">07</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Deepak Rao</div>
+                  <div class="ln-mock-ptime">11:00 AM slot · ~35 min</div>
+                </div>
+                <span class="ln-mock-badge ln-mock-badge--wait">Waiting</span>
+              </div>
+            </div>
             </div>
           </div>
         </div>
 
-        <!-- 2. e-Prescriptions -->
+        <!-- 2. E-Prescriptions -->
         <div class="ln-fcarousel-slide">
           <div>
             <div class="ln-fcarousel-icon">
@@ -1987,46 +2132,52 @@
                 <line x1="10" y1="9" x2="8" y2="9" />
               </svg>
             </div>
-            <h3 class="ln-fcarousel-title">e-Prescriptions</h3>
-            <p class="ln-fcarousel-desc">Digital prescriptions with a 787-drug autocomplete, generic and Indian brand
-              names. Print-ready in one click.</p>
+            <h3 class="ln-fcarousel-title">E-Prescriptions</h3>
+            <p class="ln-fcarousel-desc">Drug names autocomplete as you type — a 787-drug database of generic and
+              Indian brand names, so there's barely any typing at all. Every prescription prints straight onto your
+              own clinic's letterhead, ready to hand to the patient.</p>
           </div>
-          <div class="ln-fcarousel-mock">
-            <div class="ln-mock-bar">
-              <div class="ln-mock-dot" style="background:#f87171;"></div>
-              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
-              <div class="ln-mock-dot" style="background:#4ade80;"></div>
-              <span class="ln-mock-title">Rx · Ramesh Patil</span>
+          <div class="ln-fcarousel-mock ln-fcarousel-mock--paper">
+            <div>
+              <div class="ln-paper-clinic">Mehta Clinic</div>
+              <div class="ln-paper-doctor">Dr. Rajesh Mehta · General Physician</div>
+              <div class="ln-paper-addr">243, 4th Avenue Marg, Sector 46, Chandigarh · +91 99154 46676</div>
             </div>
-            <div class="ln-mock-queue">
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Amoxicillin 500mg</div>
-                  <div class="ln-mock-ptime">1-0-1 · after food · 5 days</div>
-                </div>
+            <hr class="ln-paper-hr">
+            <div class="ln-paper-row">
+              <div>
+                <div class="ln-paper-label">Patient</div>
+                <div class="ln-paper-patient">Meher</div>
+                <div class="ln-paper-sub">24 yrs · Male</div>
               </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Paracetamol 650mg</div>
-                  <div class="ln-mock-ptime">SOS · for fever</div>
-                </div>
-              </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Cetirizine 10mg</div>
-                  <div class="ln-mock-ptime">0-0-1 · at night · 3 days</div>
-                </div>
-              </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Vitamin D3 60K</div>
-                  <div class="ln-mock-ptime">Once weekly · 4 weeks</div>
-                </div>
+              <div style="text-align:right;">
+                <div class="ln-paper-label">Date</div>
+                <div class="ln-paper-date">17 August 2026</div>
               </div>
             </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
-              <span style="font-size:11px;color:var(--muted);">787-drug database · generic + brand</span>
-              <span class="ln-mock-badge ln-mock-badge--wait">Print-ready</span>
+            <hr class="ln-paper-hr">
+            <div class="ln-paper-label">Diagnosis / Chief Complaint</div>
+            <div class="ln-paper-value">Fever</div>
+            <div class="ln-paper-med-table">
+              <div class="ln-paper-med-head">
+                <span>Drug</span><span>Dosage</span><span>Frequency</span><span>Days</span><span>Instructions</span>
+              </div>
+              <div class="ln-paper-med-row">
+                <strong>Calpol</strong><span>500 mg</span><span>Twice daily</span><span>3 days</span><span style="opacity:.75;font-style:italic;">After food</span>
+              </div>
+            </div>
+            <div class="ln-mock-body">
+              <div>
+                <div class="ln-paper-label" style="margin-top:14px;">Advice</div>
+                <div class="ln-paper-value">Rest, Liquid Diet (today only)</div>
+                <div class="ln-paper-label" style="margin-top:12px;">Follow-up</div>
+                <div class="ln-paper-value">Only if required</div>
+              </div>
+              <div class="ln-paper-sig">
+                <div class="ln-paper-sig-line">＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿</div>
+                <div class="ln-paper-sig-name">Dr. Rajesh Mehta</div>
+                <div class="ln-paper-sig-spec">General Physician</div>
+              </div>
             </div>
           </div>
         </div>
@@ -2044,45 +2195,56 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Billing &amp; GST</h3>
-            <p class="ln-fcarousel-desc">Line-item billing with discounts, GST, and every payment mode — cash, UPI,
-              card, insurance. PDF receipts generated instantly.</p>
+            <p class="ln-fcarousel-desc">Save your consultation fees once as a price catalog, then add them to a bill
+              with one tap. Discounts, GST, and every payment mode — cash, UPI, card, insurance — with PDF receipts
+              generated instantly.</p>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
               <div class="ln-mock-dot" style="background:#f87171;"></div>
               <div class="ln-mock-dot" style="background:#fbbf24;"></div>
               <div class="ln-mock-dot" style="background:#4ade80;"></div>
-              <span class="ln-mock-title">Bill #1042 · Ramesh Patil</span>
+              <span class="ln-mock-title">Collect Payment · Amar</span>
+              <span class="ln-mock-badge ln-mock-badge--wait" style="margin-left:auto;">Paid</span>
             </div>
-            <div class="ln-mock-queue" style="margin-bottom:12px;">
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Consultation</div>
+            <div class="ln-mock-body">
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim, var(--muted));margin-bottom:8px;">Price catalog · quick add</div>
+                <div class="ln-mock-pills" style="margin-bottom:16px;">
+                  <span class="ln-mock-pill">Consultation · ₹500</span>
+                  <span class="ln-mock-pill">Dressing · ₹300</span>
                 </div>
-                <div class="ln-mock-pname">₹500</div>
-              </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Dressing</div>
+                <div class="ln-mock-queue">
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info">
+                      <div class="ln-mock-pname">Consultation</div>
+                      <div class="ln-mock-ptime">Qty 1 × ₹500</div>
+                    </div>
+                    <div class="ln-mock-pname">₹500</div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info">
+                      <div class="ln-mock-pname">Dressing</div>
+                      <div class="ln-mock-ptime">Qty 1 × ₹300</div>
+                    </div>
+                    <div class="ln-mock-pname">₹300</div>
+                  </div>
                 </div>
-                <div class="ln-mock-pname">₹200</div>
               </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">GST (18%)</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim, var(--muted));margin:14px 0 8px;">Payment mode</div>
+                <div class="ln-mock-pills" style="margin-bottom:16px;">
+                  <span class="ln-mock-pill">Cash</span>
+                  <span class="ln-mock-pill ln-mock-pill--active">UPI</span>
+                  <span class="ln-mock-pill">Card</span>
+                  <span class="ln-mock-pill">Insurance</span>
+                  <span class="ln-mock-pill">Free</span>
                 </div>
-                <div class="ln-mock-pname">₹126</div>
+                <div class="ln-mock-serving ln-mock-serving--total">
+                  <div class="ln-mock-serving-label">Total · Paid via UPI</div>
+                  <div class="ln-mock-token" style="color:var(--amber);">₹800</div>
+                </div>
               </div>
-            </div>
-            <div class="ln-mock-serving ln-mock-serving--total" style="margin-bottom:14px;">
-              <div class="ln-mock-serving-label">Total · Paid via UPI</div>
-              <div class="ln-mock-token" style="color:var(--amber);">₹826</div>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Cash</span>
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">UPI</span>
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Card</span>
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Insurance</span>
             </div>
           </div>
         </div>
@@ -2096,46 +2258,68 @@
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </div>
-            <h3 class="ln-fcarousel-title">WhatsApp Reminders</h3>
-            <p class="ln-fcarousel-desc">Automatic booking confirmations and 2-hour reminders sent to patients. No
-              manual follow-up needed.</p>
+            <h3 class="ln-fcarousel-title">WhatsApp Notifications</h3>
+            <p class="ln-fcarousel-desc">Every step sends itself — a token message the moment a patient checks in, a
+              confirmation the moment an appointment is booked, and a receipt the moment a bill is paid. These are the
+              exact messages your patients receive, with no manual follow-up from you.</p>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
               <div class="ln-mock-dot" style="background:#f87171;"></div>
               <div class="ln-mock-dot" style="background:#fbbf24;"></div>
               <div class="ln-mock-dot" style="background:#4ade80;"></div>
-              <span class="ln-mock-title">WhatsApp · Ramesh Patil</span>
+              <span class="ln-mock-title">WhatsApp</span>
             </div>
-            <div class="ln-mock-chat" style="margin-bottom:10px;">
-              <div>
-                <div class="ln-mock-bubble">
-                  Hi Ramesh, reminder for your appointment with Dr. Mehta today at 10:15 AM. Reply CONFIRM to keep
-                  your slot.
-                </div>
-                <div class="ln-mock-bubble-meta">10:08 AM
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div class="ln-mock-chat" style="margin-bottom:14px;">
-              <div>
-                <div class="ln-mock-bubble">Thank you for visiting! Here's your receipt and feedback link. Get well
-                  soon 🙂</div>
-                <div class="ln-mock-bubble-meta">11:42 AM
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
+            <div class="ln-mock-chatscroll">
+              <div class="ln-mock-chat">
+                <div>
+                  <div class="ln-mock-bubble ln-mock-bubble--wa">
+                    Hello Sunita Desai,<br><br>
+                    You are checked in at <strong>Mehta Clinic</strong>.<br>
+                    Token: <strong>#04</strong><br>
+                    People ahead of you: <strong>1</strong><br>
+                    Estimated wait: <strong>~8 mins</strong><br><br>
+                    We will call you shortly.
+                  </div>
+                  <div class="ln-mock-bubble-meta">9:52 AM
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:11px;color:var(--muted);">Confirmations · reminders · receipts</span>
-              <span class="ln-mock-badge ln-mock-badge--wait">Zero manual follow-up</span>
+              <div class="ln-mock-chat">
+                <div>
+                  <div class="ln-mock-bubble ln-mock-bubble--wa">
+                    Hello Arjun Sharma,<br><br>
+                    Your appointment at <strong>Mehta Clinic</strong> is confirmed.<br>
+                    Date: <strong>17 Aug 2026</strong>&nbsp; Time: <strong>10:30 AM</strong><br>
+                    Duration: 15 mins<br>
+                    Address: 243, 4th Avenue Marg, Sector 46, Chandigarh<br><br>
+                    Please arrive 5 minutes early. To reschedule, call the clinic directly.
+                  </div>
+                  <div class="ln-mock-bubble-meta">10:01 AM
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  </div>
+                </div>
+              </div>
+              <div class="ln-mock-chat">
+                <div>
+                  <div class="ln-mock-bubble ln-mock-bubble--wa">
+                    <strong>Bill Receipt — Mehta Clinic</strong><br>
+                    Date: 17 Aug 2026<br>
+                    Patient: Amar<br><br>
+                    • Consultation: ₹500<br>
+                    • Dressing: ₹300<br><br>
+                    <strong>Total: ₹800</strong><br>
+                    Paid via: UPI<br><br>
+                    Thank you for visiting Mehta Clinic.<br><br>
+                    We would love your feedback — rate your visit here:<br>
+                    medtrack.life/feedback/8f2a1c
+                  </div>
+                  <div class="ln-mock-bubble-meta">11:20 AM
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2163,31 +2347,40 @@
               <div class="ln-mock-dot" style="background:#4ade80;"></div>
               <span class="ln-mock-title">Patient Vault</span>
             </div>
-            <div class="ln-mock-serving" style="background:var(--bg-3, var(--bg));border-color:var(--border);margin-bottom:14px;">
+            <div class="ln-mock-body">
               <div>
-                <div class="ln-mock-serving-name">Ramesh Patil</div>
-                <div style="font-size:11px;color:var(--muted);margin-top:2px;">42 yrs · 7 visits · since Jan 2025</div>
-              </div>
-            </div>
-            <div class="ln-mock-queue" style="margin-bottom:14px;">
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Doctor's note · 12 Aug</div>
-                  <div class="ln-mock-ptime">Mild fever, prescribed antibiotics, review in 5 days</div>
+                <div class="ln-mock-vault-name">Ramesh Patil</div>
+                <div style="font-size:12px;color:var(--muted);margin-top:3px;margin-bottom:16px;">42 yrs · 7 visits · since Jan 2025</div>
+                <div class="ln-mock-queue" style="margin-bottom:16px;">
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info">
+                      <div class="ln-mock-pname">Doctor's note · 12 Aug</div>
+                      <div class="ln-mock-ptime">Mild fever, prescribed antibiotics, review in 5 days</div>
+                    </div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info">
+                      <div class="ln-mock-pname">Doctor's note · 3 Jun</div>
+                      <div class="ln-mock-ptime">Routine follow-up, blood pressure stable</div>
+                    </div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info">
+                      <div class="ln-mock-pname">Allergies</div>
+                      <div class="ln-mock-ptime">Penicillin — flagged on every future visit</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Allergies</div>
-                  <div class="ln-mock-ptime">Penicillin — flagged on every future visit</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim, var(--muted));margin-bottom:8px;">Documents</div>
+                <div class="ln-mock-filechips">
+                  <span class="ln-mock-filechip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Lab Report.pdf</span>
+                  <span class="ln-mock-filechip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Prescription.pdf</span>
+                  <span class="ln-mock-filechip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>X-Ray.jpg</span>
+                  <span class="ln-mock-filechip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/></svg>Bill.pdf</span>
                 </div>
               </div>
-            </div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px;">
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">📄 Lab Report.pdf</span>
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">💊 Prescription.pdf</span>
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">🩻 X-Ray.jpg</span>
-              <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">🧾 Bill.pdf</span>
             </div>
           </div>
         </div>
@@ -2203,41 +2396,54 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Income &amp; Expenses</h3>
-            <p class="ln-fcarousel-desc">Track daily and monthly revenue, log clinic expenses by category, and see
-              net profit — no separate accounting tool needed.</p>
+            <p class="ln-fcarousel-desc">Every consultation and bill feeds your income automatically. Log expenses by
+              category alongside it, and see net profit for the month — no separate accounting tool needed.</p>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
               <div class="ln-mock-dot" style="background:#f87171;"></div>
               <div class="ln-mock-dot" style="background:#fbbf24;"></div>
               <div class="ln-mock-dot" style="background:#4ade80;"></div>
-              <span class="ln-mock-title">Income · This month</span>
+              <span class="ln-mock-title">Income &amp; Expenses · August</span>
             </div>
-            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
-              <div class="ln-mock-serving-name" style="font-size:20px;">₹1,84,200</div>
-              <span class="ln-mock-badge ln-mock-badge--wait">↑ 12% vs last month</span>
-            </div>
-            <div class="ln-mock-bars" style="margin-bottom:16px;">
-              <div class="ln-mock-bar-col" style="height:45%;"></div>
-              <div class="ln-mock-bar-col" style="height:65%;"></div>
-              <div class="ln-mock-bar-col" style="height:52%;"></div>
-              <div class="ln-mock-bar-col" style="height:80%;"></div>
-              <div class="ln-mock-bar-col" style="height:70%;"></div>
-              <div class="ln-mock-bar-col" style="height:95%;"></div>
-              <div class="ln-mock-bar-col" style="height:60%;"></div>
-            </div>
-            <div class="ln-mock-queue">
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Rent &amp; utilities</div>
+            <div class="ln-mock-body">
+              <div>
+                <div class="ln-mock-stats ln-mock-stats--3" style="margin-bottom:16px;">
+                  <div class="ln-mock-stat">
+                    <div class="ln-mock-stat-val" style="color:#4ade80;">₹1,84,200</div>
+                    <div class="ln-mock-stat-label">Income</div>
+                  </div>
+                  <div class="ln-mock-stat">
+                    <div class="ln-mock-stat-val">₹62,400</div>
+                    <div class="ln-mock-stat-label">Expenses</div>
+                  </div>
+                  <div class="ln-mock-stat">
+                    <div class="ln-mock-stat-val" style="color:#4ade80;">+₹1,21,800</div>
+                    <div class="ln-mock-stat-label">Net P&amp;L</div>
+                  </div>
                 </div>
-                <div class="ln-mock-ptime">− ₹32,000</div>
-              </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Net profit this month</div>
+                <div class="ln-mock-queue">
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info"><div class="ln-mock-pname">Consultations · 142 visits</div></div>
+                    <div class="ln-mock-pname" style="color:#4ade80;">+ ₹1,42,000</div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info"><div class="ln-mock-pname">Procedures &amp; dressing</div></div>
+                    <div class="ln-mock-pname" style="color:#4ade80;">+ ₹42,200</div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info"><div class="ln-mock-pname">Staff salaries</div></div>
+                    <div class="ln-mock-ptime">− ₹35,000</div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info"><div class="ln-mock-pname">Clinic rent</div></div>
+                    <div class="ln-mock-ptime">− ₹18,000</div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info"><div class="ln-mock-pname">Medical supplies</div></div>
+                    <div class="ln-mock-ptime">− ₹9,400</div>
+                  </div>
                 </div>
-                <div class="ln-mock-pname" style="color:#4ade80;">₹1,41,800</div>
               </div>
             </div>
           </div>
@@ -2257,8 +2463,9 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Multi-Doctor Clinics</h3>
-            <p class="ln-fcarousel-desc">Invite associate doctors under one clinic. Shared scheduling, shared
-              billing, one dashboard for the owner.</p>
+            <p class="ln-fcarousel-desc">Invite associate doctors under one clinic. Every doctor books into the same
+              shared appointment window — one queue, one calendar, no double-booking — with shared billing and a
+              single dashboard for the owner.</p>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2267,6 +2474,7 @@
               <div class="ln-mock-dot" style="background:#4ade80;"></div>
               <span class="ln-mock-title">Mehta Clinic · Team</span>
             </div>
+            <div class="ln-mock-body">
             <div class="ln-mock-queue">
               <div class="ln-mock-row">
                 <div class="ln-mock-avatar">SM</div>
@@ -2292,10 +2500,19 @@
                 </div>
                 <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Associate</span>
               </div>
+              <div class="ln-mock-row">
+                <div class="ln-mock-avatar">KR</div>
+                <div class="ln-mock-info">
+                  <div class="ln-mock-pname">Dr. Kavita Rao</div>
+                  <div class="ln-mock-ptime">Pediatrician</div>
+                </div>
+                <span class="ln-mock-badge" style="background:var(--bg-3, var(--bg));border:1px solid var(--border);color:var(--muted);">Associate</span>
+              </div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
-              <span style="font-size:11px;color:var(--muted);">Shared calendar · shared billing</span>
+              <span style="font-size:11px;color:var(--muted);">Shared appointment window · shared billing</span>
               <span class="ln-mock-badge ln-mock-badge--wait">1 dashboard</span>
+            </div>
             </div>
           </div>
         </div>
@@ -2312,45 +2529,60 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Reports &amp; Analytics</h3>
-            <p class="ln-fcarousel-desc">Daily revenue, top patients, visit trends, and completion rates. Know
-              exactly how your practice is performing.</p>
+            <p class="ln-fcarousel-desc">This week vs last week, completion and no-show rates, peak hours, top
+              patients, and where they found you. Know exactly how your practice is performing without exporting a
+              single spreadsheet.</p>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
               <div class="ln-mock-dot" style="background:#f87171;"></div>
               <div class="ln-mock-dot" style="background:#fbbf24;"></div>
               <div class="ln-mock-dot" style="background:#4ade80;"></div>
-              <span class="ln-mock-title">Reports · Today</span>
+              <span class="ln-mock-title">Reports · This Week</span>
             </div>
-            <div class="ln-mock-stats">
-              <div class="ln-mock-stat">
-                <div class="ln-mock-stat-val">24</div>
-                <div class="ln-mock-stat-label">Visits</div>
-              </div>
-              <div class="ln-mock-stat">
-                <div class="ln-mock-stat-val">₹12.4k</div>
-                <div class="ln-mock-stat-label">Revenue</div>
-              </div>
-              <div class="ln-mock-stat">
-                <div class="ln-mock-stat-val">92%</div>
-                <div class="ln-mock-stat-label">Completed</div>
-              </div>
-              <div class="ln-mock-stat">
-                <div class="ln-mock-stat-val">4.8★</div>
-                <div class="ln-mock-stat-label">Avg. rating</div>
-              </div>
-            </div>
-            <div class="ln-mock-queue" style="margin-top:14px;">
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Top patient</div>
-                  <div class="ln-mock-ptime">Sunita Desai · 9 visits this year</div>
+            <div class="ln-mock-body">
+              <div class="ln-mock-stats">
+                <div class="ln-mock-stat">
+                  <div class="ln-mock-stat-val">5</div>
+                  <div class="ln-mock-stat-label">This Week</div>
+                </div>
+                <div class="ln-mock-stat">
+                  <div class="ln-mock-stat-val">100%</div>
+                  <div class="ln-mock-stat-label">Completion</div>
+                </div>
+                <div class="ln-mock-stat">
+                  <div class="ln-mock-stat-val">0%</div>
+                  <div class="ln-mock-stat-label">No-show</div>
+                </div>
+                <div class="ln-mock-stat">
+                  <div class="ln-mock-stat-val">2 min</div>
+                  <div class="ln-mock-stat-label">Avg. wait</div>
                 </div>
               </div>
-              <div class="ln-mock-row">
-                <div class="ln-mock-info">
-                  <div class="ln-mock-pname">Busiest slot</div>
-                  <div class="ln-mock-ptime">10:00 AM – 12:00 PM · weekdays</div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim, var(--muted));margin:14px 0 8px;">Peak hours · last 30 days</div>
+                <div class="ln-mock-bars" style="height:56px;margin-bottom:14px;">
+                  <div class="ln-mock-bar-col" style="height:100%;"></div>
+                  <div class="ln-mock-bar-col" style="height:35%;"></div>
+                  <div class="ln-mock-bar-col" style="height:20%;"></div>
+                  <div class="ln-mock-bar-col" style="height:18%;"></div>
+                  <div class="ln-mock-bar-col" style="height:15%;"></div>
+                  <div class="ln-mock-bar-col" style="height:15%;"></div>
+                  <div class="ln-mock-bar-col" style="height:12%;"></div>
+                </div>
+                <div class="ln-mock-queue">
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info">
+                      <div class="ln-mock-pname">Top patient</div>
+                      <div class="ln-mock-ptime">Meher · 2 visits this month</div>
+                    </div>
+                  </div>
+                  <div class="ln-mock-row">
+                    <div class="ln-mock-info">
+                      <div class="ln-mock-pname">Top source</div>
+                      <div class="ln-mock-ptime">Facebook · 25% of known referrals</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2361,9 +2593,9 @@
 
     <div class="ln-fcarousel-dots" id="fcarouselDots">
       <button type="button" class="ln-fcarousel-dot active" data-index="0" aria-label="Appointments &amp; Walk-ins"></button>
-      <button type="button" class="ln-fcarousel-dot" data-index="1" aria-label="e-Prescriptions"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="1" aria-label="E-Prescriptions"></button>
       <button type="button" class="ln-fcarousel-dot" data-index="2" aria-label="Billing &amp; GST"></button>
-      <button type="button" class="ln-fcarousel-dot" data-index="3" aria-label="WhatsApp Reminders"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="3" aria-label="WhatsApp Notifications"></button>
       <button type="button" class="ln-fcarousel-dot" data-index="4" aria-label="Patient Records &amp; Vault"></button>
       <button type="button" class="ln-fcarousel-dot" data-index="5" aria-label="Income &amp; Expenses"></button>
       <button type="button" class="ln-fcarousel-dot" data-index="6" aria-label="Multi-Doctor Clinics"></button>
@@ -2628,6 +2860,8 @@
       var stage = document.querySelector('.ln-fcarousel');
       var slides = document.querySelectorAll('.ln-fcarousel-slide');
       var dots = document.querySelectorAll('.ln-fcarousel-dot');
+      var prevBtn = document.getElementById('fcarouselPrev');
+      var nextBtn = document.getElementById('fcarouselNext');
       if (!stage || !slides.length || !dots.length) return;
 
       var total = slides.length;
@@ -2662,8 +2896,43 @@
         });
       });
 
+      function manualGo(i) {
+        go(i);
+        start();
+      }
+
+      if (prevBtn) prevBtn.addEventListener('click', function () { manualGo(index - 1); });
+      if (nextBtn) nextBtn.addEventListener('click', function () { manualGo(index + 1); });
+
       stage.addEventListener('mouseenter', stop);
       stage.addEventListener('mouseleave', start);
+
+      // Trackpad two-finger horizontal swipe (and horizontal mouse-wheel).
+      // Vertical scroll intent (deltaY dominant) is left alone so the page
+      // still scrolls normally over the carousel.
+      var wheelLocked = false;
+      stage.addEventListener('wheel', function (e) {
+        if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || Math.abs(e.deltaX) < 12) return;
+        e.preventDefault();
+        if (wheelLocked) return;
+        wheelLocked = true;
+        manualGo(index + (e.deltaX > 0 ? 1 : -1));
+        setTimeout(function () { wheelLocked = false; }, 550);
+      }, { passive: false });
+
+      // Click-and-drag swipe (mouse) and touch drag — one pointer-event
+      // pair handles both.
+      var dragX = null;
+      stage.addEventListener('pointerdown', function (e) {
+        dragX = e.clientX;
+      });
+      stage.addEventListener('pointerup', function (e) {
+        if (dragX === null) return;
+        var dx = e.clientX - dragX;
+        dragX = null;
+        if (Math.abs(dx) > 50) manualGo(index + (dx < 0 ? 1 : -1));
+      });
+      stage.addEventListener('pointerleave', function () { dragX = null; });
 
       go(0);
       start();
