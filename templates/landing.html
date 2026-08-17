@@ -1014,40 +1014,42 @@
     }
 
     /* E-Prescriptions only: this one shows the actual printed letterhead
-       output (paper, not app chrome) — it's what the doctor hands the
-       patient, so it deliberately breaks from the dark-chrome mock style
-       used everywhere else. */
+       output — clinic header, rules, med table, signature — rather than
+       the app-chrome look every other card uses. The structure is what
+       reads as "a prescription," so it still uses the site's own theme
+       colors and follows dark/light mode like every other card, instead
+       of a hardcoded paper hue that only happened to work in light mode. */
     .ln-fcarousel-mock--paper {
-      background: #f4efe7;
-      color: #2a2420;
+      background: var(--bg-2);
+      color: var(--text);
       padding: 26px 28px;
     }
-    .ln-paper-clinic { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; color: #1a1410; }
-    .ln-paper-doctor { font-size: 12.5px; color: #5c5148; margin-top: 3px; }
-    .ln-paper-addr { font-size: 11px; color: #8a7f74; margin-top: 2px; }
-    .ln-paper-hr { border: none; border-top: 1px solid #ddd2c4; margin: 14px 0; }
+    .ln-paper-clinic { font-family: 'Playfair Display', serif; font-size: 19px; font-weight: 700; color: var(--text); }
+    .ln-paper-doctor { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+    .ln-paper-addr { font-size: 11px; color: var(--dim); margin-top: 2px; }
+    .ln-paper-hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     .ln-paper-row { display: flex; justify-content: space-between; align-items: baseline; }
-    .ln-paper-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #9a8f85; }
-    .ln-paper-patient { font-size: 15px; font-weight: 700; color: #1a1410; margin-top: 2px; }
-    .ln-paper-sub { font-size: 11.5px; color: #6b6058; margin-top: 1px; }
-    .ln-paper-date { font-size: 13px; font-weight: 700; color: #1a1410; }
-    .ln-paper-value { font-size: 13.5px; color: #2a2420; margin-top: 4px; }
+    .ln-paper-label { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+    .ln-paper-patient { font-size: 15px; font-weight: 700; color: var(--text); margin-top: 2px; }
+    .ln-paper-sub { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
+    .ln-paper-date { font-size: 13px; font-weight: 700; color: var(--text); }
+    .ln-paper-value { font-size: 13.5px; color: var(--text); margin-top: 4px; }
     .ln-paper-med-table { margin-top: 4px; }
     .ln-paper-med-head {
       display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1.2fr;
       font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
-      color: #9a8f85; padding-bottom: 6px; border-bottom: 1px solid #ddd2c4;
+      color: var(--dim); padding-bottom: 6px; border-bottom: 1px solid var(--border);
     }
     .ln-paper-med-row {
       display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr 1.2fr;
-      font-size: 12.5px; color: #2a2420; padding: 9px 0; border-bottom: 1px solid #ede6db;
+      font-size: 12.5px; color: var(--text); padding: 9px 0; border-bottom: 1px solid var(--border);
       align-items: center;
     }
     .ln-paper-med-row strong { font-size: 13px; }
     .ln-paper-sig { text-align: right; margin-top: auto; padding-top: 10px; }
-    .ln-paper-sig-line { color: #b8ab9c; font-size: 12px; }
-    .ln-paper-sig-name { font-size: 13px; font-weight: 700; color: #1a1410; margin-top: 2px; }
-    .ln-paper-sig-spec { font-size: 11px; color: #8a7f74; }
+    .ln-paper-sig-line { color: var(--border); font-size: 12px; }
+    .ln-paper-sig-name { font-size: 13px; font-weight: 700; color: var(--text); margin-top: 2px; }
+    .ln-paper-sig-spec { font-size: 11px; color: var(--dim); }
 
     /* Billing card: payment-mode pills + quick price-catalog buttons */
     .ln-mock-pills { display: flex; flex-wrap: wrap; gap: 6px; }
