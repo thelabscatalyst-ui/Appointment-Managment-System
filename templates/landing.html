@@ -97,6 +97,26 @@
       line-height: 1.6;
     }
 
+    /* ── Scroll progress bar ──────────────────────────────────
+       Cream in dark mode, dark brown in light mode — fixed to the very
+       top edge, above the nav, so it reads as page-completion at a
+       glance regardless of theme. Width is driven by JS on every scroll
+       frame; no CSS transition here since per-frame updates already
+       look continuous, and adding one would just lag the bar behind the
+       real position. */
+    .ln-scroll-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 0%;
+      height: 3px;
+      background: #f0e8da;
+      z-index: 500;
+    }
+    html.light .ln-scroll-progress {
+      background: #4a2f1a;
+    }
+
     /* ── Navbar ────────────────────────────────────────────── */
     .ln-nav {
       position: sticky;
@@ -1833,6 +1853,8 @@
 
 <body>
 
+  <div class="ln-scroll-progress" id="scrollProgress"></div>
+
   <!-- ══════════════════════════════════════════════════════════
      NAVBAR
 ══════════════════════════════════════════════════════════ -->
@@ -2826,6 +2848,89 @@
   </footer>
 
   <script>
+    // ── Scroll progress bar ─────────────────────────────────────────────────
+    (function () {
+      var bar = document.getElementById('scrollProgress');
+      if (!bar) return;
+      function update() {
+        var doc = document.documentElement;
+        var max = doc.scrollHeight - window.innerHeight;
+        bar.style.width = (max > 0 ? Math.min(100, (window.scrollY / max) * 100) : 0) + '%';
+      }
+      window.addEventListener('scroll', update, { passive: true });
+      window.addEventListener('resize', update);
+      update();
+    })();
+
+    // ── Smooth, eased scrolling ──────────────────────────────────────────────
+    // Wheel/trackpad input accumulates into a target position; the actual
+    // scroll position eases toward it every frame (lerp) instead of jumping
+    // straight there — fast flicks still feel like they're accelerating
+    // into place rather than snapping or lagging. Keyboard, scrollbar-drag,
+    // and touch scrolling are left native (untouched) and simply resync the
+    // target the moment they move the page, so nothing fights the user.
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+      var doc = document.documentElement;
+      var target = window.scrollY;
+      var current = window.scrollY;
+      var ease = 0.1;
+      var raf = null;
+      var ownScroll = false;
+
+      function maxScroll() {
+        return doc.scrollHeight - window.innerHeight;
+      }
+
+      function inScrollableAncestor(el) {
+        // nodeType 1 = Element — e.target can be document or (rarely) window,
+        // neither of which getComputedStyle() accepts.
+        while (el && el.nodeType === 1 && el !== document.body && el !== doc) {
+          var cs = window.getComputedStyle(el);
+          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight) {
+            return true;
+          }
+          el = el.parentElement;
+        }
+        return false;
+      }
+
+      function loop() {
+        current += (target - current) * ease;
+        if (Math.abs(target - current) < 0.5) {
+          current = target;
+          ownScroll = true;
+          window.scrollTo(0, current);
+          raf = null;
+          return;
+        }
+        ownScroll = true;
+        window.scrollTo(0, current);
+        raf = requestAnimationFrame(loop);
+      }
+
+      window.addEventListener('wheel', function (e) {
+        if (inScrollableAncestor(e.target)) return;
+        e.preventDefault();
+        target = Math.max(0, Math.min(maxScroll(), target + e.deltaY));
+        if (!raf) raf = requestAnimationFrame(loop);
+      }, { passive: false });
+
+      // Any scroll not driven by our own loop (keyboard, scrollbar drag,
+      // touch) — snap target/current to match so the next wheel tick eases
+      // from where the page actually is.
+      window.addEventListener('scroll', function () {
+        if (ownScroll) { ownScroll = false; return; }
+        target = window.scrollY;
+        current = window.scrollY;
+      }, { passive: true });
+
+      window.addEventListener('resize', function () {
+        target = Math.min(target, maxScroll());
+      });
+    })();
+
     // ── Landing animations: 3D mock parallax + scroll reveal ───────────────────
     (function () {
       var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
