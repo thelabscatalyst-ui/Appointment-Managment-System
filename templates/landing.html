@@ -1147,61 +1147,6 @@
     }
     .ln-mock-filechip svg { flex-shrink: 0; opacity: .7; }
 
-    /* WhatsApp card: the 3 real message types side by side as their own
-       columns, each one filled top-to-bottom — no scrolling, no dead
-       space, since every column carries its own label + full bubble. */
-    .ln-mock-chat-grid {
-      flex: 1;
-      min-height: 0;
-      display: grid;
-      /* The 2 short messages stack on the left; the long Bill Receipt
-         gets its own full-height column on the right — sized to what
-         each side actually needs instead of 3 equal, half-empty columns. */
-      grid-template-columns: 1fr 1.2fr;
-      grid-template-rows: 1fr;
-      gap: 14px;
-    }
-    .ln-mock-chat-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      min-height: 0;
-    }
-    .ln-mock-chat-stack .ln-mock-chat {
-      flex: 1;
-      min-height: 0;
-    }
-    /* The two stacked columns are half the height of the Bill Receipt
-       column, so their bubble text stays a size smaller to fit without
-       clipping — the long column keeps the larger, more legible size. */
-    .ln-mock-chat-stack .ln-mock-bubble--wa {
-      font-size: 10px;
-      line-height: 1.32;
-      padding: 6px 9px;
-    }
-    .ln-mock-chat-stack .ln-mock-chat-label { margin-bottom: 4px; }
-    /* No brand green — these are plain theme-neutral message boxes, same
-       recipe as the pills/chips elsewhere on the card, so they follow
-       dark/light mode automatically via the shared --bg-3/--border tokens. */
-    .ln-mock-bubble--wa {
-      /* flex:1 alone stretches this box within its .ln-mock-chat column —
-         it must NOT also be display:flex itself: with plain text mixed
-         with <br> and <strong>, flex lays out each fragment as its own
-         flex item instead of respecting the line breaks, scrambling the
-         message. Block layout (the default) is required here. */
-      flex: 1;
-      box-sizing: border-box;
-      background: var(--bg-3, var(--bg));
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 10px 12px;
-      max-width: 100%;
-      color: var(--text);
-      font-size: 11.5px;
-      line-height: 1.5;
-    }
-    .ln-mock-bubble--wa strong { color: var(--text); }
-
     /* 3-column stat row (Income & Expenses) */
     .ln-mock-stats--3 { grid-template-columns: repeat(3, 1fr); }
 
@@ -1253,47 +1198,6 @@
       color: var(--amber);
     }
 
-    .ln-mock-chat {
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
-      min-height: 0;
-    }
-
-    /* Column header — what this message actually is, since these are 3
-       labelled examples of real sends, not a back-and-forth conversation. */
-    .ln-mock-chat-label {
-      margin-bottom: 8px;
-    }
-    .ln-mock-chat-label-num {
-      font-family: 'Playfair Display', serif;
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--amber);
-      opacity: .8;
-      margin-right: 5px;
-    }
-    .ln-mock-chat-label-title {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .ln-mock-chat-label-sub {
-      font-size: 9.5px;
-      color: var(--dim);
-      line-height: 1.35;
-      margin-top: 2px;
-    }
-
-    .ln-mock-bubble-meta {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 4px;
-      margin-top: 6px;
-      font-size: 10px;
-      color: var(--muted);
-    }
 
     .ln-mock-bars {
       display: flex;
@@ -2455,117 +2359,7 @@
           </div>
         </div>
 
-        <!-- 4. WhatsApp Reminders -->
-        <div class="ln-fcarousel-slide">
-          <div class="ln-fcarousel-desc-box">
-            <div class="ln-fcarousel-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-              </svg>
-            </div>
-            <h3 class="ln-fcarousel-title">WhatsApp Notifications</h3>
-            <p class="ln-fcarousel-tagline">Every step notifies the patient automatically — no manual texting.</p>
-            <div class="ln-fcarousel-divider">
-              <span class="ln-fcarousel-divider-line"></span>
-              <span class="ln-fcarousel-divider-mark">&#10022;</span>
-              <span class="ln-fcarousel-divider-line"></span>
-            </div>
-            <p class="ln-fcarousel-desc">From check-in to payment, the patient gets a WhatsApp message at every
-              step — the exact texts shown here, sent for you with nothing to type.</p>
-            <ul class="ln-fcarousel-bullets">
-              <li>
-                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg></span>
-                <span class="ln-fcarousel-bullet-text">Token &amp; queue updates the moment they check in</span>
-              </li>
-              <li>
-                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
-                <span class="ln-fcarousel-bullet-text">Booking confirmations and appointment reminders</span>
-              </li>
-              <li>
-                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-                <span class="ln-fcarousel-bullet-text">Itemised bill receipts sent right after payment</span>
-              </li>
-              <li>
-                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span>
-                <span class="ln-fcarousel-bullet-text">Zero manual follow-up from the front desk</span>
-              </li>
-            </ul>
-          </div>
-          <div class="ln-fcarousel-mock">
-            <div class="ln-mock-bar">
-              <div class="ln-mock-dot" style="background:#f87171;"></div>
-              <div class="ln-mock-dot" style="background:#fbbf24;"></div>
-              <div class="ln-mock-dot" style="background:#4ade80;"></div>
-              <span class="ln-mock-title">WhatsApp</span>
-            </div>
-            <div class="ln-mock-chat-grid">
-              <div class="ln-mock-chat-stack">
-                <div class="ln-mock-chat">
-                  <div class="ln-mock-chat-label">
-                    <span class="ln-mock-chat-label-num">01</span>
-                    <span class="ln-mock-chat-label-title">Token &amp; Queue</span>
-                  </div>
-                  <div class="ln-mock-bubble--wa">
-                    Hello Sunita Desai,<br>
-                    You are checked in at <strong>Mehta Clinic</strong>.<br>
-                    Token: <strong>#04</strong><br>
-                    People ahead of you: <strong>1</strong><br>
-                    Estimated wait: <strong>~8 mins</strong><br>
-                    We will call you shortly.
-                  </div>
-                </div>
-                <div class="ln-mock-chat">
-                  <div class="ln-mock-chat-label">
-                    <span class="ln-mock-chat-label-num">02</span>
-                    <span class="ln-mock-chat-label-title">Booking Confirmation</span>
-                  </div>
-                  <div class="ln-mock-bubble--wa">
-                    Hello Arjun Sharma,<br>
-                    Your appointment at <strong>Mehta Clinic</strong> is confirmed.<br>
-                    Date: <strong>17 Aug 2026</strong>&nbsp; Time: <strong>10:30 AM</strong><br>
-                    Duration: 15 mins<br>
-                    Address: 243, 4th Avenue Marg, Sector 46, Chandigarh
-                  </div>
-                </div>
-                <div class="ln-mock-chat">
-                  <div class="ln-mock-chat-label">
-                    <span class="ln-mock-chat-label-num">03</span>
-                    <span class="ln-mock-chat-label-title">2-Hour Reminder</span>
-                  </div>
-                  <div class="ln-mock-bubble--wa">
-                    Reminder: Your appointment at <strong>Mehta Clinic</strong> is in about 2 hours, at
-                    <strong>10:30 AM</strong> today.<br>
-                    See you soon!
-                  </div>
-                </div>
-              </div>
-              <div class="ln-mock-chat">
-                <div class="ln-mock-chat-label">
-                  <span class="ln-mock-chat-label-num">04</span>
-                  <span class="ln-mock-chat-label-title">Bill Receipt</span>
-                </div>
-                <div class="ln-mock-bubble--wa">
-                  <strong>Bill Receipt — Mehta Clinic</strong><br>
-                  Date: 17 Aug 2026<br>
-                  Patient: Amar<br>
-                  • Consultation: ₹500<br>
-                  • Dressing: ₹300<br>
-                  • Injection administration: ₹150<br>
-                  • Nebulisation: ₹180<br>
-                  • ECG: ₹350<br>
-                  <strong>Total: ₹1,480</strong><br>
-                  Paid via: UPI<br>
-                  Thank you for visiting Mehta Clinic.<br>
-                  We would love your feedback — rate your visit here:<br>
-                  medtrack.life/feedback/8f2a1c
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 5. Patient Records & Vault -->
+        <!-- 4. Patient Records & Vault -->
         <div class="ln-fcarousel-slide">
           <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
@@ -2651,7 +2445,7 @@
           </div>
         </div>
 
-        <!-- 6. Income & Expenses -->
+        <!-- 5. Income & Expenses -->
         <div class="ln-fcarousel-slide">
           <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
@@ -2748,7 +2542,7 @@
           </div>
         </div>
 
-        <!-- 7. Multi-Doctor Clinics -->
+        <!-- 6. Multi-Doctor Clinics -->
         <div class="ln-fcarousel-slide">
           <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
@@ -2847,7 +2641,7 @@
           </div>
         </div>
 
-        <!-- 8. Reports & Analytics -->
+        <!-- 7. Reports & Analytics -->
         <div class="ln-fcarousel-slide">
           <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
@@ -2953,11 +2747,10 @@
       <button type="button" class="ln-fcarousel-dot active" data-index="0" aria-label="Appointments &amp; Walk-ins"></button>
       <button type="button" class="ln-fcarousel-dot" data-index="1" aria-label="E-Prescriptions"></button>
       <button type="button" class="ln-fcarousel-dot" data-index="2" aria-label="Billing &amp; GST"></button>
-      <button type="button" class="ln-fcarousel-dot" data-index="3" aria-label="WhatsApp Notifications"></button>
-      <button type="button" class="ln-fcarousel-dot" data-index="4" aria-label="Patient Records &amp; Vault"></button>
-      <button type="button" class="ln-fcarousel-dot" data-index="5" aria-label="Income &amp; Expenses"></button>
-      <button type="button" class="ln-fcarousel-dot" data-index="6" aria-label="Multi-Doctor Clinics"></button>
-      <button type="button" class="ln-fcarousel-dot" data-index="7" aria-label="Reports &amp; Analytics"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="3" aria-label="Patient Records &amp; Vault"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="4" aria-label="Income &amp; Expenses"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="5" aria-label="Multi-Doctor Clinics"></button>
+      <button type="button" class="ln-fcarousel-dot" data-index="6" aria-label="Reports &amp; Analytics"></button>
     </div>
   </section>
 
