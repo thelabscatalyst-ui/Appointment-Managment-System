@@ -141,6 +141,10 @@
          cancelling a 1.3 zoom on body takes its reciprocal here, not 1. */
       zoom: 0.7692;
     }
+    html.light .ln-nav {
+      background: #f0e6d4;
+      border-bottom-color: rgba(0, 0, 0, .08);
+    }
 
     .ln-brand {
       font-family: 'Playfair Display', serif;
@@ -150,9 +154,15 @@
       text-decoration: none;
       letter-spacing: -.01em;
     }
+    html.light .ln-brand {
+      color: #2a1c0e;
+    }
 
     .ln-brand:hover {
       color: #fff8f0;
+    }
+    html.light .ln-brand:hover {
+      color: #000;
     }
 
     .ln-nav-right {
@@ -170,9 +180,15 @@
       border-radius: var(--radius-sm);
       transition: color .15s;
     }
+    html.light .ln-signin {
+      color: #6b5540;
+    }
 
     .ln-signin:hover {
       color: #f0e6d4;
+    }
+    html.light .ln-signin:hover {
+      color: #2a1c0e;
     }
 
     .ln-cta-nav {
@@ -202,9 +218,15 @@
       align-items: center;
       transition: color .15s;
     }
+    html.light .ln-theme-btn {
+      color: #6b5540;
+    }
 
     .ln-theme-btn:hover {
       color: #f0e6d4;
+    }
+    html.light .ln-theme-btn:hover {
+      color: #2a1c0e;
     }
 
     /* ── Sections shared ───────────────────────────────────── */
@@ -1620,6 +1642,10 @@
       border-top: 1px solid rgba(255, 255, 255, .06);
       flex-wrap: wrap;
     }
+    html.light .ln-footer {
+      background: #f0e6d4;
+      border-top-color: rgba(0, 0, 0, .08);
+    }
 
     .ln-footer-brand {
       font-family: 'Playfair Display', serif;
@@ -1628,12 +1654,18 @@
       color: #f0e6d4;
       margin-bottom: 8px;
     }
+    html.light .ln-footer-brand {
+      color: #2a1c0e;
+    }
 
     .ln-footer-tagline {
       font-size: 12px;
       color: #8a7a6a;
       line-height: 1.6;
       max-width: 240px;
+    }
+    html.light .ln-footer-tagline {
+      color: #6b5540;
     }
 
     .ln-footer-links {
@@ -1649,9 +1681,15 @@
       text-decoration: none;
       transition: color .15s;
     }
+    html.light .ln-footer-link {
+      color: #6b5540;
+    }
 
     .ln-footer-link:hover {
       color: #f0e6d4;
+    }
+    html.light .ln-footer-link:hover {
+      color: #2a1c0e;
     }
 
     .ln-footer-copy {
@@ -1661,6 +1699,10 @@
       padding-top: 24px;
       border-top: 1px solid rgba(255, 255, 255, .05);
       text-align: center;
+    }
+    html.light .ln-footer-copy {
+      color: #a89680;
+      border-top-color: rgba(0, 0, 0, .06);
     }
 
     /* ── Responsive ────────────────────────────────────────── */
