@@ -1298,12 +1298,30 @@
       background: transparent;
       border-top: 1px solid var(--border);
       border-bottom: 1px solid var(--border);
-      padding: 18px 60px;
+      padding: 18px 0;
+      overflow: hidden;
+    }
+
+    /* Continuous marquee: the track holds the item list twice back to
+       back and slides left by exactly half its own width, so the moment
+       it resets to 0 the second copy is already sitting where the first
+       one started — no visible seam or jump. */
+    .ln-strip-track {
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 32px;
-      flex-wrap: wrap;
+      width: max-content;
+      animation: ln-strip-scroll 38s linear infinite;
+    }
+    .ln-strip:hover .ln-strip-track {
+      animation-play-state: paused;
+    }
+    @keyframes ln-strip-scroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ln-strip-track { animation: none; }
     }
 
     .ln-strip-item {
@@ -1312,11 +1330,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-    }
-
-    .ln-strip-item svg {
-      color: var(--amber);
-      flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .ln-strip-sep {
@@ -1675,7 +1689,9 @@
       }
 
       .ln-strip {
-        padding: 16px 32px;
+        padding: 16px 0;
+      }
+      .ln-strip-track {
         gap: 16px;
       }
 
@@ -1721,13 +1737,8 @@
         width: 100%;
       }
 
-      .ln-strip {
-        flex-direction: column;
+      .ln-strip-track {
         gap: 12px;
-      }
-
-      .ln-strip-sep {
-        display: none;
       }
 
       .ln-pricing-grid {
@@ -1804,7 +1815,7 @@
       }
 
       .ln-strip {
-        padding: 12px 14px;
+        padding: 12px 0;
       }
 
       .ln-how-grid {
@@ -1978,36 +1989,25 @@
      SOCIAL PROOF STRIP
 ══════════════════════════════════════════════════════════ -->
   <div class="ln-strip">
-    <div class="ln-strip-item">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      Seamless paperless clinic
-    </div>
-    <div class="ln-strip-sep"></div>
-    <div class="ln-strip-item">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      Works on any phone or browser
-    </div>
-    <div class="ln-strip-sep"></div>
-    <div class="ln-strip-item">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      WhatsApp-first notifications
-    </div>
-    <div class="ln-strip-sep"></div>
-    <div class="ln-strip-item">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-        stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-      </svg>
-      14-day free trial, no card needed
+    <div class="ln-strip-track">
+      {% macro strip_items() %}
+      <div class="ln-strip-item">Seamless paperless clinic</div>
+      <div class="ln-strip-sep"></div>
+      <div class="ln-strip-item">Works on any phone or browser</div>
+      <div class="ln-strip-sep"></div>
+      <div class="ln-strip-item">WhatsApp-first notifications</div>
+      <div class="ln-strip-sep"></div>
+      <div class="ln-strip-item">14-day free trial, no card needed</div>
+      <div class="ln-strip-sep"></div>
+      <div class="ln-strip-item">Starts at ₹599/month — cheaper than a dinner out</div>
+      <div class="ln-strip-sep"></div>
+      <div class="ln-strip-item">Live in under 5 minutes, no IT team needed</div>
+      <div class="ln-strip-sep"></div>
+      <div class="ln-strip-item">Your patient data stays private, always</div>
+      {% endmacro %}
+      {{ strip_items() }}
+      <div class="ln-strip-sep"></div>
+      {{ strip_items() }}
     </div>
   </div>
 
