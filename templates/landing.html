@@ -128,13 +128,13 @@
       position: sticky;
       top: 0;
       z-index: 200;
-      background: #2e1e0c;
+      background: #f0e6d4;
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 25px;
       height: 56px;
-      border-bottom: 1px solid rgba(255, 255, 255, .06);
+      border-bottom: 1px solid rgba(0, 0, 0, .08);
       /* Opts out of body's zoom — stays a normal compact bar regardless
          of how big the page content below it is scaled. zoom compounds
          through the ancestor chain (unlike most CSS properties), so
@@ -142,27 +142,27 @@
       zoom: 0.7692;
     }
     html.light .ln-nav {
-      background: #f0e6d4;
-      border-bottom-color: rgba(0, 0, 0, .08);
+      background: #2e1e0c;
+      border-bottom-color: rgba(255, 255, 255, .06);
     }
 
     .ln-brand {
       font-family: 'Playfair Display', serif;
       font-size: 20px;
       font-weight: 700;
-      color: #f0e6d4;
+      color: #2a1c0e;
       text-decoration: none;
       letter-spacing: -.01em;
     }
     html.light .ln-brand {
-      color: #2a1c0e;
+      color: #f0e6d4;
     }
 
     .ln-brand:hover {
-      color: #fff8f0;
+      color: #000;
     }
     html.light .ln-brand:hover {
-      color: #000;
+      color: #fff8f0;
     }
 
     .ln-nav-right {
@@ -174,21 +174,21 @@
     .ln-signin {
       font-size: 13px;
       font-weight: 500;
-      color: #c4b49e;
+      color: #6b5540;
       text-decoration: none;
       padding: 8px 14px;
       border-radius: var(--radius-sm);
       transition: color .15s;
     }
     html.light .ln-signin {
-      color: #6b5540;
+      color: #c4b49e;
     }
 
     .ln-signin:hover {
-      color: #f0e6d4;
+      color: #2a1c0e;
     }
     html.light .ln-signin:hover {
-      color: #2a1c0e;
+      color: #f0e6d4;
     }
 
     .ln-cta-nav {
@@ -211,7 +211,7 @@
       background: none;
       border: none;
       cursor: pointer;
-      color: #c4b49e;
+      color: #6b5540;
       padding: 8px;
       border-radius: 8px;
       display: flex;
@@ -219,14 +219,14 @@
       transition: color .15s;
     }
     html.light .ln-theme-btn {
-      color: #6b5540;
+      color: #c4b49e;
     }
 
     .ln-theme-btn:hover {
-      color: #f0e6d4;
+      color: #2a1c0e;
     }
     html.light .ln-theme-btn:hover {
-      color: #2a1c0e;
+      color: #f0e6d4;
     }
 
     /* ── Sections shared ───────────────────────────────────── */
@@ -1633,39 +1633,39 @@
 
     /* ── Footer ────────────────────────────────────────────── */
     .ln-footer {
-      background: #2e1e0c;
+      background: #f0e6d4;
       padding: 40px 60px;
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: 40px;
-      border-top: 1px solid rgba(255, 255, 255, .06);
+      border-top: 1px solid rgba(0, 0, 0, .08);
       flex-wrap: wrap;
     }
     html.light .ln-footer {
-      background: #f0e6d4;
-      border-top-color: rgba(0, 0, 0, .08);
+      background: #2e1e0c;
+      border-top-color: rgba(255, 255, 255, .06);
     }
 
     .ln-footer-brand {
       font-family: 'Playfair Display', serif;
       font-size: 18px;
       font-weight: 700;
-      color: #f0e6d4;
+      color: #2a1c0e;
       margin-bottom: 8px;
     }
     html.light .ln-footer-brand {
-      color: #2a1c0e;
+      color: #f0e6d4;
     }
 
     .ln-footer-tagline {
       font-size: 12px;
-      color: #8a7a6a;
+      color: #6b5540;
       line-height: 1.6;
       max-width: 240px;
     }
     html.light .ln-footer-tagline {
-      color: #6b5540;
+      color: #8a7a6a;
     }
 
     .ln-footer-links {
@@ -1677,32 +1677,32 @@
 
     .ln-footer-link {
       font-size: 13px;
-      color: #8a7a6a;
+      color: #6b5540;
       text-decoration: none;
       transition: color .15s;
     }
     html.light .ln-footer-link {
-      color: #6b5540;
+      color: #8a7a6a;
     }
 
     .ln-footer-link:hover {
-      color: #f0e6d4;
+      color: #2a1c0e;
     }
     html.light .ln-footer-link:hover {
-      color: #2a1c0e;
+      color: #f0e6d4;
     }
 
     .ln-footer-copy {
       width: 100%;
       font-size: 11px;
-      color: #5e4e3e;
+      color: #a89680;
       padding-top: 24px;
-      border-top: 1px solid rgba(255, 255, 255, .05);
+      border-top: 1px solid rgba(0, 0, 0, .06);
       text-align: center;
     }
     html.light .ln-footer-copy {
-      color: #a89680;
-      border-top-color: rgba(0, 0, 0, .06);
+      color: #5e4e3e;
+      border-top-color: rgba(255, 255, 255, .05);
     }
 
     /* ── Responsive ────────────────────────────────────────── */
