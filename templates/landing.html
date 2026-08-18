@@ -986,44 +986,76 @@
       margin-bottom: 14px;
     }
 
-    /* Thin, theme-adjusted curved-border box wrapping each card's brief +
-       bullet points — border color follows --border, which already flips
-       between the dark and light palettes, so this needs no separate
-       light/dark rules of its own. */
     .ln-fcarousel-desc-box {
       max-width: 420px;
     }
     .ln-fcarousel-desc-box .ln-fcarousel-icon {
       margin-bottom: 16px;
     }
+
+    /* Short one-line tagline directly under the heading. */
+    .ln-fcarousel-tagline {
+      font-size: 15px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    /* Line – sparkle – line divider between the tagline and the fuller
+       paragraph below it. */
+    .ln-fcarousel-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .ln-fcarousel-divider-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .ln-fcarousel-divider-mark {
+      flex-shrink: 0;
+      color: var(--amber);
+      font-size: 13px;
+      line-height: 1;
+    }
+
     .ln-fcarousel-desc-box .ln-fcarousel-desc {
       max-width: none;
-      margin-bottom: 12px;
+      margin-bottom: 20px;
     }
+
+    /* Icon-boxed bullet rows, replacing the plain dot list. */
     .ln-fcarousel-bullets {
       list-style: none;
       margin: 0;
       padding: 0;
       display: flex;
       flex-direction: column;
-      gap: 9px;
+      gap: 14px;
     }
     .ln-fcarousel-bullets li {
-      position: relative;
-      padding-left: 17px;
-      font-size: 13.5px;
-      color: var(--muted);
-      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 14px;
     }
-    .ln-fcarousel-bullets li::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 7px;
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: var(--amber);
+    .ln-fcarousel-bullet-icon {
+      width: 36px;
+      height: 36px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: rgba(180, 130, 60, .1);
+      border: 1px solid rgba(180, 130, 60, .2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--amber);
+    }
+    .ln-fcarousel-bullet-text {
+      font-size: 14px;
+      color: var(--text);
+      line-height: 1.4;
     }
 
     /* The floating window itself — same recipe as .ln-hero-mock, minus the
@@ -1355,12 +1387,12 @@
     }
 
     @media (max-width: 860px) {
-      /* Stacked layout: bordered text box (now enclosing the icon and
-         heading too, so it runs taller) + gap + mock must all fit within
+      /* Stacked layout: text column (icon, heading, tagline, divider,
+         paragraph, 4 icon-boxed bullets) + gap + mock must all fit within
          this floor, since the slide is position:absolute and won't grow
          to fit overflowing content on its own. */
       .ln-fcarousel {
-        min-height: 980px;
+        min-height: 1090px;
       }
 
       .ln-fcarousel-slide {
@@ -2165,12 +2197,31 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Appointments &amp; Walk-ins</h3>
-            <p class="ln-fcarousel-desc">Manage walk-ins and scheduled visits from one live queue.</p>
+            <p class="ln-fcarousel-tagline">Manage walk-ins and scheduled visits from one live queue.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">Patients check in, book online, or walk in — everyone sees exactly where
+              they stand in the queue, live, without asking the front desk.</p>
             <ul class="ln-fcarousel-bullets">
-              <li>Token-based queue for walk-in patients</li>
-              <li>Online booking for scheduled appointments</li>
-              <li>Live display screen for the waiting room</li>
-              <li>Real-time wait-time estimates per patient</li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Token-based queue for walk-in patients</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Online booking for scheduled appointments</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Live display screen for the waiting room</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Real-time wait-time estimates per patient</span>
+              </li>
             </ul>
           </div>
           <div class="ln-fcarousel-mock">
@@ -2241,13 +2292,32 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">E-Prescriptions</h3>
-              <p class="ln-fcarousel-desc">Write and print prescriptions in seconds, not minutes.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>787-drug autocomplete, generic and Indian brand names</li>
-                <li>Dosage, frequency, and instructions as quick-pick dropdowns</li>
-                <li>Prints straight onto your own clinic's letterhead</li>
-                <li>Saved to the patient's record automatically</li>
-              </ul>
+            <p class="ln-fcarousel-tagline">Write and print prescriptions in seconds, not minutes.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">Search a drug, pick the dosage, and you're done — every prescription
+              prints instantly on your own clinic's letterhead, ready to hand to the patient.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">787-drug autocomplete, generic and Indian brand names</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Dosage, frequency, and instructions as quick-pick dropdowns</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Prints straight onto your own clinic's letterhead</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Saved to the patient's record automatically</span>
+              </li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock ln-fcarousel-mock--paper">
             <div>
@@ -2307,13 +2377,33 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Billing &amp; GST</h3>
-              <p class="ln-fcarousel-desc">Bill a patient in a few taps, not a calculator.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>Save consultation fees once as a price catalog</li>
-                <li>Add items with one tap, apply discounts and GST</li>
-                <li>Every payment mode — cash, UPI, card, insurance</li>
-                <li>PDF receipts generated and sent instantly</li>
-              </ul>
+            <p class="ln-fcarousel-tagline">Turn every consultation into a clean, complete bill in seconds.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">Create invoices effortlessly with saved services, automatic GST
+              calculations, flexible payment modes, and instant digital receipts — all from one simple billing
+              screen.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Save consultation fees and services once</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Apply GST and discounts automatically</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Accept Cash, UPI, Card, Insurance, or Free</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Generate and share receipts instantly</span>
+              </li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2375,13 +2465,32 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">WhatsApp Notifications</h3>
-              <p class="ln-fcarousel-desc">Every step notifies the patient automatically — no manual texting.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>Token &amp; queue updates the moment they check in</li>
-                <li>Booking confirmations and appointment reminders</li>
-                <li>Itemised bill receipts sent right after payment</li>
-                <li>Zero manual follow-up from the front desk</li>
-              </ul>
+            <p class="ln-fcarousel-tagline">Every step notifies the patient automatically — no manual texting.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">From check-in to payment, the patient gets a WhatsApp message at every
+              step — the exact texts shown here, sent for you with nothing to type.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Token &amp; queue updates the moment they check in</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Booking confirmations and appointment reminders</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Itemised bill receipts sent right after payment</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.89 17.89 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Zero manual follow-up from the front desk</span>
+              </li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2469,13 +2578,32 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Patient Records &amp; Vault</h3>
-              <p class="ln-fcarousel-desc">Every visit, note, and document — in one secure place.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>Full visit history and doctor's notes per patient</li>
-                <li>Upload lab reports, X-rays, prescriptions, and bills</li>
-                <li>Allergies and flags surfaced on every future visit</li>
-                <li>Searchable across your entire patient base</li>
-              </ul>
+            <p class="ln-fcarousel-tagline">Every visit, note, and document — in one secure place.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">Every note, report, and prescription lives on the patient's timeline, so
+              history is always one click away instead of buried in a paper file.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Full visit history and doctor's notes per patient</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Upload lab reports, X-rays, prescriptions, and bills</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Allergies and flags surfaced on every future visit</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Searchable across your entire patient base</span>
+              </li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2534,13 +2662,32 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Income &amp; Expenses</h3>
-              <p class="ln-fcarousel-desc">See exactly what your clinic earns and spends, automatically.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>Every consultation and bill logged as income in real time</li>
-                <li>Log expenses by category — rent, salaries, supplies</li>
-                <li>30-day revenue trend and payment-mode breakdown</li>
-                <li>Net profit calculated for you, no spreadsheet needed</li>
-              </ul>
+            <p class="ln-fcarousel-tagline">See exactly what your clinic earns and spends, automatically.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">Every consultation and bill becomes income the moment it's recorded — log
+              expenses alongside it and watch your net profit calculate itself.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Every consultation and bill logged as income in real time</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2.41 12.4a2 2 0 0 1 0-2.83l7.17-7.17a2 2 0 0 1 1.42-.59H18a2 2 0 0 1 2 2v6.17a2 2 0 0 1-.59 1.42Z"/><circle cx="7" cy="7" r="1"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Log expenses by category — rent, salaries, supplies</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">30-day revenue trend and payment-mode breakdown</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="12" x2="8.01" y2="12"/><line x1="12" y1="12" x2="12.01" y2="12"/><line x1="16" y1="12" x2="16.01" y2="12"/><line x1="8" y1="16" x2="8.01" y2="16"/><line x1="12" y1="16" x2="12.01" y2="16"/><line x1="16" y1="16" x2="16.01" y2="16"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Net profit calculated for you, no spreadsheet needed</span>
+              </li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2615,13 +2762,32 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Multi-Doctor Clinics</h3>
-              <p class="ln-fcarousel-desc">Run a multi-doctor practice from one shared system.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>Invite associate doctors under one clinic account</li>
-                <li>One shared appointment window — no double-booking</li>
-                <li>Shared billing and price catalog across doctors</li>
-                <li>Single dashboard for the clinic owner</li>
-              </ul>
+            <p class="ln-fcarousel-tagline">Run a multi-doctor practice from one shared system.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">Add every associate doctor under one clinic account, and they all share
+              the same queue, calendar, and billing — with a single dashboard for you as the owner.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Invite associate doctors under one clinic account</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">One shared appointment window — no double-booking</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Shared billing and price catalog across doctors</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Single dashboard for the clinic owner</span>
+              </li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2693,13 +2859,32 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Reports &amp; Analytics</h3>
-              <p class="ln-fcarousel-desc">Know how your practice is really performing, at a glance.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>Weekly trends, completion and no-show rates</li>
-                <li>Peak-hour patterns to plan staffing</li>
-                <li>Top patients and where new ones are finding you</li>
-                <li>Visit-type breakdown across your patient base</li>
-              </ul>
+            <p class="ln-fcarousel-tagline">Know how your practice is really performing, at a glance.</p>
+            <div class="ln-fcarousel-divider">
+              <span class="ln-fcarousel-divider-line"></span>
+              <span class="ln-fcarousel-divider-mark">&#10022;</span>
+              <span class="ln-fcarousel-divider-line"></span>
+            </div>
+            <p class="ln-fcarousel-desc">See your busiest hours, your most loyal patients, and where new ones are
+              finding you — all summarised automatically, with nothing to export.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Weekly trends, completion and no-show rates</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Peak-hour patterns to plan staffing</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Top patients and where new ones are finding you</span>
+              </li>
+              <li>
+                <span class="ln-fcarousel-bullet-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span>
+                <span class="ln-fcarousel-bullet-text">Visit-type breakdown across your patient base</span>
+              </li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
