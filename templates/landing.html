@@ -991,10 +991,13 @@
        between the dark and light palettes, so this needs no separate
        light/dark rules of its own. */
     .ln-fcarousel-desc-box {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px 20px;
+      border: 3px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 24px;
       max-width: 420px;
+    }
+    .ln-fcarousel-desc-box .ln-fcarousel-icon {
+      margin-bottom: 16px;
     }
     .ln-fcarousel-desc-box .ln-fcarousel-desc {
       max-width: none;
@@ -1152,9 +1155,13 @@
        recipe as the pills/chips elsewhere on the card, so they follow
        dark/light mode automatically via the shared --bg-3/--border tokens. */
     .ln-mock-bubble--wa {
+      /* flex:1 alone stretches this box within its .ln-mock-chat column —
+         it must NOT also be display:flex itself: with plain text mixed
+         with <br> and <strong>, flex lays out each fragment as its own
+         flex item instead of respecting the line breaks, scrambling the
+         message. Block layout (the default) is required here. */
       flex: 1;
-      display: flex;
-      align-items: center;
+      box-sizing: border-box;
       background: var(--bg-3, var(--bg));
       border: 1px solid var(--border);
       border-radius: 10px;
@@ -1269,7 +1276,7 @@
 
     .ln-mock-bar-col {
       flex: 1;
-      background: linear-gradient(180deg, var(--amber), rgba(180, 130, 60, .35));
+      background: linear-gradient(180deg, var(--muted), var(--border));
       border-radius: 4px 4px 0 0;
       min-height: 6px;
     }
@@ -1351,8 +1358,12 @@
     }
 
     @media (max-width: 860px) {
+      /* Stacked layout: bordered text box (now enclosing the icon and
+         heading too, so it runs taller) + gap + mock must all fit within
+         this floor, since the slide is position:absolute and won't grow
+         to fit overflowing content on its own. */
       .ln-fcarousel {
-        min-height: 840px;
+        min-height: 980px;
       }
 
       .ln-fcarousel-slide {
@@ -2146,7 +2157,7 @@
 
         <!-- 1. Appointments & Walk-ins -->
         <div class="ln-fcarousel-slide active">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2157,15 +2168,13 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Appointments &amp; Walk-ins</h3>
-            <div class="ln-fcarousel-desc-box">
-              <p class="ln-fcarousel-desc">Manage walk-ins and scheduled visits from one live queue.</p>
-              <ul class="ln-fcarousel-bullets">
-                <li>Token-based queue for walk-in patients</li>
-                <li>Online booking for scheduled appointments</li>
-                <li>Live display screen for the waiting room</li>
-                <li>Real-time wait-time estimates per patient</li>
-              </ul>
-            </div>
+            <p class="ln-fcarousel-desc">Manage walk-ins and scheduled visits from one live queue.</p>
+            <ul class="ln-fcarousel-bullets">
+              <li>Token-based queue for walk-in patients</li>
+              <li>Online booking for scheduled appointments</li>
+              <li>Live display screen for the waiting room</li>
+              <li>Real-time wait-time estimates per patient</li>
+            </ul>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2223,7 +2232,7 @@
 
         <!-- 2. E-Prescriptions -->
         <div class="ln-fcarousel-slide">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2235,7 +2244,6 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">E-Prescriptions</h3>
-            <div class="ln-fcarousel-desc-box">
               <p class="ln-fcarousel-desc">Write and print prescriptions in seconds, not minutes.</p>
               <ul class="ln-fcarousel-bullets">
                 <li>787-drug autocomplete, generic and Indian brand names</li>
@@ -2243,7 +2251,6 @@
                 <li>Prints straight onto your own clinic's letterhead</li>
                 <li>Saved to the patient's record automatically</li>
               </ul>
-            </div>
           </div>
           <div class="ln-fcarousel-mock ln-fcarousel-mock--paper">
             <div>
@@ -2292,7 +2299,7 @@
 
         <!-- 3. Billing & GST -->
         <div class="ln-fcarousel-slide">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2303,7 +2310,6 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Billing &amp; GST</h3>
-            <div class="ln-fcarousel-desc-box">
               <p class="ln-fcarousel-desc">Bill a patient in a few taps, not a calculator.</p>
               <ul class="ln-fcarousel-bullets">
                 <li>Save consultation fees once as a price catalog</li>
@@ -2311,7 +2317,6 @@
                 <li>Every payment mode — cash, UPI, card, insurance</li>
                 <li>PDF receipts generated and sent instantly</li>
               </ul>
-            </div>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2365,7 +2370,7 @@
 
         <!-- 4. WhatsApp Reminders -->
         <div class="ln-fcarousel-slide">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2373,7 +2378,6 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">WhatsApp Notifications</h3>
-            <div class="ln-fcarousel-desc-box">
               <p class="ln-fcarousel-desc">Every step notifies the patient automatically — no manual texting.</p>
               <ul class="ln-fcarousel-bullets">
                 <li>Token &amp; queue updates the moment they check in</li>
@@ -2381,7 +2385,6 @@
                 <li>Itemised bill receipts sent right after payment</li>
                 <li>Zero manual follow-up from the front desk</li>
               </ul>
-            </div>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2459,7 +2462,7 @@
 
         <!-- 5. Patient Records & Vault -->
         <div class="ln-fcarousel-slide">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2470,7 +2473,6 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Patient Records &amp; Vault</h3>
-            <div class="ln-fcarousel-desc-box">
               <p class="ln-fcarousel-desc">Every visit, note, and document — in one secure place.</p>
               <ul class="ln-fcarousel-bullets">
                 <li>Full visit history and doctor's notes per patient</li>
@@ -2478,7 +2480,6 @@
                 <li>Allergies and flags surfaced on every future visit</li>
                 <li>Searchable across your entire patient base</li>
               </ul>
-            </div>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2528,7 +2529,7 @@
 
         <!-- 6. Income & Expenses -->
         <div class="ln-fcarousel-slide">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2537,7 +2538,6 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Income &amp; Expenses</h3>
-            <div class="ln-fcarousel-desc-box">
               <p class="ln-fcarousel-desc">See exactly what your clinic earns and spends, automatically.</p>
               <ul class="ln-fcarousel-bullets">
                 <li>Every consultation and bill logged as income in real time</li>
@@ -2545,7 +2545,6 @@
                 <li>30-day revenue trend and payment-mode breakdown</li>
                 <li>Net profit calculated for you, no spreadsheet needed</li>
               </ul>
-            </div>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2556,7 +2555,7 @@
             </div>
             <div class="ln-mock-body">
               <div>
-                <div class="ln-mock-stats" style="margin-bottom:14px;">
+                <div class="ln-mock-stats" style="margin-bottom:16px;">
                   <div class="ln-mock-stat">
                     <div class="ln-mock-stat-val">₹8,400</div>
                     <div class="ln-mock-stat-label">Today</div>
@@ -2575,7 +2574,7 @@
                   </div>
                 </div>
                 <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim, var(--muted));margin-bottom:8px;">30-day revenue</div>
-                <div class="ln-mock-bars" style="height:56px;margin-bottom:14px;">
+                <div class="ln-mock-bars" style="height:96px;margin-bottom:18px;">
                   <div class="ln-mock-bar-col" style="height:38%;"></div>
                   <div class="ln-mock-bar-col" style="height:62%;"></div>
                   <div class="ln-mock-bar-col" style="height:45%;"></div>
@@ -2589,6 +2588,10 @@
                 </div>
               </div>
               <div class="ln-mock-queue">
+                <div class="ln-mock-row">
+                  <div class="ln-mock-info"><div class="ln-mock-pname">Avg. bill value</div></div>
+                  <div class="ln-mock-ptime">₹1,438 · 128 visits this month</div>
+                </div>
                 <div class="ln-mock-row">
                   <div class="ln-mock-info"><div class="ln-mock-pname">Payment mode</div></div>
                   <div class="ln-mock-ptime">UPI 64% · Cash 24% · Card 12%</div>
@@ -2604,7 +2607,7 @@
 
         <!-- 7. Multi-Doctor Clinics -->
         <div class="ln-fcarousel-slide">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2616,7 +2619,6 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Multi-Doctor Clinics</h3>
-            <div class="ln-fcarousel-desc-box">
               <p class="ln-fcarousel-desc">Run a multi-doctor practice from one shared system.</p>
               <ul class="ln-fcarousel-bullets">
                 <li>Invite associate doctors under one clinic account</li>
@@ -2624,7 +2626,6 @@
                 <li>Shared billing and price catalog across doctors</li>
                 <li>Single dashboard for the clinic owner</li>
               </ul>
-            </div>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2686,7 +2687,7 @@
 
         <!-- 8. Reports & Analytics -->
         <div class="ln-fcarousel-slide">
-          <div>
+          <div class="ln-fcarousel-desc-box">
             <div class="ln-fcarousel-icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                 stroke-linecap="round" stroke-linejoin="round">
@@ -2696,7 +2697,6 @@
               </svg>
             </div>
             <h3 class="ln-fcarousel-title">Reports &amp; Analytics</h3>
-            <div class="ln-fcarousel-desc-box">
               <p class="ln-fcarousel-desc">Know how your practice is really performing, at a glance.</p>
               <ul class="ln-fcarousel-bullets">
                 <li>Weekly trends, completion and no-show rates</li>
@@ -2704,7 +2704,6 @@
                 <li>Top patients and where new ones are finding you</li>
                 <li>Visit-type breakdown across your patient base</li>
               </ul>
-            </div>
           </div>
           <div class="ln-fcarousel-mock">
             <div class="ln-mock-bar">
@@ -2733,8 +2732,8 @@
                 </div>
               </div>
               <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim, var(--muted));margin:14px 0 8px;">Peak hours · last 30 days</div>
-                <div class="ln-mock-bars" style="height:56px;margin-bottom:14px;">
+                <div style="font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dim, var(--muted));margin:16px 0 8px;">Peak hours · last 30 days</div>
+                <div class="ln-mock-bars" style="height:104px;margin-bottom:18px;">
                   <div class="ln-mock-bar-col" style="height:30%;"></div>
                   <div class="ln-mock-bar-col" style="height:72%;"></div>
                   <div class="ln-mock-bar-col" style="height:100%;"></div>
