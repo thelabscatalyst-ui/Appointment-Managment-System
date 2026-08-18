@@ -996,6 +996,11 @@
       padding: 22px 24px;
       max-width: 420px;
     }
+    /* Light theme's --border (#c2a98a) is too pale at 3px — a medium
+       brown reads clearly against the cream background instead. */
+    html.light .ln-fcarousel-desc-box {
+      border-color: #8b5a2b;
+    }
     .ln-fcarousel-desc-box .ln-fcarousel-icon {
       margin-bottom: 16px;
     }
@@ -2419,8 +2424,7 @@
                     Your appointment at <strong>Mehta Clinic</strong> is confirmed.<br>
                     Date: <strong>17 Aug 2026</strong>&nbsp; Time: <strong>10:30 AM</strong><br>
                     Duration: 15 mins<br>
-                    Address: 243, 4th Avenue Marg, Sector 46, Chandigarh<br>
-                    Please arrive 5 minutes early. To reschedule, call the clinic directly.
+                    Address: 243, 4th Avenue Marg, Sector 46, Chandigarh
                   </div>
                 </div>
                 <div class="ln-mock-chat">
