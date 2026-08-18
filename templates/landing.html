@@ -1150,42 +1150,6 @@
     /* 3-column stat row (Income & Expenses) */
     .ln-mock-stats--3 { grid-template-columns: repeat(3, 1fr); }
 
-    /* Small nav arrows either side of the stage */
-    .ln-fcarousel-arrow {
-      position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 34px;
-      height: 34px;
-      border-radius: 50%;
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      color: var(--muted);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: color .15s ease, border-color .15s ease, background .15s ease;
-      z-index: 5;
-    }
-    .ln-fcarousel-arrow:hover { color: var(--amber); border-color: var(--amber); background: rgba(180,130,60,.08); }
-    /* Flank the mock card, not the whole two-column stage — the mock is
-       the last grid track (1.1fr of 1fr+1.1fr), so its left edge sits at
-       roughly the 50% mark regardless of stage width. Anchoring "prev" to
-       the stage's own left edge instead would land it on top of the
-       running description text. */
-    .ln-fcarousel-arrow--prev { left: calc(50% - 17px); }
-    .ln-fcarousel-arrow--next { right: -17px; }
-    @media (max-width: 1380px) {
-      .ln-fcarousel-arrow--next { right: 4px; }
-    }
-    @media (max-width: 860px) {
-      /* Stacked single-column layout — text and mock share the full
-         width, so a left/right flank has nothing safe to sit beside.
-         Touch swipe and the dots cover navigation here instead. */
-      .ln-fcarousel-arrow { display: none; }
-    }
-
     /* Reusable mock body primitives — new ones only where .ln-mock-row /
        .ln-mock-serving don't already fit the shape (chat bubble, bar chart,
        avatar, stat tiles). Everything else below reuses those verbatim. */
@@ -2081,12 +2045,6 @@
 ══════════════════════════════════════════════════════════ -->
   <section class="ln-section">
     <div class="ln-fcarousel">
-      <button type="button" class="ln-fcarousel-arrow ln-fcarousel-arrow--prev" id="fcarouselPrev" aria-label="Previous feature">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-      </button>
-      <button type="button" class="ln-fcarousel-arrow ln-fcarousel-arrow--next" id="fcarouselNext" aria-label="Next feature">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-      </button>
 
         <!-- 1. Appointments & Walk-ins -->
         <div class="ln-fcarousel-slide active">
@@ -3011,8 +2969,6 @@
       var stage = document.querySelector('.ln-fcarousel');
       var slides = document.querySelectorAll('.ln-fcarousel-slide');
       var dots = document.querySelectorAll('.ln-fcarousel-dot');
-      var prevBtn = document.getElementById('fcarouselPrev');
-      var nextBtn = document.getElementById('fcarouselNext');
       if (!stage || !slides.length || !dots.length) return;
 
       var total = slides.length;
@@ -3051,9 +3007,6 @@
         go(i);
         start();
       }
-
-      if (prevBtn) prevBtn.addEventListener('click', function () { manualGo(index - 1); });
-      if (nextBtn) nextBtn.addEventListener('click', function () { manualGo(index + 1); });
 
       stage.addEventListener('mouseenter', stop);
       stage.addEventListener('mouseleave', start);
