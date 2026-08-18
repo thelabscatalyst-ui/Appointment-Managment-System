@@ -426,6 +426,10 @@
       position: relative;
       overflow: hidden;
       perspective: 1400px;
+      /* Scaled up so the hero (and so everything below it) sits taller —
+         the MacBook demo mockup further down the page no longer peeks
+         into view on first load, on typical desktop viewport heights. */
+      zoom: 1.15;
     }
 
     .ln-hero::before {
@@ -1657,6 +1661,7 @@
       .ln-hero {
         grid-template-columns: 1fr;
         padding: 70px 32px 60px;
+        zoom: 1;
       }
 
       .ln-hero-mock {
