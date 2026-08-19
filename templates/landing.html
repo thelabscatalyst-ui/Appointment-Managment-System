@@ -186,6 +186,9 @@
       padding: 8px 18px;
       border-radius: var(--radius-sm);
       transition: opacity .15s, transform .15s;
+      position: relative;
+      z-index: 0;
+      --ripple-color: rgba(26, 22, 18, 0.28);
     }
 
     .ln-cta-nav:hover {
@@ -720,6 +723,9 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      position: relative;
+      z-index: 0;
+      --ripple-color: rgba(26, 22, 18, 0.28);
     }
 
     .ln-btn-primary:hover {
@@ -740,12 +746,47 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      position: relative;
+      z-index: 0;
+      --ripple-color: rgba(212, 163, 86, 0.4);
     }
 
     .ln-btn-outline:hover {
       border-color: var(--amber);
       color: var(--amber);
       transform: translateY(-2px);
+    }
+
+    /* Ripple: bleeds slightly past the button's own box, then fades out
+       slowly. Radial-gradient fill + blur keep the edge soft instead of
+       a hard-edged ring; the easing curve gives it an inertia-like
+       fast-start/slow-finish expansion. */
+    .ln-ripple {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: -1;
+      border-radius: 50%;
+      pointer-events: none;
+      transform: translate(-50%, -50%) scale(0);
+      opacity: .5;
+      background: radial-gradient(circle, var(--ripple-color) 0%, var(--ripple-color) 35%, transparent 72%);
+      filter: blur(6px);
+      animation: ln-ripple-anim 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes ln-ripple-anim {
+      0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: .5;
+      }
+      60% {
+        opacity: .3;
+      }
+      100% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0;
+      }
     }
 
     /* ── Hero mock ─────────────────────────────────────────── */
@@ -3188,6 +3229,38 @@
 
       go(0);
       start();
+    })();
+
+    // Ripple effect: bleeds past the button box on hover/click, then
+    // fades out slowly and smoothly.
+    (function () {
+      var buttons = document.querySelectorAll('.ln-btn-primary, .ln-btn-outline, .ln-cta-nav');
+
+      function spawnRipple(btn, offsetX, offsetY) {
+        var rect = btn.getBoundingClientRect();
+        var size = Math.max(rect.width, rect.height) * 1.2;
+        var ripple = document.createElement('span');
+        ripple.className = 'ln-ripple';
+        ripple.style.width = size + 'px';
+        ripple.style.height = size + 'px';
+        ripple.style.left = (offsetX == null ? rect.width / 2 : offsetX) + 'px';
+        ripple.style.top = (offsetY == null ? rect.height / 2 : offsetY) + 'px';
+        btn.appendChild(ripple);
+        ripple.addEventListener('animationend', function () {
+          ripple.remove();
+        });
+      }
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          var rect = btn.getBoundingClientRect();
+          spawnRipple(btn, e.clientX - rect.left, e.clientY - rect.top);
+        });
+
+        btn.addEventListener('mouseenter', function () {
+          spawnRipple(btn);
+        });
+      });
     })();
   </script>
 </body>
