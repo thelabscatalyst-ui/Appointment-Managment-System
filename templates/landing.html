@@ -733,12 +733,24 @@
       transform: translateY(-2px);
     }
 
+    /* Light theme swaps --amber to a deeper brown-gold fill, so the dark
+       ripple used on the dark-theme's pale amber fill would nearly
+       disappear — use a light cream ripple instead. */
+    html.light .ln-btn-primary,
+    html.light .ln-cta-nav {
+      --ripple-color: rgba(255, 244, 224, 0.4);
+    }
+
     .ln-btn-outline {
       font-size: 14px;
       font-weight: 600;
       color: var(--text);
       background: transparent;
-      border: 1px solid var(--border);
+      /* The shared --border token (#3d3630) is nearly invisible against
+         the dark-theme background — brighten it here to a visible cream
+         so the outline actually reads. Light theme's --border token
+         already reads correctly and is restored below. */
+      border: 1px solid rgba(237, 232, 226, 0.5);
       text-decoration: none;
       padding: 14px 28px;
       border-radius: var(--radius-sm);
@@ -757,14 +769,25 @@
       transform: translateY(-2px);
     }
 
-    /* Ripple: bleeds slightly past the button's own box, then fades out
-       slowly. Radial-gradient fill + blur keep the edge soft instead of
-       a hard-edged ring; the easing curve gives it an inertia-like
-       fast-start/slow-finish expansion. */
+    /* Light theme's page background is pale, so the gold ripple reads
+       better a shade darker there than it does against the near-black
+       dark-theme background. */
+    html.light .ln-btn-outline {
+      border-color: var(--border);
+      --ripple-color: rgba(138, 101, 32, 0.35);
+    }
+
+    /* Ripple: always grows from dead-center of the button (percentage-
+       based positioning avoids any border-box offset math), bleeds
+       slightly past the button's own box, then fades out slowly.
+       Radial-gradient fill + blur keep the edge soft instead of a
+       hard-edged ring. It reaches full size *before* it starts to fade —
+       the two per-keyframe timing functions below split the animation
+       into a slow inertia-style growth phase and a separate fade phase. */
     .ln-ripple {
       position: absolute;
-      top: 0;
-      left: 0;
+      top: 50%;
+      left: 50%;
       z-index: -1;
       border-radius: 50%;
       pointer-events: none;
@@ -772,16 +795,19 @@
       opacity: .5;
       background: radial-gradient(circle, var(--ripple-color) 0%, var(--ripple-color) 35%, transparent 72%);
       filter: blur(6px);
-      animation: ln-ripple-anim 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: ln-ripple-anim 2.2s ease forwards;
     }
 
     @keyframes ln-ripple-anim {
       0% {
         transform: translate(-50%, -50%) scale(0);
         opacity: .5;
+        animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
       }
-      60% {
-        opacity: .3;
+      55% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: .5;
+        animation-timing-function: ease-out;
       }
       100% {
         transform: translate(-50%, -50%) scale(1);
@@ -3231,20 +3257,19 @@
       start();
     })();
 
-    // Ripple effect: bleeds past the button box on hover/click, then
-    // fades out slowly and smoothly.
+    // Ripple effect: always grows from dead-center of the button on
+    // hover/click, bleeds past the button box, then fades out slowly
+    // and smoothly.
     (function () {
       var buttons = document.querySelectorAll('.ln-btn-primary, .ln-btn-outline, .ln-cta-nav');
 
-      function spawnRipple(btn, offsetX, offsetY) {
+      function spawnRipple(btn) {
         var rect = btn.getBoundingClientRect();
         var size = Math.max(rect.width, rect.height) * 1.2;
         var ripple = document.createElement('span');
         ripple.className = 'ln-ripple';
         ripple.style.width = size + 'px';
         ripple.style.height = size + 'px';
-        ripple.style.left = (offsetX == null ? rect.width / 2 : offsetX) + 'px';
-        ripple.style.top = (offsetY == null ? rect.height / 2 : offsetY) + 'px';
         btn.appendChild(ripple);
         ripple.addEventListener('animationend', function () {
           ripple.remove();
@@ -3252,9 +3277,8 @@
       }
 
       buttons.forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-          var rect = btn.getBoundingClientRect();
-          spawnRipple(btn, e.clientX - rect.left, e.clientY - rect.top);
+        btn.addEventListener('click', function () {
+          spawnRipple(btn);
         });
 
         btn.addEventListener('mouseenter', function () {
