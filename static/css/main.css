@@ -97,6 +97,18 @@ body {
   line-height: 1.6;
   color: var(--text);
   background-color: transparent;
+  /* App-wide size bump, desktop only (matches the landing page's own zoom
+     treatment). zoom affects layout flow, unlike transform: scale, so
+     everything — including fixed/sticky chrome like the navbar and the
+     PIN overlay — grows together exactly as if the browser were zoomed in.
+     Reset to 1 below 767px: mobile screens are already tight on space. */
+  zoom: 1.12;
+}
+
+@media (max-width: 767px) {
+  body {
+    zoom: 1;
+  }
 }
 
 a { color: var(--text-muted); text-decoration: none; transition: color 0.15s; }
@@ -3880,23 +3892,25 @@ html.light .sub-pro-tag {
   width: 100%;
 }
 
-/* Back arrow — top-left of overlay */
+/* Back link — top-left of overlay. Text label + higher base opacity so
+   it reads as an actual affordance rather than a barely-visible icon. */
 .pin-back-btn {
   position: absolute;
   top: 20px;
   left: 20px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 6px;
+  padding: 6px 10px 6px 8px;
   border-radius: var(--radius-sm);
-  color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.55);
+  font-size: 13px;
+  font-weight: 500;
   text-decoration: none;
   transition: color 0.15s, background 0.15s;
 }
 .pin-back-btn:hover {
-  color: rgba(255,255,255,0.7);
+  color: rgba(255,255,255,0.85);
   background: rgba(255,255,255,0.06);
 }
 

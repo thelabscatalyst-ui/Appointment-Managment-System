@@ -136,6 +136,7 @@
       document.documentElement.classList.add('light');
     }
   </script>
+  <script src="/static/js/form-draft.js" defer></script>
 </head>
 
 <body>
@@ -353,6 +354,14 @@
         form.addEventListener('submit', function () {
           btn.classList.add('btn--loading');
           btn.disabled = true;
+        });
+
+        // form-draft.js restores field values directly, but account_type
+        // also drives visible UI (the Solo/Clinic toggle buttons + the
+        // clinic name field's visibility) that setMode() controls — re-run
+        // it once a draft comes back so the toggle matches the restored value.
+        form.addEventListener('formdraft:restored', function (e) {
+          if (e.detail && e.detail.account_type) setMode(e.detail.account_type);
         });
       }
 

@@ -1260,7 +1260,11 @@ def pin_prompt_page(
 @router.post("/pin-prompt", response_class=HTMLResponse)
 async def verify_pin_post(
     request: Request,
-    pin: str = Form(...),
+    # default="" not Form(...): an empty PIN field is dropped entirely by
+    # Starlette's form parser (blank values aren't kept), so a required
+    # Form(...) sees it as *missing* and raises a raw 422 instead of just
+    # failing the PIN check like every other wrong guess does.
+    pin: str = Form(default=""),
     next: str = Form(default="/dashboard"),
     doctor: Doctor = Depends(get_current_doctor),
 ):
