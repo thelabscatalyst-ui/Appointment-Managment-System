@@ -329,6 +329,13 @@
       z-index: 2;
       overflow: hidden;
       background: #000;
+      /* The screen cutout is ~1.54:1, but the video is 16:9 (1.78:1).
+         Centre a true 16:9 box inside it and let the black wrapper show
+         through as letterbox bars, rather than stretching the video to
+         fill the taller cutout. */
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .macbook-screen-border {
@@ -344,8 +351,9 @@
     }
 
     .macbook-video-wrapper .ln-video-frame {
-      aspect-ratio: auto !important;
-      height: 100% !important;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
       border-radius: 0 !important;
     }
 
@@ -354,7 +362,9 @@
     }
 
     .macbook-video-wrapper .ln-video-poster {
-      background-size: 100% 100% !important;
+      /* contain, not 100% 100% — the frame is a true 16:9 box now, so the
+         16:9 thumbnail lands edge-to-edge without being stretched. */
+      background-size: contain !important;
     }
 
     .ln-video-frame {
@@ -391,19 +401,6 @@
       width: 100%;
       height: 100%;
       border: 0;
-      /* Cross-origin iframes (YouTube's embed) lay out their OWN internal
-         document using the element's box size from BEFORE the page's zoom
-         multiplies it, but still get visually stretched to the zoomed
-         rendered size — that mismatch is what made the player crop/not
-         show the whole video. zoom: 1/1.3 cancels body's compounded zoom
-         just for this element (so its logical size matches what actually
-         gets painted, pre-transform), and transform restores the same
-         on-screen footprint via a pure compositor-level scale, which
-         doesn't feed back into the iframe's internal layout the way zoom
-         does. Reset alongside body's own zoom under the mobile breakpoint.  */
-      zoom: calc(1 / 1.3);
-      transform: scale(1.3);
-      transform-origin: top left;
     }
 
     .ln-video-poster {
@@ -1445,32 +1442,24 @@
     }
 
     /* ── FAQ ────────────────────────────────────────────────── */
-    /* zoom + a height-changing transition (max-height here) collapses to
-       0 in some engines — cancel body's zoom for this whole section and
-       restore the same visual size via transform instead, which doesn't
-       have that interaction. The extra padding-bottom absorbs the gap
-       between this section's un-scaled layout footprint and its scaled-up
-       visual size (only one answer opens at a time, so it's bounded). */
-    #faq {
-      zoom: calc(1 / 1.3);
-      transform: scale(1.3);
-      transform-origin: top center;
-      padding-bottom: 120px;
-    }
-
     .ln-faq-list {
-      max-width: 760px;
+      max-width: 680px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
     }
 
     .ln-faq-item {
       background: var(--bg-2);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
+      border-radius: 12px;
       overflow: hidden;
+      transition: border-color .15s ease;
+    }
+
+    .ln-faq-item.is-open {
+      border-color: var(--amber);
     }
 
     .ln-faq-question {
@@ -1479,20 +1468,21 @@
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      padding: 20px 24px;
+      padding: 15px 20px;
       background: none;
       border: 0;
       cursor: pointer;
       text-align: left;
       font-family: inherit;
-      font-size: 15px;
-      font-weight: 700;
+      font-size: 14.5px;
+      font-weight: 600;
+      line-height: 1.45;
       color: var(--text);
     }
 
     .ln-faq-chevron {
       flex-shrink: 0;
-      transition: transform .2s ease;
+      transition: transform .2s ease, color .2s ease;
       color: var(--muted);
     }
 
@@ -1501,21 +1491,27 @@
       color: var(--amber);
     }
 
+    /* max-height is driven from JS (the element's own scrollHeight) rather
+       than a fixed value: a one-size cap makes every answer animate the
+       same distance regardless of how much text it holds, so short answers
+       spend the whole duration easing through empty space — which is what
+       read as laggy. Exact heights also mean no answer can ever be clipped. */
     .ln-faq-answer {
       max-height: 0;
       overflow: hidden;
-      transition: max-height .3s ease;
-    }
-
-    .ln-faq-item.is-open .ln-faq-answer {
-      max-height: 240px;
+      transition: max-height .24s cubic-bezier(.4, 0, .2, 1);
     }
 
     .ln-faq-answer-inner p {
-      padding: 0 24px 20px;
-      font-size: 13.5px;
+      padding: 0 20px 16px;
+      font-size: 13px;
       color: var(--muted);
-      line-height: 1.7;
+      line-height: 1.65;
+    }
+
+    .ln-faq-support {
+      text-align: center;
+      margin-top: 32px;
     }
 
     .ln-how-video-link {
@@ -1810,20 +1806,6 @@
         /* body is back to zoom:1 here, so nav's desktop-only 1/1.3
            compensation would make it render too small — reset it too. */
         zoom: 1;
-      }
-
-      .ln-video-frame iframe {
-        /* body is back to zoom:1 here, so the desktop-only zoom-cancel +
-           transform-restore pair would double the video's size — reset it. */
-        zoom: 1;
-        transform: none;
-      }
-
-      #faq {
-        /* same reasoning as .ln-video-frame iframe above */
-        zoom: 1;
-        transform: none;
-        padding-bottom: 0;
       }
 
       .ln-hero {
@@ -2196,7 +2178,7 @@
         <!-- Video screen area behind the frame overlay -->
         <div class="macbook-video-wrapper">
           <div class="ln-video-frame" id="videoFrame" onclick="loadDemoVideo()" role="button" tabindex="0"
-            aria-label="Play Med Track demo video" style="width: 100%; height: 100%; border-radius: 0; box-shadow: none;">
+            aria-label="Play Med Track demo video" style="border-radius: 0; box-shadow: none;">
             <div class="ln-video-poster" id="videoPoster">
               <div class="ln-video-play">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="#f5f0ea" aria-hidden="true">
@@ -3046,7 +3028,7 @@
 
     </div>
 
-    <div style="text-align:center;margin-top:40px;">
+    <div class="ln-faq-support">
       <a href="/support" class="ln-btn-outline">
         Contact Support
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -3348,21 +3330,40 @@
     })();
 
     // FAQ accordion — one open at a time, native <button> for a11y.
+    // Heights are set here from each answer's own scrollHeight rather than
+    // from a fixed CSS cap, so every answer opens to exactly its content
+    // height and the animation distance always matches the content.
     (function () {
-      var items = document.querySelectorAll('.ln-faq-item');
+      var items = Array.prototype.slice.call(document.querySelectorAll('.ln-faq-item'));
+
+      function close(item) {
+        item.classList.remove('is-open');
+        item.querySelector('.ln-faq-question').setAttribute('aria-expanded', 'false');
+        item.querySelector('.ln-faq-answer').style.maxHeight = '';
+      }
+
+      function open(item) {
+        var answer = item.querySelector('.ln-faq-answer');
+        item.classList.add('is-open');
+        item.querySelector('.ln-faq-question').setAttribute('aria-expanded', 'true');
+        answer.style.maxHeight = answer.scrollHeight + 'px';
+      }
+
       items.forEach(function (item) {
-        var btn = item.querySelector('.ln-faq-question');
-        btn.addEventListener('click', function () {
+        item.querySelector('.ln-faq-question').addEventListener('click', function () {
           var wasOpen = item.classList.contains('is-open');
-          items.forEach(function (other) {
-            other.classList.remove('is-open');
-            other.querySelector('.ln-faq-question').setAttribute('aria-expanded', 'false');
-          });
-          if (!wasOpen) {
-            item.classList.add('is-open');
-            btn.setAttribute('aria-expanded', 'true');
-          }
+          items.forEach(close);
+          if (!wasOpen) open(item);
         });
+      });
+
+      // Text reflows at a different width — an answer left open across a
+      // resize would keep a now-wrong pixel height, so re-measure it.
+      window.addEventListener('resize', function () {
+        var openItem = document.querySelector('.ln-faq-item.is-open');
+        if (!openItem) return;
+        var answer = openItem.querySelector('.ln-faq-answer');
+        answer.style.maxHeight = answer.scrollHeight + 'px';
       });
     })();
   </script>
