@@ -64,6 +64,16 @@
       line-height: 1.6;
       background: transparent;
       color: var(--text);
+      /* Matches the app-wide size bump in main.css (desktop only — the
+         logged-in app's own body { zoom: 1.12 }). This page doesn't link
+         main.css, so it needs the same rule applied locally. */
+      zoom: 1.12;
+    }
+
+    @media (max-width: 767px) {
+      body {
+        zoom: 1;
+      }
     }
 
     a {
