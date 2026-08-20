@@ -251,13 +251,21 @@
     .ln-video-section {
       padding: 84px 60px;
       border-bottom: 1px solid var(--border);
+      /* Opt this one section out of body { zoom: 1.3 } — zoom compounds
+         through ancestors, so cancelling it takes the reciprocal, not 1.
+         Every problem in this section traced back to that zoom: it made
+         the mockup render 30% oversized, and it desynced the embedded
+         player's layout viewport from its painted size, which is what
+         magnified YouTube's controls. At a net zoom of 1 the section
+         renders exactly as it did before the zoom existed and nothing
+         inside it needs compensating. */
+      zoom: calc(1 / 1.3);
     }
 
     .ln-video-grid {
-      /* These widths are divided by the body's 1.3 zoom so the demo block
-         keeps the on-screen footprint it was designed at (1320px) instead
-         of rendering 30% oversized. Same reasoning on .macbook-container. */
-      max-width: 1015px;
+      /* Back to the value this was designed at — the section is no longer
+         zoomed, so it no longer needs to be divided down. */
+      max-width: 1320px;
       margin: 0 auto;
       display: grid;
       grid-template-columns: 1.75fr 1fr;
@@ -294,8 +302,8 @@
     .macbook-container {
       position: relative;
       width: 100%;
-      /* 900 / 1.3 — see .ln-video-grid above. */
-      max-width: 692px;
+      /* Back to the designed value — see .ln-video-section above. */
+      max-width: 900px;
       margin: 0 auto;
       aspect-ratio: 3944 / 2564;
     }
@@ -1914,6 +1922,11 @@
       .ln-nav {
         /* body is back to zoom:1 here, so nav's desktop-only 1/1.3
            compensation would make it render too small — reset it too. */
+        zoom: 1;
+      }
+
+      .ln-video-section {
+        /* Same reason: there is no body zoom to cancel at this breakpoint. */
         zoom: 1;
       }
 
