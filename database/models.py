@@ -257,9 +257,6 @@ class Doctor(Base):
     # this a stolen session would survive the very reset meant to kill it.
     # Carried in the token as "tv" and compared in get_current_doctor().
     token_version      = Column(Integer, default=0, nullable=False)
-    # v5: platform operator — only admins can post the official answer that
-    # closes a support query. Not a plan/clinic role; this is Med Track staff.
-    is_admin           = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     appointments       = relationship("Appointment", back_populates="doctor", cascade="all, delete-orphan")
@@ -739,44 +736,3 @@ class Feedback(Base):
 
     doctor  = relationship("Doctor")
     patient = relationship("Patient")
-
-
-class SupportQuery(Base):
-    """Public support board. Any doctor can post a query, visible to
-    everyone — including logged-out visitors — the moment it's posted.
-    Other doctors can reply while it's open ("chitchat"). Only an admin
-    doctor can post the official closing answer; that reply is flagged
-    is_official and locks the query against further replies, but the
-    whole thread — including the official answer — stays visible forever."""
-    __tablename__ = "support_queries"
-
-    id        = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
-
-    title = Column(String(200), nullable=False)
-    body  = Column(Text, nullable=False)
-
-    status     = Column(String(10), nullable=False, default="open")  # open|closed
-    created_at = Column(DateTime, default=datetime.utcnow)
-    closed_at  = Column(DateTime, nullable=True)
-
-    doctor  = relationship("Doctor")
-    replies = relationship(
-        "SupportReply", back_populates="query",
-        cascade="all, delete-orphan", order_by="SupportReply.created_at",
-    )
-
-
-class SupportReply(Base):
-    __tablename__ = "support_replies"
-
-    id        = Column(Integer, primary_key=True, index=True)
-    query_id  = Column(Integer, ForeignKey("support_queries.id"), nullable=False, index=True)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False, index=True)
-
-    body        = Column(Text, nullable=False)
-    is_official = Column(Boolean, default=False)  # the admin's closing answer
-    created_at  = Column(DateTime, default=datetime.utcnow)
-
-    query  = relationship("SupportQuery", back_populates="replies")
-    doctor = relationship("Doctor")

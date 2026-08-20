@@ -497,16 +497,7 @@ def _run_migrations():
         # ── v5: optional per-drug prescription notes ──────────────────────────
         _add_column(conn, "ALTER TABLE prescription_items ADD COLUMN notes TEXT")
 
-        # ── v5: platform admin flag (support board moderation) ────────────────
-        # BOOLEAN DEFAULT FALSE, not DEFAULT 0 — see the is_verified comment
-        # above for why the literal matters on Postgres.
-        _add_column(conn, "ALTER TABLE doctors ADD COLUMN is_admin BOOLEAN DEFAULT FALSE")
-        try:
-            conn.execute(text(
-                "UPDATE doctors SET is_admin = TRUE WHERE email = 'thelabscatalyst@gmail.com'"
-            ))
-            conn.commit()
-        except Exception:
-            conn.rollback()
-        # support_queries / support_replies tables come from create_all() above
-        # — brand new tables, no ALTER needed.
+        # The support board (support_queries / support_replies tables and the
+        # doctors.is_admin column) was removed. Existing databases keep those
+        # objects — nothing references them, and dropping data is not worth
+        # the risk to reclaim a few unused columns.

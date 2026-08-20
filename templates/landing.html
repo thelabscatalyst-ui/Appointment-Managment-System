@@ -1565,10 +1565,128 @@
       transition: border-color .15s, color .15s, transform .15s;
     }
 
+    .ln-faq-card-btn {
+      background: none;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
     .ln-faq-card-btn:hover {
       border-color: var(--amber);
       color: var(--amber);
       transform: translateY(-1px);
+    }
+
+    /* ── Contact dialog ─────────────────────────────────────── */
+    .ln-contact-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 900;
+      background: rgba(10, 8, 6, .55);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+    }
+
+    .ln-contact {
+      position: fixed;
+      z-index: 901;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: min(380px, calc(100vw - 40px));
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 24px 24px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+    }
+
+    .ln-contact[hidden],
+    .ln-contact-backdrop[hidden] {
+      display: none;
+    }
+
+    .ln-contact-close {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      padding: 6px;
+      border: 0;
+      border-radius: 8px;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      transition: color .15s, background .15s;
+    }
+
+    .ln-contact-close:hover {
+      color: var(--text);
+      background: rgba(180, 130, 60, .12);
+    }
+
+    .ln-contact-title {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .ln-contact-sub {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 20px;
+    }
+
+    .ln-contact-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 13px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      text-decoration: none;
+      margin-bottom: 10px;
+      transition: border-color .15s, background .15s;
+    }
+
+    .ln-contact-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .ln-contact-row:hover {
+      border-color: var(--amber);
+      background: rgba(180, 130, 60, .06);
+    }
+
+    .ln-contact-icon {
+      flex-shrink: 0;
+      width: 34px;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9px;
+      color: var(--amber);
+      background: rgba(180, 130, 60, .12);
+      border: 1px solid rgba(180, 130, 60, .28);
+    }
+
+    .ln-contact-label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1px;
+    }
+
+    .ln-contact-value {
+      display: block;
+      font-size: 13.5px;
+      color: var(--text);
+      word-break: break-all;
     }
 
     .ln-faq-item {
@@ -3183,14 +3301,14 @@
             </svg>
           </div>
           <div class="ln-faq-card-title">Still have a question?</div>
-          <p class="ln-faq-card-text">Ask on the support board and we'll answer it publicly, so every doctor gets the answer too.</p>
-          <a href="/support" class="ln-faq-card-btn">
-            Contact Support
+          <p class="ln-faq-card-text">Call or email us directly — a real person answers, no account needed.</p>
+          <button type="button" class="ln-faq-card-btn" onclick="openContact()">
+            Contact us
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <line x1="5" y1="12" x2="19" y2="12" />
               <polyline points="12 5 19 12 12 19" />
             </svg>
-          </a>
+          </button>
         </div>
       </aside>
 
@@ -3252,10 +3370,49 @@
       <a href="/pricing" class="ln-footer-link">Pricing</a>
       <a href="/login" class="ln-footer-link">Sign In</a>
       <a href="/register" class="ln-footer-link">Register</a>
-      <a href="/support" class="ln-footer-link">Support</a>
+      <a href="#" class="ln-footer-link" onclick="openContact(); return false;">Contact</a>
     </div>
     <div class="ln-footer-copy">© <span id="footerYear">2026</span> Med Track. All rights reserved.</div>
   </footer>
+
+  <!-- ══════════════════════════════════════════════════════════
+     CONTACT DIALOG
+══════════════════════════════════════════════════════════ -->
+  <div class="ln-contact-backdrop" id="contactBackdrop" onclick="closeContact()" hidden></div>
+  <div class="ln-contact" id="contactModal" role="dialog" aria-modal="true" aria-labelledby="contactTitle" hidden>
+    <button type="button" class="ln-contact-close" onclick="closeContact()" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+      </svg>
+    </button>
+
+    <h3 class="ln-contact-title" id="contactTitle">Get in touch</h3>
+    <p class="ln-contact-sub">We usually reply the same day.</p>
+
+    <a class="ln-contact-row" href="tel:+919915446676">
+      <span class="ln-contact-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 3.08 4.18 2 2 0 0 1 5.09 2h3a2 2 0 0 1 2 1.72 13 13 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L9.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 13 13 0 0 0 2.81.7A2 2 0 0 1 23 16.92z" />
+        </svg>
+      </span>
+      <span>
+        <span class="ln-contact-label">Phone</span>
+        <span class="ln-contact-value">+91 99154 46676</span>
+      </span>
+    </a>
+
+    <a class="ln-contact-row" href="mailto:thelabscatalyst@gmail.com">
+      <span class="ln-contact-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2" /><polyline points="2 6 12 13 22 6" />
+        </svg>
+      </span>
+      <span>
+        <span class="ln-contact-label">Email</span>
+        <span class="ln-contact-value">thelabscatalyst@gmail.com</span>
+      </span>
+    </a>
+  </div>
 
   <script>
     // ── Scroll progress bar ─────────────────────────────────────────────────
@@ -3428,6 +3585,23 @@
       iframe.style.left = ((host.width - w) / 2) / zoom + 'px';
       iframe.style.top = ((host.height - h) / 2) / zoom + 'px';
     }
+
+    /* Contact dialog — phone + email, no login involved. */
+    function openContact() {
+      document.getElementById('contactBackdrop').hidden = false;
+      document.getElementById('contactModal').hidden = false;
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeContact() {
+      document.getElementById('contactBackdrop').hidden = true;
+      document.getElementById('contactModal').hidden = true;
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeContact();
+    });
 
     function toggleTheme() {
       const isLight = document.documentElement.classList.toggle('light');
