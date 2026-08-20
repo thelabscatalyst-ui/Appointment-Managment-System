@@ -64,10 +64,10 @@
       line-height: 1.6;
       background: transparent;
       color: var(--text);
-      /* Matches the app-wide size bump in main.css (desktop only — the
-         logged-in app's own body { zoom: 1.12 }). This page doesn't link
-         main.css, so it needs the same rule applied locally. */
-      zoom: 1.12;
+      /* Slightly beyond the app-wide 1.12 (main.css's body { zoom: 1.12 })
+         — this page doesn't link main.css so it needs its own rule, bumped
+         up a bit further per explicit request. */
+      zoom: 1.18;
     }
 
     @media (max-width: 767px) {
@@ -342,7 +342,7 @@
     .pc-price {
       font-family: 'Inter', sans-serif;
       font-size: 32px;
-      font-weight: 500;
+      font-weight: 800;
       color: var(--text);
       line-height: 1;
       margin-bottom: 2px;
