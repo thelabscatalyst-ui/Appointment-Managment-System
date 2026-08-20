@@ -402,29 +402,11 @@
       top: 0;
       left: 0;
       border: 0;
-      /* Two separate corrections here.
-
-         1) Aspect. The screen cutout is ~1.54:1 and the video is 16:9. Given
-            a 1.54:1 box YouTube fills it and crops the sides rather than
-            fitting the video inside, so the frame is made exactly 16:9 and
-            centred instead — the player then matches the video edge to edge
-            with nothing cropped, and the black wrapper reads as the
-            letterbox. top: 6.7% is half of (1 - 1.5396/1.7778), the share of
-            the cutout height the bars take.
-
-         2) Scale. The page runs at body { zoom: 1.3 }, so an iframe sized at
-            100% gets a layout viewport 1.3x smaller than the box it is
-            painted into, and YouTube's player comes out magnified 1.3x.
-            Sizing it 130% and scaling back down by the same factor makes the
-            internal viewport match the painted size 1:1. transform rather
-            than zoom, since transform does not feed back into the iframe's
-            own layout. */
-      top: 6.7%;
-      width: 130%;
-      height: auto;
-      aspect-ratio: 16 / 9;
-      transform: scale(0.769231);
-      transform-origin: top left;
+      /* Size, position and scale are all set by fitDemoIframe() from
+         measured geometry — see the comment there for why this can't be
+         done in CSS. These are just the starting values. */
+      width: 100%;
+      height: 100%;
     }
 
     .ln-video-poster {
@@ -1935,15 +1917,6 @@
         zoom: 1;
       }
 
-      .ln-video-frame iframe {
-        /* No body zoom here, so the iframe's viewport already matches its
-           painted size — the desktop 130%/scale-down pair would shrink the
-           player below native scale. The 16:9 letterboxing above still
-           applies. */
-        width: 100%;
-        transform: none;
-      }
-
       .ln-hero {
         grid-template-columns: 1fr;
         padding: 70px 32px 60px;
@@ -3394,6 +3367,47 @@
         '?autoplay=1&rel=0&modestbranding=1" title="Med Track Product Demo" ' +
         'allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" ' +
         'allowfullscreen></iframe>';
+      fitDemoIframe();
+      window.addEventListener('resize', fitDemoIframe);
+    }
+
+    /* Size the player from measured geometry instead of CSS percentages.
+       Two things have to hold and neither can be expressed reliably in CSS
+       here, because the page's zoom factor differs per breakpoint:
+
+         - the iframe box must be exactly 16:9, or the player fills a
+           non-16:9 box and crops the sides;
+         - the iframe's layout viewport must equal its painted size, or
+           YouTube lays out for one size and gets painted at another, which
+           magnifies the whole player.
+
+       The zoom factor is derived at runtime (painted width / layout width)
+       rather than hardcoded, so this stays correct if the page zoom ever
+       changes again. */
+    function fitDemoIframe() {
+      var frame = document.getElementById('videoFrame');
+      if (!frame) return;
+      var iframe = frame.querySelector('iframe');
+      if (!iframe) return;
+
+      var host = frame.getBoundingClientRect();          // painted, post-zoom
+      if (!host.width || !frame.offsetWidth) return;
+      var zoom = host.width / frame.offsetWidth;         // offsetWidth is pre-zoom
+
+      // Largest 16:9 box that fits the screen cutout, in painted pixels.
+      var w = host.width;
+      var h = w * 9 / 16;
+      if (h > host.height) { h = host.height; w = h * 16 / 9; }
+
+      // Setting the layout size to the painted pixel count makes the
+      // player's internal viewport match what's on screen 1:1; the inverse
+      // scale then puts the painted box back to the intended size.
+      iframe.style.width = w + 'px';
+      iframe.style.height = h + 'px';
+      iframe.style.transformOrigin = 'top left';
+      iframe.style.transform = 'scale(' + (1 / zoom) + ')';
+      iframe.style.left = ((host.width - w) / 2) / zoom + 'px';
+      iframe.style.top = ((host.height - h) / 2) / zoom + 'px';
     }
 
     function toggleTheme() {
