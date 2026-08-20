@@ -333,13 +333,6 @@
       z-index: 2;
       overflow: hidden;
       background: #000;
-      /* The screen cutout is ~1.54:1, but the video is 16:9 (1.78:1).
-         Centre a true 16:9 box inside it and let the black wrapper show
-         through as letterbox bars, rather than stretching the video to
-         fill the taller cutout. */
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
     .macbook-screen-border {
@@ -354,10 +347,15 @@
       pointer-events: none;
     }
 
+    /* Fill the screen cutout edge to edge. The cutout is ~1.54:1 and the
+       video is 16:9, but that's handled inside the iframe: YouTube's player
+       letterboxes its own 16:9 frame within whatever box it's given, which
+       is exactly how a real YouTube embed behaves. Sizing the element
+       itself to 16:9 instead would leave dead bars around the screen. */
     .macbook-video-wrapper .ln-video-frame {
       width: 100%;
-      height: auto;
-      aspect-ratio: 16 / 9;
+      height: 100%;
+      aspect-ratio: auto;
       border-radius: 0 !important;
     }
 
@@ -366,9 +364,9 @@
     }
 
     .macbook-video-wrapper .ln-video-poster {
-      /* contain, not 100% 100% — the frame is a true 16:9 box now, so the
-         16:9 thumbnail lands edge-to-edge without being stretched. */
-      background-size: contain !important;
+      /* cover, not 100% 100% — fills the cutout with no distortion, at the
+         cost of a few percent cropped off the sides of the 16:9 thumbnail. */
+      background-size: cover !important;
     }
 
     .ln-video-frame {
@@ -1586,7 +1584,7 @@
       text-align: left;
       font-family: inherit;
       font-size: 14.5px;
-      font-weight: 600;
+      font-weight: 400;
       line-height: 1.45;
       color: var(--text);
     }
