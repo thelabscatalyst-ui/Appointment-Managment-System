@@ -402,16 +402,27 @@
       top: 0;
       left: 0;
       border: 0;
-      /* The page runs at body { zoom: 1.3 }. An iframe sized at 100% gets a
-         layout viewport 1.3x smaller than the box it is painted into, so
-         YouTube lays its player out for the smaller viewport and the result
-         is magnified 1.3x — the video and its controls looked zoomed in.
-         Sizing it 130% and scaling it back down by the same factor makes the
-         internal viewport match the painted size 1:1, so the player renders
-         at native scale. transform is used rather than zoom because it does
-         not feed back into the iframe's own layout. */
+      /* Two separate corrections here.
+
+         1) Aspect. The screen cutout is ~1.54:1 and the video is 16:9. Given
+            a 1.54:1 box YouTube fills it and crops the sides rather than
+            fitting the video inside, so the frame is made exactly 16:9 and
+            centred instead — the player then matches the video edge to edge
+            with nothing cropped, and the black wrapper reads as the
+            letterbox. top: 6.7% is half of (1 - 1.5396/1.7778), the share of
+            the cutout height the bars take.
+
+         2) Scale. The page runs at body { zoom: 1.3 }, so an iframe sized at
+            100% gets a layout viewport 1.3x smaller than the box it is
+            painted into, and YouTube's player comes out magnified 1.3x.
+            Sizing it 130% and scaling back down by the same factor makes the
+            internal viewport match the painted size 1:1. transform rather
+            than zoom, since transform does not feed back into the iframe's
+            own layout. */
+      top: 6.7%;
       width: 130%;
-      height: 130%;
+      height: auto;
+      aspect-ratio: 16 / 9;
       transform: scale(0.769231);
       transform-origin: top left;
     }
@@ -1927,9 +1938,9 @@
       .ln-video-frame iframe {
         /* No body zoom here, so the iframe's viewport already matches its
            painted size — the desktop 130%/scale-down pair would shrink the
-           player below native scale. */
+           player below native scale. The 16:9 letterboxing above still
+           applies. */
         width: 100%;
-        height: 100%;
         transform: none;
       }
 
