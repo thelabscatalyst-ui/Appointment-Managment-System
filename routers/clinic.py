@@ -374,6 +374,16 @@ def doctor_invite_accept(
             "error": "You are already a member of this clinic.",
         })
 
+    # Server-side enforcement of the same check the template guards against —
+    # a direct POST could otherwise let whoever is logged in accept an invite
+    # addressed to someone else, silently burning it for the real invitee.
+    if logged_in_doctor.email != invite.email:
+        return templates.TemplateResponse(request, "clinic/doctor_invite.html", {
+            "invite": invite, "clinic": clinic,
+            "logged_in_doctor": logged_in_doctor, "already_member": False,
+            "error": f"This invite was sent to {invite.email}, not {logged_in_doctor.email}.",
+        }, status_code=403)
+
     db.add(ClinicDoctor(
         clinic_id = invite.clinic_id,
         doctor_id = logged_in_doctor.id,

@@ -127,6 +127,15 @@ class Clinic(Base):
     plan_expires_at = Column(DateTime, nullable=True)
     owner_doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=True)
     created_at      = Column(DateTime, default=datetime.utcnow)
+    # v3 columns — added via raw ALTER TABLE in connection.py long before this
+    # class declared them, so every getattr(clinic, "max_doctors", 1) read the
+    # Python-side default instead of the real column: paying "Clinic" plan
+    # customers (5 seats) could only ever invite 1 doctor. Declaring them here
+    # doesn't need a new migration — the columns already exist in the DB.
+    plan_grace_until      = Column(DateTime, nullable=True)
+    max_doctors           = Column(Integer, default=1)
+    max_staff             = Column(Integer, default=2)
+    billing_access_staff  = Column(Boolean, default=False)
 
     doctor_memberships = relationship("ClinicDoctor", back_populates="clinic", cascade="all, delete-orphan")
 

@@ -112,6 +112,7 @@ def register(
     city: str = Form(""),
     clinic_invite: str = Form(""),
     medical_reg_number: str = Form(""),
+    account_type: str = Form("solo"),
     db: Session = Depends(get_db),
 ):
     invite_token = clinic_invite.strip()
@@ -198,7 +199,10 @@ def register(
         db.commit()
 
     else:
-        # ── Solo doctor path: 14-day trial + auto solo clinic ─────────────────
+        # ── Solo/clinic path: 14-day trial + auto clinic ───────────────────
+        is_clinic_signup = account_type.strip().lower() == "clinic"
+        trial_ends_at = datetime.utcnow() + timedelta(days=14)
+
         doctor = Doctor(
             name=name,
             email=norm_email,
@@ -209,14 +213,24 @@ def register(
             city=city.strip() or None,
             slug=slug,
             plan_type=PlanType.trial,
-            trial_ends_at=datetime.utcnow() + timedelta(days=14),
+            trial_ends_at=trial_ends_at,
             medical_reg_number=medical_reg_number.strip() or None,
         )
         db.add(doctor)
         db.commit()
         db.refresh(doctor)
 
-        # Auto-create an implicit clinic for every solo doctor (owner role)
+        # Auto-create an implicit clinic for every doctor (owner role). A
+        # "Clinic Account" signup gets Clinic Admin (invite doctors, manage
+        # the team) for the trial window too — plan_expires_at mirrors the
+        # doctor's own trial_ends_at, so it lapses at the same moment a solo
+        # trial would, and the doctor sees the same upgrade prompt to keep it.
+        # Previously account_type was accepted by the form but never read
+        # here, so choosing "Clinic Account" silently produced an ordinary
+        # solo account — plan_type stayed "trial" forever unless the doctor
+        # separately paid for a duo/clinic/hospital/enterprise plan, which
+        # is the only other place plan_type ever becomes "clinic"
+        # (routers/doctors.py billing_verify).
         clinic_slug = slug + "-clinic"
         base_clinic_slug = clinic_slug
         counter = 1
@@ -224,12 +238,19 @@ def register(
             clinic_slug = f"{base_clinic_slug}-{counter}"
             counter += 1
 
+        clinic_seats = 1
+        if is_clinic_signup:
+            from services.payment_service import PLAN_CONFIG
+            clinic_seats = PLAN_CONFIG["clinic"]["seats"]  # matches the paid Clinic tier
+
         clinic = Clinic(
             name=clinic_name.strip() or f"{name}'s Clinic",
             address=None,
             city=city.strip() or None,
             slug=clinic_slug,
-            plan_type="trial",
+            plan_type="clinic" if is_clinic_signup else "trial",
+            plan_expires_at=trial_ends_at if is_clinic_signup else None,
+            max_doctors=clinic_seats,
             owner_doctor_id=doctor.id,
         )
         db.add(clinic)
@@ -341,8 +362,16 @@ def login(
 # ------------------------------------------------------------------ #
 
 @router.get("/logout")
-def logout():
-    response = RedirectResponse(url="/login", status_code=303)
+def logout(next: str = Query(default="")):
+    # Same open-redirect guard as /login's next= handling — relative paths
+    # only. Lets a public page (e.g. a clinic invite link) send the doctor
+    # straight back after switching accounts, instead of stranding them on
+    # /login with no way back except retyping the invite URL from memory.
+    safe_next = next.strip() if (
+        next and next.startswith("/") and not next.startswith("//")
+        and not next.startswith("/login") and not next.startswith("/register")
+    ) else ""
+    response = RedirectResponse(url=safe_next or "/login", status_code=303)
     # Clear EVERY auth cookie. Previously only access_token was deleted, so a
     # logged-out session left a live pin_session / clinic_admin_auth behind —
     # logging back in silently skipped the PIN gate.

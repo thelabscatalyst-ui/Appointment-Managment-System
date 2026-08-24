@@ -61,8 +61,25 @@
         </p>
         <a href="/dashboard" class="btn btn-primary" style="margin-top:16px;">Go to Dashboard</a>
 
+      {% elif logged_in_doctor and logged_in_doctor.email != invite.email %}
+        <!-- Logged in as someone other than the invited email · this invite
+             is not theirs to accept. Without this check, whoever happened to
+             be logged in when they opened the link could join in the invited
+             doctor's place and silently burn the invite. -->
+        <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin:20px 0;">
+          <div style="font-size:14px;color:var(--text-muted);margin-bottom:4px;">Logged in as</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text);">Dr. {{ logged_in_doctor.name }}</div>
+          <div style="font-size:13px;color:var(--text-muted);">{{ logged_in_doctor.email }}</div>
+        </div>
+        <div class="alert alert-error">
+          This invite was sent to <strong>{{ invite.email }}</strong>, not {{ logged_in_doctor.email }}.
+        </div>
+        <a href="/logout?next=/clinic/doctor-invite/{{ invite.token }}" class="btn btn-secondary">
+          Log out and switch account
+        </a>
+
       {% elif logged_in_doctor %}
-        <!-- Doctor is logged in · show confirm button -->
+        <!-- Doctor is logged in, email matches · show confirm button -->
         <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:16px;margin:20px 0;">
           <div style="font-size:14px;color:var(--text-muted);margin-bottom:4px;">Logged in as</div>
           <div style="font-size:16px;font-weight:600;color:var(--text);">Dr. {{ logged_in_doctor.name }}</div>
@@ -78,9 +95,9 @@
           <a href="/register?clinic_invite={{ invite.token }}"
              class="btn btn-primary">Register & Join</a>
           <p style="text-align:center;color:var(--muted);font-size:13px;margin:0;">or</p>
-          <a href="/login" class="btn btn-secondary">Log in to accept</a>
+          <a href="/login?next=/clinic/doctor-invite/{{ invite.token }}" class="btn btn-secondary">Log in to accept</a>
           <p style="color:var(--muted);font-size:12px;text-align:center;margin-top:8px;">
-            Already have a Med Track account? Log in, then come back to this link to join.
+            Already have a Med Track account? Log in, then you'll land right back here to join.
           </p>
         </div>
       {% endif %}

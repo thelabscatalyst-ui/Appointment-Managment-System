@@ -124,13 +124,14 @@ def _next_phone() -> str:
 
 def register(client, *, name="Dr Test", email="test@example.com",
              phone=None, password="Kv9$mPq2#Zx8L", city="Mumbai",
-             clinic_name="Test Clinic"):
+             clinic_name="Test Clinic", account_type="solo"):
     if phone is None:
         phone = _next_phone()
     resp = client.post("/register", data={
         "name": name, "email": email, "phone": phone,
         "password": password, "clinic_name": clinic_name,
         "city": city, "specialization": "General", "clinic_invite": "",
+        "account_type": account_type,
     }, follow_redirects=False)
     # Auto-verify: verification is mandatory now (get_paying_doctor raises
     # EmailNotVerified until it's set) and has its own dedicated coverage in
@@ -2631,3 +2632,132 @@ class TestSessionHardening:
         for c in access:
             assert "Max-Age=0" in c or "01 Jan 1970" in c, \
                 f"logout re-issued a live cookie: {c}"
+
+
+class TestClinicAccountSignup:
+    """account_type='clinic' at registration used to be accepted by the form
+    and silently discarded server-side — every signup got an ordinary solo
+    account regardless of what was selected, and Clinic.plan_type only ever
+    became 'clinic' after a real paid multi-doctor subscription. Also covers
+    the Clinic.max_doctors ORM gap: the column existed in the DB via a raw
+    migration but was never declared on the model, so every
+    getattr(clinic, "max_doctors", 1) read the Python-side default of 1 —
+    meaning no clinic, trial or paid, could ever invite a second doctor."""
+
+    def test_clinic_signup_grants_clinic_admin_during_trial(self, client):
+        r = register(client, email="clinicsignup1@test.com", account_type="clinic")
+        assert r.status_code in (302, 303)
+        cookie = login(client, "clinicsignup1@test.com").cookies.get("access_token")
+
+        resp = client.get("/clinic/admin", cookies={"access_token": cookie},
+                          follow_redirects=False)
+        assert resp.status_code == 200, \
+            f"clinic account should reach the Clinic Admin password gate, got {resp.status_code}"
+
+    def test_solo_signup_still_blocked_from_clinic_admin(self, client):
+        """Sanity check the fix didn't loosen the gate for real solo accounts.
+        get_clinic_owner raises a 403, but main.py's global 403 handler turns
+        that into a 303 to /dashboard rather than a raw 403 response."""
+        r = register(client, email="soloonly1@test.com", account_type="solo")
+        assert r.status_code in (302, 303)
+        cookie = login(client, "soloonly1@test.com").cookies.get("access_token")
+
+        resp = client.get("/clinic/admin", cookies={"access_token": cookie},
+                          follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers.get("location") == "/dashboard"
+
+    def test_clinic_signup_seat_limit_matches_paid_clinic_tier(self, client):
+        from database.models import Clinic
+        register(client, email="clinicsignup2@test.com", account_type="clinic")
+        db = TestSession()
+        try:
+            doc = db.query(Doctor).filter(Doctor.email == "clinicsignup2@test.com").first()
+            clinic = db.query(Clinic).filter(Clinic.owner_doctor_id == doc.id).first()
+            assert clinic.plan_type == "clinic"
+            assert clinic.max_doctors == 5, \
+                "max_doctors should round-trip through the ORM, not silently fall back to 1"
+        finally:
+            db.close()
+
+    def test_max_doctors_column_is_mapped_on_the_model(self, client):
+        """Direct regression guard for the missing-column bug: write a value
+        through the ORM and read it back through a fresh session, so a
+        future accidental removal of the Column declaration fails loudly
+        instead of quietly reverting every clinic to a 1-doctor cap."""
+        from database.models import Clinic
+        db = TestSession()
+        try:
+            clinic = Clinic(name="Column Check Clinic", plan_type="clinic", max_doctors=7)
+            db.add(clinic)
+            db.commit()
+            clinic_id = clinic.id
+        finally:
+            db.close()
+
+        db2 = TestSession()
+        try:
+            reloaded = db2.query(Clinic).filter(Clinic.id == clinic_id).first()
+            assert reloaded.max_doctors == 7
+        finally:
+            db2.close()
+
+
+class TestClinicDoctorInvite:
+    """The invite-accept route never checked that the logged-in doctor's
+    email matched the invite's target email — whoever was logged in when
+    they opened the link could join in the invited doctor's place and
+    silently burn the invite for the real invitee."""
+
+    def _create_clinic_and_invite(self, client, owner_email, invitee_email):
+        from database.models import Clinic, ClinicDoctor, ClinicDoctorInvite
+        import secrets
+        from datetime import timedelta as _td
+
+        register(client, email=owner_email, account_type="clinic")
+        db = TestSession()
+        try:
+            owner = db.query(Doctor).filter(Doctor.email == owner_email).first()
+            clinic = db.query(Clinic).filter(Clinic.owner_doctor_id == owner.id).first()
+            token = secrets.token_urlsafe(16)
+            db.add(ClinicDoctorInvite(
+                clinic_id=clinic.id, email=invitee_email, token=token,
+                expires_at=datetime.utcnow() + _td(days=7),
+            ))
+            db.commit()
+            return token
+        finally:
+            db.close()
+
+    def test_mismatched_logged_in_doctor_cannot_accept(self, client):
+        token = self._create_clinic_and_invite(
+            client, "inviteowner1@test.com", "invitee1@test.com")
+        # A completely unrelated doctor, logged in, tries to accept.
+        register(client, email="bystander1@test.com")
+        bystander_cookie = login(client, "bystander1@test.com").cookies.get("access_token")
+
+        resp = client.post(f"/clinic/doctor-invite/{token}",
+                           cookies={"access_token": bystander_cookie},
+                           follow_redirects=False)
+        assert resp.status_code == 403
+
+        from database.models import ClinicDoctorInvite
+        db = TestSession()
+        try:
+            invite = db.query(ClinicDoctorInvite).filter(ClinicDoctorInvite.token == token).first()
+            assert invite.used_at is None, \
+                "a rejected accept attempt must not consume the invite"
+        finally:
+            db.close()
+
+    def test_matching_email_can_accept(self, client):
+        token = self._create_clinic_and_invite(
+            client, "inviteowner2@test.com", "invitee2@test.com")
+        register(client, email="invitee2@test.com")
+        cookie = login(client, "invitee2@test.com").cookies.get("access_token")
+
+        resp = client.post(f"/clinic/doctor-invite/{token}",
+                           cookies={"access_token": cookie},
+                           follow_redirects=False)
+        assert resp.status_code == 303
+        assert resp.headers.get("location") == "/dashboard?joined=1"
