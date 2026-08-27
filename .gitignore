@@ -5,6 +5,11 @@ __pycache__/
 *.pyo
 *.db
 *.sqlite3
+# Pre-migration database snapshots. *.db above does not match these — they
+# carry real patient data and must never be committed.
+*.db.bak
+*.db.*.bak
+clinic.db.*
 .DS_Store
 CLAUDE.md
 .claude/

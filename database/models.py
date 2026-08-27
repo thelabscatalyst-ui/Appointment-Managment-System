@@ -538,9 +538,14 @@ class PinnedPatient(Base):
 
 class Visit(Base):
     __tablename__ = "visits"
+    # Token numbering is per (doctor, clinic, day): a doctor running a morning
+    # shift at their own clinic and an evening shift elsewhere must get two
+    # independent token sequences, not one shared one. The migration that
+    # rebuilds this constraint on existing databases lands with the queue
+    # isolation work; fresh databases and the test suite get it from here.
     __table_args__ = (
-        UniqueConstraint("doctor_id", "visit_date", "token_number",
-                         name="uq_visit_token_per_doctor_day"),
+        UniqueConstraint("doctor_id", "clinic_id", "visit_date", "token_number",
+                         name="uq_visit_token_per_clinic_day"),
     )
 
     id             = Column(Integer, primary_key=True, index=True)

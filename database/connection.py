@@ -62,6 +62,19 @@ def _run_migrations():
         except Exception:
             conn.rollback()
 
+    def _safe_exec(conn, sql, params=None):
+        """Run a DML statement, ignore failures, roll back cleanly.
+
+        Same contract as the two helpers above but for UPDATE/INSERT rather
+        than DDL. The rollback matters most on PostgreSQL: an unguarded
+        failure leaves the transaction aborted, which turns every subsequent
+        statement in this function into an error too."""
+        try:
+            conn.execute(text(sql), params or {})
+            conn.commit()
+        except Exception:
+            conn.rollback()
+
     with engine.connect() as conn:
         # ── Tier 1 ──────────────────────────────────────────────────────────
         _add_column(conn, "ALTER TABLE doctors ADD COLUMN pin_hash VARCHAR(255)")
@@ -317,11 +330,12 @@ def _run_migrations():
         _add_column(conn, "ALTER TABLE clinics ADD COLUMN max_staff INTEGER DEFAULT 2")
         _add_column(conn, "ALTER TABLE clinics ADD COLUMN billing_access_staff BOOLEAN DEFAULT FALSE")
         # Backfill: solo-plan clinics keep max_doctors=1; set Clinic plan ones to 5
-        conn.execute(text(
+        # Guarded: this ran unwrapped, so on PostgreSQL a single failure here
+        # aborted the transaction and poisoned every statement below it.
+        _safe_exec(conn,
             "UPDATE clinics SET max_doctors = 5, max_staff = 999 "
             "WHERE plan_type = 'clinic'"
-        ))
-        conn.commit()
+        )
 
         # ── patient document vault ────────────────────────────────────────────
         _safe_ddl(conn,
@@ -436,6 +450,89 @@ def _run_migrations():
             except Exception:
                 conn.rollback()
 
+        # ── v6: clinic_id attribution backfill ───────────────────────────────
+        # clinic_id has existed on these tables for a long time but was never
+        # populated on most write paths and never read by any query — it was
+        # NULL on 100% of appointments, patients, schedules and price-catalog
+        # rows. Multi-clinic scoping needs it to be truthful, so backfill it.
+        #
+        # Order matters: derive from a LINKED row wherever one exists, and only
+        # then fall back to the doctor's home clinic. A bill in particular must
+        # inherit its visit's clinic — attributing it to the doctor's own
+        # clinic would move revenue between businesses.
+        #
+        # Every statement is guarded by `WHERE clinic_id IS NULL`, so re-running
+        # migrations is a no-op. All SQL below is portable to SQLite and
+        # PostgreSQL (correlated scalar subqueries, CASE, LIMIT).
+
+        # 1. appointments <- their linked visit
+        _safe_exec(conn,
+            "UPDATE appointments SET clinic_id = ("
+            "  SELECT v.clinic_id FROM visits v WHERE v.id = appointments.visit_id"
+            ") "
+            "WHERE clinic_id IS NULL AND visit_id IS NOT NULL "
+            "  AND EXISTS (SELECT 1 FROM visits v2 "
+            "              WHERE v2.id = appointments.visit_id "
+            "                AND v2.clinic_id IS NOT NULL)"
+        )
+
+        # 2. visits <- their linked appointment
+        _safe_exec(conn,
+            "UPDATE visits SET clinic_id = ("
+            "  SELECT a.clinic_id FROM appointments a WHERE a.id = visits.appointment_id"
+            ") "
+            "WHERE clinic_id IS NULL AND appointment_id IS NOT NULL "
+            "  AND EXISTS (SELECT 1 FROM appointments a2 "
+            "              WHERE a2.id = visits.appointment_id "
+            "                AND a2.clinic_id IS NOT NULL)"
+        )
+
+        # 3. bills <- their visit (never the doctor's home clinic)
+        _safe_exec(conn,
+            "UPDATE bills SET clinic_id = ("
+            "  SELECT v.clinic_id FROM visits v WHERE v.id = bills.visit_id"
+            ") "
+            "WHERE clinic_id IS NULL AND visit_id IS NOT NULL "
+            "  AND EXISTS (SELECT 1 FROM visits v2 "
+            "              WHERE v2.id = bills.visit_id "
+            "                AND v2.clinic_id IS NOT NULL)"
+        )
+
+        # 4. expenses <- the recurring rule that generated them
+        _safe_exec(conn,
+            "UPDATE expenses SET clinic_id = ("
+            "  SELECT r.clinic_id FROM recurring_expenses r WHERE r.id = expenses.recurring_id"
+            ") "
+            "WHERE clinic_id IS NULL AND recurring_id IS NOT NULL "
+            "  AND EXISTS (SELECT 1 FROM recurring_expenses r2 "
+            "              WHERE r2.id = expenses.recurring_id "
+            "                AND r2.clinic_id IS NOT NULL)"
+        )
+
+        # 5. Home-clinic fallback for anything still NULL. Prefers the clinic
+        #    the doctor OWNS, then lowest clinic_id, so the result is
+        #    deterministic rather than insertion-ordered.
+        #
+        #    Known limitation: for a doctor who genuinely works at two clinics,
+        #    this collapses their history onto the owned one. There is no
+        #    recoverable signal for where past work actually happened, and
+        #    guessing from timestamps would be worse than a consistent rule.
+        for _tbl in (
+            "appointments", "visits", "bills", "patients",
+            "expenses", "recurring_expenses", "doctor_schedules", "price_catalog",
+        ):
+            _safe_exec(conn,
+                f"UPDATE {_tbl} SET clinic_id = ("
+                "  SELECT cd.clinic_id FROM clinic_doctors cd "
+                f" WHERE cd.doctor_id = {_tbl}.doctor_id "
+                "  ORDER BY CASE WHEN cd.role = 'owner' THEN 0 ELSE 1 END, cd.clinic_id "
+                "  LIMIT 1"
+                ") "
+                "WHERE clinic_id IS NULL "
+                "  AND EXISTS (SELECT 1 FROM clinic_doctors cd2 "
+                f"             WHERE cd2.doctor_id = {_tbl}.doctor_id)"
+            )
+
         # ── Performance: composite indexes on the hottest filter columns ─────
         # (doctor_id + date) covers the appointment-list and queue queries.
         # CREATE INDEX IF NOT EXISTS works on both SQLite and PostgreSQL.
@@ -444,6 +541,13 @@ def _run_migrations():
             "ON appointments (doctor_id, appointment_date)",
             "CREATE INDEX IF NOT EXISTS ix_visits_doctor_date "
             "ON visits (doctor_id, visit_date)",
+            # Clinic-scoped reads land next; these cover them.
+            "CREATE INDEX IF NOT EXISTS ix_visits_clinic_date "
+            "ON visits (clinic_id, visit_date)",
+            "CREATE INDEX IF NOT EXISTS ix_appointments_clinic_date "
+            "ON appointments (clinic_id, appointment_date)",
+            "CREATE INDEX IF NOT EXISTS ix_bills_clinic_paid "
+            "ON bills (clinic_id, paid_at)",
         ):
             _add_column(conn, _ix_sql)
 

@@ -26,7 +26,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text as _sa_text
 from sqlalchemy.orm import sessionmaker
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2927,5 +2927,132 @@ class TestRegisterInviteHoles:
             inv = db.query(ClinicDoctorInvite).filter(
                 ClinicDoctorInvite.token == token).first()
             assert inv.used_at is None, "rejected registration must not burn the invite"
+        finally:
+            db.close()
+
+
+class TestClinicIdBackfill:
+    """clinic_id existed on the operational tables but was never populated on
+    most write paths and never read — NULL on 100% of appointments, patients,
+    schedules and price-catalog rows. Multi-clinic scoping needs it truthful."""
+
+    def test_migration_is_idempotent(self):
+        """_run_migrations must be safe to re-run — it executes on every boot."""
+        from database.connection import create_tables
+        db = TestSession()
+        try:
+            before = db.execute(_sa_text(
+                "SELECT COUNT(*) FROM appointments WHERE clinic_id IS NULL")).scalar()
+        finally:
+            db.close()
+        create_tables()
+        create_tables()
+        db = TestSession()
+        try:
+            after = db.execute(_sa_text(
+                "SELECT COUNT(*) FROM appointments WHERE clinic_id IS NULL")).scalar()
+        finally:
+            db.close()
+        assert before == after
+
+    def test_bill_inherits_its_visit_clinic_not_the_doctors(self, client):
+        """A bill must be attributed to the clinic the visit happened at.
+        Falling back to the doctor's own clinic would move revenue between
+        businesses."""
+        from database.models import Clinic, ClinicDoctor, Patient, Visit, Bill
+        from database.connection import create_tables
+
+        register(client, email="bf-owner@test.com", account_type="clinic")
+        db = TestSession()
+        try:
+            doc = db.query(Doctor).filter(Doctor.email == "bf-owner@test.com").first()
+            own = db.query(Clinic).filter(Clinic.owner_doctor_id == doc.id).first()
+
+            # A second clinic the doctor is an associate at.
+            other = Clinic(name="Other Clinic", slug="bf-other-clinic",
+                           plan_type="clinic", owner_doctor_id=None)
+            db.add(other); db.commit(); db.refresh(other)
+            db.add(ClinicDoctor(clinic_id=other.id, doctor_id=doc.id,
+                                role="associate", is_active=True))
+
+            pat = Patient(doctor_id=doc.id, name="BF Pat", phone="9800000041")
+            db.add(pat); db.commit(); db.refresh(pat)
+
+            # Visit explicitly at the OTHER clinic; bill left unattributed.
+            v = Visit(doctor_id=doc.id, patient_id=pat.id, clinic_id=other.id,
+                      visit_date=date.today(), token_number=901, status="done")
+            db.add(v); db.commit(); db.refresh(v)
+            b = Bill(visit_id=v.id, doctor_id=doc.id, patient_id=pat.id,
+                     clinic_id=None, total=100, subtotal=100)
+            db.add(b); db.commit()
+            bill_id, other_id, own_id = b.id, other.id, own.id
+        finally:
+            db.close()
+
+        create_tables()  # runs the backfill
+
+        db = TestSession()
+        try:
+            b = db.query(Bill).filter(Bill.id == bill_id).first()
+            assert b.clinic_id == other_id, (
+                f"bill should inherit the visit's clinic {other_id}, "
+                f"got {b.clinic_id} (doctor's own clinic is {own_id})")
+        finally:
+            db.close()
+
+    def test_fallback_prefers_the_owned_clinic(self, client):
+        """With no linked row to derive from, attribution must be deterministic
+        (owner-first), not dependent on membership insertion order."""
+        from database.models import Clinic, ClinicDoctor, Patient
+        from database.connection import create_tables
+
+        register(client, email="bf-dual@test.com", account_type="clinic")
+        db = TestSession()
+        try:
+            doc = db.query(Doctor).filter(Doctor.email == "bf-dual@test.com").first()
+            own = db.query(Clinic).filter(Clinic.owner_doctor_id == doc.id).first()
+
+            # Associate membership at a LOWER clinic id, added first, so a
+            # naive .first()/lowest-id rule would pick the wrong one.
+            other = Clinic(name="Assoc Clinic", slug="bf-assoc-clinic",
+                           plan_type="clinic", owner_doctor_id=None)
+            db.add(other); db.commit(); db.refresh(other)
+            db.add(ClinicDoctor(clinic_id=other.id, doctor_id=doc.id,
+                                role="associate", is_active=True))
+            db.commit()
+
+            pat = Patient(doctor_id=doc.id, name="BF Dual", phone="9800000042")
+            db.add(pat); db.commit(); db.refresh(pat)
+            # Force NULL so the backfill has to decide.
+            db.execute(_sa_text("UPDATE patients SET clinic_id = NULL WHERE id = :i"),
+                       {"i": pat.id})
+            db.commit()
+            pat_id, own_id = pat.id, own.id
+        finally:
+            db.close()
+
+        create_tables()
+
+        db = TestSession()
+        try:
+            p = db.query(Patient).filter(Patient.id == pat_id).first()
+            assert p.clinic_id == own_id, (
+                f"fallback should prefer the OWNED clinic {own_id}, got {p.clinic_id}")
+        finally:
+            db.close()
+
+    def test_no_row_attributed_to_a_clinic_the_doctor_is_not_in(self):
+        """Backfill must never invent a membership that doesn't exist."""
+        db = TestSession()
+        try:
+            for tbl in ("appointments", "visits", "bills", "patients",
+                        "expenses", "doctor_schedules", "price_catalog"):
+                orphans = db.execute(_sa_text(
+                    f"SELECT COUNT(*) FROM {tbl} x "
+                    "WHERE x.clinic_id IS NOT NULL AND NOT EXISTS ("
+                    "  SELECT 1 FROM clinic_doctors cd "
+                    "  WHERE cd.doctor_id = x.doctor_id AND cd.clinic_id = x.clinic_id)"
+                )).scalar()
+                assert orphans == 0, f"{tbl} has {orphans} rows in a clinic the doctor isn't in"
         finally:
             db.close()
