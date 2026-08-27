@@ -25,6 +25,7 @@ from services.scheduler_service import start_scheduler, stop_scheduler
 from services.auth_service import (
     PlanExpired, PinRequired, EmailNotVerified, decode_token, create_access_token, should_renew,
 )
+from routers.clinic import ClinicAdminAuthRequired
 from config import settings
 
 # ── Auth rate limiter — max 10 attempts per client IP per 15 minutes ────────
@@ -328,6 +329,17 @@ async def auth_check(request: Request):
 @app.exception_handler(403)
 async def forbidden_handler(request: Request, exc: HTTPException):
     return RedirectResponse(url="/dashboard", status_code=303)
+
+
+@app.exception_handler(ClinicAdminAuthRequired)
+async def clinic_admin_auth_required_handler(request: Request, exc):
+    """Owner is signed in but hasn't passed the clinic-admin password gate.
+
+    Bounces to the dashboard route, which renders the password prompt in
+    place — rather than 403ing, which forbidden_handler would turn into a
+    silent redirect with no way to actually authenticate.
+    """
+    return RedirectResponse(url="/clinic/admin", status_code=303)
 
 
 @app.exception_handler(EmailNotVerified)

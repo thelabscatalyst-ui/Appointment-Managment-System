@@ -169,6 +169,26 @@ def register(
             ClinicDoctorInvite.expires_at > datetime.utcnow(),
         ).first()
 
+        # A token was supplied but didn't resolve. This used to fall through
+        # to the solo branch, silently handing the user their own trial clinic
+        # while they believed they were joining one — with no error shown.
+        if not valid_invite:
+            return _reject(
+                "This clinic invite link is invalid or has expired. "
+                "Ask the clinic to send you a new one."
+            )
+
+        # /clinic/doctor-invite enforces that the accepting doctor's email
+        # matches the invite; registering did not, so the control was
+        # bypassable by registering instead of logging in and accepting.
+        # invite.email is lowercased when sent; norm_email is lowercased above.
+        if valid_invite.email != norm_email:
+            return _reject(
+                f"This invite was sent to {valid_invite.email}. "
+                f"Register with that email address, or ask the clinic to "
+                f"re-send the invite to {norm_email}."
+            )
+
     if valid_invite:
         # ── Clinic member path: no trial, no solo clinic ──────────────────────
         doctor = Doctor(

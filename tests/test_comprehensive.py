@@ -2761,3 +2761,171 @@ class TestClinicDoctorInvite:
                            follow_redirects=False)
         assert resp.status_code == 303
         assert resp.headers.get("location") == "/dashboard?joined=1"
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Phase 0 — safety net regressions
+# ═══════════════════════════════════════════════════════════════════════════
+
+class TestEmailSuppressedInTests:
+    """The suite registers a doctor ~116 times and /register queues a real
+    verification email via BackgroundTasks, which TestClient runs
+    synchronously. With a live key in .env that was ~116 real sends per run
+    against a 100/day quota. conftest zeroes the key; this guards it."""
+
+    def test_resend_key_is_blank_during_tests(self):
+        from config import settings
+        assert settings.RESEND_API_KEY == "", (
+            "RESEND_API_KEY must be blank in tests — a live key makes the "
+            "suite send real email on every registration."
+        )
+
+    def test_registration_does_not_reach_resend(self, client, monkeypatch):
+        """Registration must not touch the network even end-to-end."""
+        import resend
+        calls = []
+
+        def _boom(*a, **k):
+            calls.append(1)
+            raise AssertionError("real email attempted")
+
+        monkeypatch.setattr(resend.Emails, "send", staticmethod(_boom))
+        r = register(client, email="nomail@test.com")
+        assert r.status_code in (200, 302, 303)
+        assert calls == []
+
+
+class TestApptDoctorTokenVersion:
+    """get_appt_doctor re-implements token handling instead of calling
+    get_current_doctor, and was missing the token-version check — so a
+    session minted before a password reset still authenticated on all nine
+    appointment routes, surviving the reset meant to kill it."""
+
+    def test_stale_token_version_rejected_on_appointment_route(self, client):
+        tok = auth_cookie(client, "tv-appt@test.com")
+        make_schedule(client, tok)
+
+        # Book something so there is a real appointment id to request.
+        client.post("/appointments", data={
+            "patient_name": "Token Version", "patient_phone": "9812345671",
+            "appt_date": next_monday(), "appt_time": "09:00",
+            "appointment_type": "new_patient",
+        }, cookies={"access_token": tok}, follow_redirects=False)
+
+        db = TestSession()
+        try:
+            doc = db.query(Doctor).filter(Doctor.email == "tv-appt@test.com").first()
+            appt = db.query(Appointment).filter(Appointment.doctor_id == doc.id).first()
+            assert appt is not None, "setup failed: no appointment created"
+            appt_id = appt.id
+            # Simulate a password reset bumping the version after the cookie
+            # above was minted.
+            doc.token_version = (doc.token_version or 0) + 1
+            db.commit()
+        finally:
+            db.close()
+
+        r = client.get(f"/appointments/{appt_id}",
+                       cookies={"access_token": tok}, follow_redirects=False)
+        assert r.status_code == 303, (
+            f"stale-token-version session should be rejected, got {r.status_code}"
+        )
+        assert "/login" in r.headers.get("location", "")
+
+
+class TestClinicAdminGateCoversAllRoutes:
+    """The password gate was called only from the dashboard route, so the
+    roster could be listed and invites sent with just a live owner session."""
+
+    def _owner_cookie(self, client, email):
+        register(client, email=email, account_type="clinic")
+        return login(client, email).cookies.get("access_token")
+
+    def test_doctors_list_requires_password_gate(self, client):
+        cookie = self._owner_cookie(client, "gate-list@test.com")
+        r = client.get("/clinic/admin/doctors",
+                       cookies={"access_token": cookie}, follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers.get("location") == "/clinic/admin"
+
+    def test_invite_requires_password_gate(self, client):
+        cookie = self._owner_cookie(client, "gate-invite@test.com")
+        r = client.post("/clinic/admin/doctors/invite",
+                        data={"invite_email": "someone@test.com"},
+                        cookies={"access_token": cookie}, follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers.get("location") == "/clinic/admin"
+
+        # And no invite was actually created.
+        from database.models import ClinicDoctorInvite
+        db = TestSession()
+        try:
+            assert db.query(ClinicDoctorInvite).filter(
+                ClinicDoctorInvite.email == "someone@test.com").first() is None
+        finally:
+            db.close()
+
+
+class TestRegisterInviteHoles:
+    """/register accepted any email against a valid token, and silently fell
+    through to a solo signup when the token was bad."""
+
+    def test_invalid_invite_token_is_rejected_not_silently_solo(self, client):
+        r = register(client, email="badtoken@test.com")  # baseline works
+        assert r.status_code in (200, 302, 303)
+
+        resp = client.post("/register", data={
+            "name": "Dr Bad", "email": "badtoken2@test.com",
+            "phone": _next_phone(), "password": "Kv9$mPq2#Zx8L",
+            "clinic_name": "X", "city": "Y", "specialization": "General",
+            "clinic_invite": "definitely-not-a-real-token",
+            "account_type": "solo",
+        }, follow_redirects=False)
+        assert resp.status_code == 400
+        assert "invalid or has expired" in resp.text
+
+        db = TestSession()
+        try:
+            assert db.query(Doctor).filter(
+                Doctor.email == "badtoken2@test.com").first() is None, (
+                "no account should be created for a bad invite token")
+        finally:
+            db.close()
+
+    def test_register_email_must_match_invite(self, client):
+        from database.models import Clinic, ClinicDoctorInvite
+        import secrets
+        from datetime import timedelta as _td
+
+        register(client, email="rowner@test.com", account_type="clinic")
+        db = TestSession()
+        try:
+            owner = db.query(Doctor).filter(Doctor.email == "rowner@test.com").first()
+            clinic = db.query(Clinic).filter(Clinic.owner_doctor_id == owner.id).first()
+            token = secrets.token_urlsafe(16)
+            db.add(ClinicDoctorInvite(
+                clinic_id=clinic.id, email="intended@test.com", token=token,
+                expires_at=datetime.utcnow() + _td(days=7),
+            ))
+            db.commit()
+        finally:
+            db.close()
+
+        resp = client.post("/register", data={
+            "name": "Dr Wrong", "email": "wrongperson@test.com",
+            "phone": _next_phone(), "password": "Kv9$mPq2#Zx8L",
+            "clinic_name": "", "city": "Y", "specialization": "General",
+            "clinic_invite": token, "account_type": "solo",
+        }, follow_redirects=False)
+        assert resp.status_code == 400
+        assert "intended@test.com" in resp.text
+
+        db = TestSession()
+        try:
+            assert db.query(Doctor).filter(
+                Doctor.email == "wrongperson@test.com").first() is None
+            inv = db.query(ClinicDoctorInvite).filter(
+                ClinicDoctorInvite.token == token).first()
+            assert inv.used_at is None, "rejected registration must not burn the invite"
+        finally:
+            db.close()

@@ -69,6 +69,30 @@ def _is_admin_authenticated(request: Request, doctor_id: int) -> bool:
     return bool(payload and payload.get("clinic_admin") and payload.get("doctor_id") == doctor_id)
 
 
+class ClinicAdminAuthRequired(Exception):
+    """Owner is authenticated but has not passed the clinic-admin password gate.
+
+    Raised as an exception rather than returned so it works from a dependency,
+    which is what lets every /clinic/admin* route share one gate. Handled in
+    main.py by rendering the password prompt.
+    """
+    pass
+
+
+def require_clinic_admin(request: Request, doctor: Doctor = Depends(get_clinic_owner)):
+    """Clinic owner AND past the password gate.
+
+    The gate previously lived inline in the dashboard route only, so
+    GET /clinic/admin/doctors and POST /clinic/admin/doctors/invite were
+    reachable with just a live owner session — the roster could be listed and
+    invites sent without ever re-entering the password. As a dependency it
+    covers every admin route, including the lifecycle routes added later.
+    """
+    if not _is_admin_authenticated(request, doctor.id):
+        raise ClinicAdminAuthRequired()
+    return doctor
+
+
 # ─────────────────────────────────────────────────────────────────────────── #
 #  Clinic Admin — password gate                                                #
 # ─────────────────────────────────────────────────────────────────────────── #
@@ -112,7 +136,9 @@ def clinic_admin_dashboard(
     if not clinic:
         return RedirectResponse(url="/dashboard", status_code=303)
 
-    # Password gate
+    # Password gate — kept inline here (rather than via require_clinic_admin)
+    # so the prompt renders in place with its auth_error, which is the entry
+    # point users actually land on. Sibling routes use the dependency.
     if not _is_admin_authenticated(request, doctor.id):
         return templates.TemplateResponse(request, "clinic/admin_auth.html", {
             "doctor":     doctor,
@@ -163,7 +189,7 @@ def clinic_admin_dashboard(
 @router.get("/admin/doctors", response_class=HTMLResponse)
 def doctors_list_page(
     request: Request,
-    doctor: Doctor = Depends(get_clinic_owner),
+    doctor: Doctor = Depends(require_clinic_admin),
     db: Session = Depends(get_db),
 ):
     clinic = _get_owner_clinic(doctor.id, db)
@@ -208,7 +234,7 @@ def send_doctor_invite(
     request: Request,
     background_tasks: BackgroundTasks,
     invite_email: str = Form(...),
-    doctor: Doctor = Depends(get_clinic_owner),
+    doctor: Doctor = Depends(require_clinic_admin),
     db: Session = Depends(get_db),
 ):
     clinic = _get_owner_clinic(doctor.id, db)

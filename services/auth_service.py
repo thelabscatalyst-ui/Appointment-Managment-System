@@ -357,6 +357,16 @@ def get_appt_doctor(appt_id: int, request: Request, db: Session = Depends(get_db
     if not doctor or not doctor.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Account not found")
 
+    # This dependency re-implements token handling instead of calling
+    # get_current_doctor, and the version check was missing — so a session
+    # minted before a password reset still authenticated on all nine
+    # appointment routes, surviving the very reset meant to kill it.
+    if not _token_version_ok(payload, doctor):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session ended — your password was changed",
+        )
+
     _require_verified(doctor)
 
     # Plan gate (mirrors get_paying_doctor logic)

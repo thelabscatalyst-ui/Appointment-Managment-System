@@ -75,9 +75,19 @@ def send_invite_email(
 
     if ok:
         logger.info("Invite email sent to %s for clinic %s", to_email, clinic_name)
-    else:
+    elif settings.ENVIRONMENT.lower() != "production":
+        # The accept URL carries a live invite token — anyone reading the log
+        # could join the clinic as this doctor. Outside production the link is
+        # what makes a failed send recoverable locally, so keep it there only.
+        # Mirrors the same guard in services/email_service.py.
         logger.warning(
             "Invite email NOT sent to %s for clinic %s: %s — share the link manually: %s",
             to_email, clinic_name, detail, accept_url,
+        )
+    else:
+        logger.warning(
+            "Invite email NOT sent to %s for clinic %s: %s "
+            "(accept link withheld from logs in production)",
+            to_email, clinic_name, detail,
         )
     return ok, detail

@@ -17,7 +17,25 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 TEST_DATABASE_URL = "sqlite:///./test_clinic.db"
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
-from database.connection import Base, get_db
+# ── Email: hard-off for the entire suite ────────────────────────────────────
+# The suite registers a doctor ~116 times, and POST /register queues a real
+# verification email through BackgroundTasks — which TestClient executes
+# synchronously as part of the response. config.py loads .env for tests too,
+# so a live RESEND_API_KEY meant ~116 real sends per run against a 100/day
+# quota.
+#
+# Zeroing the key makes services.email_service.send_email short-circuit
+# before any network I/O and return ("not configured"). Deliberately NOT
+# monkeypatching send_email itself: TestEmailService/TestInviteService call
+# it directly and assert on that exact return value.
+#
+# This import must stay BELOW the DATABASE_URL line above — config builds its
+# Settings singleton at import time, so importing it any earlier would bind
+# the suite to the real dev database.
+from config import settings as _test_settings           # noqa: E402
+_test_settings.RESEND_API_KEY = ""
+
+from database.connection import Base, get_db            # noqa: E402
 
 test_engine = create_engine(
     TEST_DATABASE_URL,
@@ -36,9 +54,17 @@ def override_get_db():
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_database():
-    """Create all tables once for the session."""
+    """Create all tables once for the session.
+
+    Goes through create_tables() rather than Base.metadata.create_all() so the
+    additive migrations in _run_migrations() are exercised by the suite —
+    otherwise every migration ships untested. Safe because conftest sets
+    DATABASE_URL above before database.connection is imported, so that
+    module's engine is this same test database.
+    """
     from database import models  # noqa — registers models with Base
-    Base.metadata.create_all(bind=test_engine)
+    from database.connection import create_tables
+    create_tables()
     yield
     Base.metadata.drop_all(bind=test_engine)
     # Clean up the test db file
