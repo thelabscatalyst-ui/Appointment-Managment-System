@@ -318,13 +318,25 @@ def send_doctor_invite(
     ))
     db.commit()
 
-    # Send after the response so a slow/unreachable mail provider can't stall
-    # the owner's request. send_invite_email never raises; it logs the accept
-    # URL if delivery fails so the link can be shared manually.
-    from services.invite_service import send_invite_email
-    background_tasks.add_task(send_invite_email, email, token, clinic.name, doctor.name)
+    # Sent synchronously, not as a background task. Backgrounding it meant the
+    # owner was told "Invite sent" whether or not it actually sent — and with
+    # the sending domain unverified at Resend, every send was failing while the
+    # UI reported success. An invite is a rare, deliberate action; a second of
+    # latency is worth knowing the truth.
+    from services.invite_service import send_invite_email, build_invite_url
+    base_url = str(request.base_url).rstrip("/")
+    ok, detail = send_invite_email(email, token, clinic.name, doctor.name, base_url)
+    accept_url = build_invite_url(token, base_url)
 
-    return _render(success=f"Invite sent to {email}. They have 7 days to accept.")
+    if ok:
+        return _render(success=f"Invite emailed to {email}. They have 7 days to accept.")
+
+    # Delivery failed. The invite is valid regardless, so hand the owner the
+    # link rather than leaving them to discover nothing arrived.
+    return _render(success=(
+        f"Invite created for {email}, but the email could not be sent "
+        f"({detail}). Send them this link — it works for 7 days: {accept_url}"
+    ))
 
 
 # ─────────────────────────────────────────────────────────────────────────── #

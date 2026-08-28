@@ -3432,3 +3432,51 @@ class TestSchemaReconciler:
                 if col.name not in have:
                     missing.append(f"{table.name}.{col.name}")
         assert not missing, f"model columns absent from the database: {missing}"
+
+
+class TestInviteDeliveryHonesty:
+    """The invite was queued as a background task and the route reported
+    "Invite sent" unconditionally. With the sending domain unverified at
+    Resend every send was failing, and the owner was told it worked — so the
+    invited doctor simply never heard anything and nobody knew why."""
+
+    def _owner_admin_cookies(self, client, email):
+        register(client, email=email, account_type="clinic")
+        tok = login(client, email).cookies.get("access_token")
+        r = client.post("/clinic/admin/auth", data={"password": "Kv9$mPq2#Zx8L"},
+                        cookies={"access_token": tok}, follow_redirects=False)
+        return {"access_token": tok, "clinic_admin_auth": r.cookies.get("clinic_admin_auth")}
+
+    def test_failed_delivery_is_reported_and_link_is_offered(self, client):
+        """RESEND_API_KEY is blank in tests, so send_email always fails —
+        exactly the production condition."""
+        ck = self._owner_admin_cookies(client, "deliv-fail@test.com")
+        r = client.post("/clinic/admin/doctors/invite",
+                        data={"invite_email": "never-arrives@test.com"},
+                        cookies=ck, follow_redirects=False)
+        assert r.status_code == 200
+        assert "could not be sent" in r.text, "must not claim the email was sent"
+        assert "/clinic/doctor-invite/" in r.text, "must hand the owner the link instead"
+
+    def test_invite_link_uses_the_live_host_not_a_dead_domain(self):
+        """PUBLIC_BASE_URL defaulted to a domain with no DNS record, so every
+        invite link 404'd even when mail was delivered."""
+        from services.invite_service import build_invite_url
+        url = build_invite_url("tok123", base_url="https://real-host.example")
+        assert url == "https://real-host.example/clinic/doctor-invite/tok123"
+        assert "medtrack.life" not in url
+
+    def test_invite_row_still_created_when_delivery_fails(self, client):
+        """A mail outage must not cost the owner the invite itself."""
+        from database.models import ClinicDoctorInvite
+        ck = self._owner_admin_cookies(client, "deliv-row@test.com")
+        client.post("/clinic/admin/doctors/invite",
+                    data={"invite_email": "row-still-there@test.com"},
+                    cookies=ck, follow_redirects=False)
+        db = TestSession()
+        try:
+            inv = db.query(ClinicDoctorInvite).filter(
+                ClinicDoctorInvite.email == "row-still-there@test.com").first()
+            assert inv is not None and inv.used_at is None
+        finally:
+            db.close()

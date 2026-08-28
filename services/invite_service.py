@@ -22,18 +22,25 @@ logger = logging.getLogger(__name__)
 INVITE_VALID_DAYS = 7
 
 
-def build_invite_url(token: str) -> str:
+def build_invite_url(token: str, base_url: str | None = None) -> str:
     """Public accept link for a clinic doctor invite.
 
     Must match the route in routers/clinic.py — the router carries a
     `/clinic` prefix and the path is `/doctor-invite/{token}`.
+
+    base_url should be the host the owner is actually using, taken from the
+    request. PUBLIC_BASE_URL is only a fallback: it defaulted to a domain that
+    does not resolve, which produced invite links that 404'd for every
+    recipient even when the mail itself arrived. The live request host cannot
+    be wrong in that way.
     """
-    base = settings.PUBLIC_BASE_URL.rstrip("/")
+    base = (base_url or settings.PUBLIC_BASE_URL).rstrip("/")
     return f"{base}/clinic/doctor-invite/{token}"
 
 
 def send_invite_email(
-    to_email: str, token: str, clinic_name: str, invited_by: str
+    to_email: str, token: str, clinic_name: str, invited_by: str,
+    base_url: str | None = None,
 ) -> tuple[bool, str]:
     """Send a clinic invitation with its one-time accept link.
 
@@ -41,7 +48,7 @@ def send_invite_email(
     DB regardless, so a mail failure just means the owner has to share the
     link manually.
     """
-    accept_url = build_invite_url(token)
+    accept_url = build_invite_url(token, base_url)
 
     body = f"""
       <h2 style="margin:0 0 12px;font-size:20px;font-weight:700;color:#1a1410;">
