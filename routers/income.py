@@ -149,6 +149,8 @@ async def income_dashboard(
     db:      Session = Depends(get_db),
     doctor:  Doctor  = Depends(require_pin),
 ):
+    # Money is attributed to the clinic the work happened at.
+    _acid_scope = getattr(request.state, "active_clinic_id", None)
     _fire_due_recurring(doctor.id, db)
 
     # Money is attributed to the clinic the work happened at.
@@ -189,6 +191,7 @@ async def income_dashboard(
         db.query(Bill)
         .filter(
             Bill.doctor_id    == doctor.id,
+            Bill.clinic_id    == _acid_scope,
             Bill.paid_amount  == 0,
             Bill.total        > 0,
             Bill.payment_mode != PaymentMode.free,
@@ -204,6 +207,7 @@ async def income_dashboard(
         db.query(Bill)
         .filter(
             Bill.doctor_id == doctor.id,
+            Bill.clinic_id == _acid_scope,
             Bill.paid_at   >= _dt_start(chart_start),
             Bill.paid_at   <= _dt_end(today),
             Bill.payment_mode != PaymentMode.free,
@@ -230,6 +234,7 @@ async def income_dashboard(
         db.query(Bill.payment_mode, func.sum(Bill.total).label("t"))
         .filter(
             Bill.doctor_id == doctor.id,
+            Bill.clinic_id == _acid_scope,
             Bill.paid_at   >= _dt_start(m_first),
             Bill.paid_at   <= _dt_end(m_last),
         )
@@ -253,6 +258,7 @@ async def income_dashboard(
         db.query(Bill)
         .filter(
             Bill.doctor_id == doctor.id,
+            Bill.clinic_id == _acid_scope,
             Bill.paid_at   >= _dt_start(m_first),
             Bill.paid_at   <= _dt_end(m_last),
             Bill.payment_mode != PaymentMode.free,
@@ -285,6 +291,7 @@ async def income_dashboard(
         db.query(Bill)
         .filter(
             Bill.doctor_id == doctor.id,
+            Bill.clinic_id == _acid_scope,
             Bill.paid_at   >= _dt_start(today - timedelta(days=89)),
             Bill.paid_at   <= _dt_end(today),
             Bill.payment_mode != PaymentMode.free,
@@ -311,6 +318,7 @@ async def income_dashboard(
         db.query(Expense.category, func.sum(Expense.amount).label("t"))
         .filter(
             Expense.doctor_id    == doctor.id,
+            Expense.clinic_id == _acid_scope,
             Expense.expense_date >= m_first,
             Expense.expense_date <= m_last,
         )
@@ -335,6 +343,7 @@ async def income_dashboard(
         .join(Bill, Bill.patient_id == Patient.id)
         .filter(
             Bill.doctor_id == doctor.id,
+            Bill.clinic_id == _acid_scope,
             Bill.paid_at   >= _dt_start(m_first),
             Bill.paid_at   <= _dt_end(m_last),
             Bill.payment_mode != PaymentMode.free,
@@ -348,7 +357,7 @@ async def income_dashboard(
     # ── Recent 5 bills for dashboard strip ───────────────────────────── #
     recent_bills = (
         db.query(Bill)
-        .filter(Bill.doctor_id == doctor.id)
+        .filter(Bill.doctor_id == doctor.id, Bill.clinic_id == _acid_scope)
         .order_by(Bill.paid_at.desc().nullslast(), Bill.created_at.desc())
         .limit(5)
         .all()
@@ -407,6 +416,8 @@ async def transactions_page(
     db:      Session = Depends(get_db),
     doctor:  Doctor  = Depends(require_pin),
 ):
+    # Money is attributed to the clinic the work happened at.
+    _acid_scope = getattr(request.state, "active_clinic_id", None)
     import calendar as _cal
     today = date.today()
     if not year:  year  = today.year
@@ -415,7 +426,7 @@ async def transactions_page(
     # ── Build year list (all years that have bills + current year) ──────────
     all_bill_dates = (
         db.query(Bill.paid_at, Bill.created_at)
-        .filter(Bill.doctor_id == doctor.id)
+        .filter(Bill.doctor_id == doctor.id, Bill.clinic_id == _acid_scope)
         .all()
     )
     year_set  = {today.year}
@@ -445,6 +456,7 @@ async def transactions_page(
                 db.query(Bill)
                 .filter(
                     Bill.doctor_id == doctor.id,
+                    Bill.clinic_id == _acid_scope,
                     Bill.paid_at   >= _dt_start(mf),
                     Bill.paid_at   <= _dt_end(ml),
                 )
@@ -509,6 +521,7 @@ async def transactions_page(
         db.query(Bill)
         .filter(
             Bill.doctor_id == doctor.id,
+            Bill.clinic_id == _acid_scope,
             Bill.paid_at   >= _dt_start(m_first),
             Bill.paid_at   <= _dt_end(m_last),
         )
@@ -588,6 +601,8 @@ async def expenses_page(
     db:      Session = Depends(get_db),
     doctor:  Doctor  = Depends(get_paying_doctor),
 ):
+    # Money is attributed to the clinic the work happened at.
+    _acid_scope = getattr(request.state, "active_clinic_id", None)
     _fire_due_recurring(doctor.id, db)
 
     _acid2 = getattr(request.state, "active_clinic_id", None)
@@ -604,6 +619,7 @@ async def expenses_page(
         db.query(Expense)
         .filter(
             Expense.doctor_id    == doctor.id,
+            Expense.clinic_id == _acid_scope,
             Expense.expense_date >= m_first,
             Expense.expense_date <= m_last,
         )
@@ -719,9 +735,12 @@ async def delete_expense(
     db:         Session = Depends(get_db),
     doctor:     Doctor  = Depends(get_paying_doctor),
 ):
+    # Money is attributed to the clinic the work happened at.
+    _acid_scope = getattr(request.state, "active_clinic_id", None)
     exp = db.query(Expense).filter(
         Expense.id        == expense_id,
         Expense.doctor_id == doctor.id,
+        Expense.clinic_id == _acid_scope,
     ).first()
     redirect_month = date.today().month
     redirect_year  = date.today().year
