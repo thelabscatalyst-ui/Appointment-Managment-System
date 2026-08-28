@@ -242,53 +242,52 @@ def _pin_ok(request: Request, doctor) -> bool:
     return bool(payload and payload.get("doctor_id") == doctor.id)
 
 
-def get_paying_doctor(doctor=Depends(get_current_doctor), db: Session = Depends(get_db)):
-    """Dependency for all protected routes — raises PlanExpired if subscription lapsed.
-    For clinic-member doctors (no trial, no own plan), checks if their clinic is active.
-    A clinic is considered active if:
-      (a) it has a paid plan_expires_at in the future, OR
-      (b) the clinic owner still has an active trial or plan (clinic is in trial mode)
+def get_paying_doctor(request: Request, doctor=Depends(get_current_doctor),
+                      db: Session = Depends(get_db)):
+    """Dependency for all protected routes — plan-gates PER CLINIC.
 
-    Verification is checked FIRST, ahead of the plan check — email confirmation
-    is mandatory to use the software at all, not something a lapsed-plan doctor
-    should see instead of.
+    Previously this granted access GLOBALLY: it walked every membership and
+    unlocked the doctor everywhere if any one clinic qualified. That meant two
+    doctors could invite each other and both get a free personal practice
+    indefinitely. Access is now scoped to the clinic the request is actually
+    operating in:
+
+      * working in a clinic you OWN  -> your own plan, or the clinic's
+      * working in someone else's    -> that clinic's plan only
+
+    Verification is still checked first — email confirmation is mandatory to
+    use the software at all, not something a lapsed-plan doctor sees instead.
+
+    `request` is taken so the resolved clinic can be stashed on request.state,
+    which is how ~59 routes consume it without a single signature change.
+    FastAPI injects Request automatically.
     """
+    from services.clinic_context import (
+        resolve_active_clinic, clinic_plan_active, personal_plan_active, ROLE_OWNER,
+    )
+
     _require_verified(doctor)
-    now = datetime.utcnow()
-    trial_ok = doctor.trial_ends_at and doctor.trial_ends_at > now
-    plan_ok  = doctor.plan_expires_at and doctor.plan_expires_at > now
-    if not trial_ok and not plan_ok:
-        from database.models import ClinicDoctor, Clinic, Doctor as DoctorModel
-        memberships = db.query(ClinicDoctor).filter(
-            ClinicDoctor.doctor_id == doctor.id,
-            ClinicDoctor.is_active == True,
-        ).all()
-        is_associate = any(m.role == "associate" for m in memberships)
-        clinic_ok = False
-        for m in memberships:
-            clinic = db.query(Clinic).filter(Clinic.id == m.clinic_id).first()
-            if not clinic:
-                continue
-            # (a) Clinic has a paid active plan (+ grace period)
-            if clinic.plan_expires_at and clinic.plan_expires_at > now:
-                clinic_ok = True
-                break
-            grace = getattr(clinic, "plan_grace_until", None)
-            if grace and grace > now:
-                clinic_ok = True
-                break
-            # (b) Clinic on trial — check owner's plan
-            if clinic.owner_doctor_id:
-                owner = db.query(DoctorModel).filter(DoctorModel.id == clinic.owner_doctor_id).first()
-                if owner and (
-                    (owner.trial_ends_at and owner.trial_ends_at > now) or
-                    (owner.plan_expires_at and owner.plan_expires_at > now)
-                ):
-                    clinic_ok = True
-                    break
-        if not clinic_ok:
-            # Associates can't renew — send them to plan-lapsed page
-            raise PlanExpired(reason="clinic" if is_associate else "personal")
+
+    clinic, membership = resolve_active_clinic(request, doctor, db)
+    request.state.active_clinic = clinic
+    request.state.active_clinic_id = clinic.id if clinic else None
+    request.state.active_role = membership.role if membership else None
+
+    if clinic is None:
+        # No membership at all — nothing but their own entitlement applies.
+        if not personal_plan_active(doctor):
+            raise PlanExpired(reason="personal")
+        return doctor
+
+    if membership.role == ROLE_OWNER:
+        if not (personal_plan_active(doctor) or clinic_plan_active(clinic, db)):
+            raise PlanExpired(reason="personal")
+    else:
+        # Someone else's clinic: only that clinic's entitlement counts, and an
+        # associate cannot renew it — hence reason="clinic" (-> /plan-lapsed).
+        if not clinic_plan_active(clinic, db):
+            raise PlanExpired(reason="clinic")
+
     return doctor
 
 
@@ -369,45 +368,44 @@ def get_appt_doctor(appt_id: int, request: Request, db: Session = Depends(get_db
 
     _require_verified(doctor)
 
-    # Plan gate (mirrors get_paying_doctor logic)
-    now = datetime.utcnow()
-    trial_ok = doctor.trial_ends_at and doctor.trial_ends_at > now
-    plan_ok  = doctor.plan_expires_at and doctor.plan_expires_at > now
-    if not trial_ok and not plan_ok:
-        memberships = db.query(ClinicDoctor).filter(
-            ClinicDoctor.doctor_id == doctor.id,
-            ClinicDoctor.is_active == True,
-        ).all()
-        from database.models import Clinic as ClinicModel
-        clinic_ok = False
-        for m in memberships:
-            clinic = db.query(ClinicModel).filter(ClinicModel.id == m.clinic_id).first()
-            if not clinic:
-                continue
-            if clinic.plan_expires_at and clinic.plan_expires_at > now:
-                clinic_ok = True
-                break
-            if clinic.owner_doctor_id:
-                owner = db.query(DoctorModel).filter(DoctorModel.id == clinic.owner_doctor_id).first()
-                if owner and (
-                    (owner.trial_ends_at and owner.trial_ends_at > now) or
-                    (owner.plan_expires_at and owner.plan_expires_at > now)
-                ):
-                    clinic_ok = True
-                    break
-        if not clinic_ok:
-            raise PlanExpired()
+    # Plan gate — shares clinic_context with get_paying_doctor rather than
+    # duplicating the ladder. The copy this replaces silently omitted the
+    # plan_grace_until check, so a clinic inside its grace window was treated
+    # as lapsed on these nine routes but active everywhere else.
+    from services.clinic_context import (
+        resolve_active_clinic, clinic_plan_active, personal_plan_active,
+        is_owner_of, ROLE_OWNER,
+    )
 
-    # Allow clinic owners to access their associate doctors' appointments.
+    clinic, membership = resolve_active_clinic(request, doctor, db)
+    request.state.active_clinic = clinic
+    request.state.active_clinic_id = clinic.id if clinic else None
+    request.state.active_role = membership.role if membership else None
+
+    if clinic is None:
+        if not personal_plan_active(doctor):
+            raise PlanExpired(reason="personal")
+    elif membership.role == ROLE_OWNER:
+        if not (personal_plan_active(doctor) or clinic_plan_active(clinic, db)):
+            raise PlanExpired(reason="personal")
+    else:
+        if not clinic_plan_active(clinic, db):
+            raise PlanExpired(reason="clinic")
+
+    # A clinic owner may act on their doctors' appointments — but only for
+    # appointments that happened AT the clinic they are currently in. The old
+    # check took an arbitrary owned membership with no is_active filter and
+    # never looked at where the appointment happened, so an owner of clinic A
+    # could reach an associate's appointment booked at clinic B.
     appt_row = db.query(ApptModel).filter(ApptModel.id == appt_id).first()
-    if appt_row and appt_row.doctor_id != doctor.id:
-        ownership = db.query(ClinicDoctor).filter(
-            ClinicDoctor.doctor_id == doctor.id,
-            ClinicDoctor.role == "owner",
-        ).first()
-        if ownership:
+    if appt_row and appt_row.doctor_id != doctor.id and clinic is not None:
+        same_clinic = (
+            appt_row.clinic_id == clinic.id
+            or appt_row.clinic_id is None  # legacy rows the backfill couldn't place
+        )
+        if same_clinic and is_owner_of(db, doctor.id, clinic.id):
             member = db.query(ClinicDoctor).filter(
-                ClinicDoctor.clinic_id == ownership.clinic_id,
+                ClinicDoctor.clinic_id == clinic.id,
                 ClinicDoctor.doctor_id == appt_row.doctor_id,
                 ClinicDoctor.is_active == True,
             ).first()
@@ -416,6 +414,10 @@ def get_appt_doctor(appt_id: int, request: Request, db: Session = Depends(get_db
                     DoctorModel.id == appt_row.doctor_id
                 ).first()
                 if actual_doctor:
+                    # Audit trail: record who actually acted, not who they
+                    # acted as. created_by columns read real_doctor_id.
+                    request.state.real_doctor_id = doctor.id
+                    request.state.acting_as_doctor_id = actual_doctor.id
                     return actual_doctor
 
     return doctor
@@ -430,21 +432,17 @@ def get_admin_doctor(doctor=Depends(get_current_doctor)):
 
 
 def get_clinic_owner(request: Request, db: Session = Depends(get_db)):
-    """Dependency for /clinic/admin routes — doctor who owns a REAL clinic plan (not solo trial)."""
-    from database.models import ClinicDoctor, Clinic
+    """Dependency for /clinic/admin routes — doctor who owns a REAL clinic plan (not solo trial).
+
+    Delegates to clinic_context.owned_clinic, which (unlike the query this
+    replaced) also filters on is_active and compares plan_expires_at to now.
+    The old version accepted a deactivated owner membership, and let a clinic
+    that had stopped paying keep Clinic Admin indefinitely.
+    """
+    from services.clinic_context import owned_clinic
     doctor = get_current_doctor(request, db)
-    membership = (
-        db.query(ClinicDoctor)
-        .join(Clinic, Clinic.id == ClinicDoctor.clinic_id)
-        .filter(
-            ClinicDoctor.doctor_id == doctor.id,
-            ClinicDoctor.role == "owner",
-            Clinic.plan_type == "clinic",
-        )
-        .first()
-    )
-    if not membership:
+    clinic = owned_clinic(db, doctor.id, require_paid=True)
+    if not clinic:
         raise HTTPException(status_code=403, detail="Clinic plan required")
-    clinic = db.query(Clinic).filter(Clinic.id == membership.clinic_id).first()
     request.state.clinic = clinic
     return doctor

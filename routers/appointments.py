@@ -22,15 +22,33 @@ router = APIRouter(prefix="/appointments", tags=["appointments"])
 templates = Jinja2Templates(directory="templates")
 
 
-def _get_owner_clinic_doctors(doctor: Doctor, db: Session) -> list[Doctor]:
-    """If doctor is a clinic owner with multiple doctors, return all of them. Else empty."""
-    ownership = db.query(ClinicDoctor).filter(
-        ClinicDoctor.doctor_id == doctor.id, ClinicDoctor.role == "owner"
-    ).first()
-    if not ownership:
+def _active_clinic_id(request) -> int | None:
+    """The clinic this request is operating in, stashed by get_paying_doctor."""
+    return getattr(request.state, "active_clinic_id", None)
+
+
+def _get_owner_clinic_doctors(doctor: Doctor, db: Session, request=None) -> list[Doctor]:
+    """Doctors the caller may act for — only inside the clinic they OWN.
+
+    Bound to the active clinic rather than an arbitrary owned one: a doctor
+    who owns clinic A and is an associate at clinic B must not get a doctor
+    selector while working at B.
+    """
+    from services.clinic_context import is_owner_of, active_memberships, ROLE_OWNER
+    from database.models import ClinicDoctor
+
+    clinic_id = _active_clinic_id(request) if request is not None else None
+    if clinic_id is None:
+        owned = next((m for m in active_memberships(db, doctor.id)
+                      if m.role == ROLE_OWNER), None)
+        if not owned:
+            return []
+        clinic_id = owned.clinic_id
+    elif not is_owner_of(db, doctor.id, clinic_id):
         return []
+
     members = db.query(ClinicDoctor).filter(
-        ClinicDoctor.clinic_id == ownership.clinic_id, ClinicDoctor.is_active == True
+        ClinicDoctor.clinic_id == clinic_id, ClinicDoctor.is_active == True
     ).all()
     if len(members) < 2:
         return []  # solo clinic, no selector needed
@@ -38,17 +56,32 @@ def _get_owner_clinic_doctors(doctor: Doctor, db: Session) -> list[Doctor]:
     return db.query(Doctor).filter(Doctor.id.in_(ids)).order_by(Doctor.name).all()
 
 
-def _resolve_target_doctor(for_doctor_id: int, logged_in_doctor: Doctor, db: Session) -> Doctor:
-    """Return the target doctor if the logged-in doctor is their clinic owner, else return logged_in_doctor."""
+def _resolve_target_doctor(for_doctor_id: int, logged_in_doctor: Doctor, db: Session,
+                           request=None) -> Doctor:
+    """Act as another doctor — only if you own the clinic you're currently in.
+
+    Previously took any owned-clinic membership regardless of which clinic the
+    request concerned, so an owner of clinic A could act as a doctor of A while
+    nominally working at clinic B.
+    """
+    from services.clinic_context import is_owner_of, active_memberships, ROLE_OWNER
+    from database.models import ClinicDoctor
+
     if not for_doctor_id or for_doctor_id == logged_in_doctor.id:
         return logged_in_doctor
-    ownership = db.query(ClinicDoctor).filter(
-        ClinicDoctor.doctor_id == logged_in_doctor.id, ClinicDoctor.role == "owner"
-    ).first()
-    if not ownership:
+
+    clinic_id = _active_clinic_id(request) if request is not None else None
+    if clinic_id is None:
+        owned = next((m for m in active_memberships(db, logged_in_doctor.id)
+                      if m.role == ROLE_OWNER), None)
+        if not owned:
+            return logged_in_doctor
+        clinic_id = owned.clinic_id
+    elif not is_owner_of(db, logged_in_doctor.id, clinic_id):
         return logged_in_doctor
+
     member = db.query(ClinicDoctor).filter(
-        ClinicDoctor.clinic_id == ownership.clinic_id,
+        ClinicDoctor.clinic_id == clinic_id,
         ClinicDoctor.doctor_id == for_doctor_id,
         ClinicDoctor.is_active == True,
     ).first()

@@ -146,43 +146,45 @@ def dashboard(
     _today_start = _dt.combine(today, _dt.min.time())
     _today_end   = _dt.combine(today, _dt.max.time())
 
-    today_income_row = (
+    # Money is scoped to the clinic the doctor is currently working in.
+    # Summing on doctor_id alone blended an associate's takings at someone
+    # else's clinic into their own personal income.
+    _active_clinic_id = getattr(request.state, "active_clinic_id", None)
+
+    def _clinic_scope(q, model):
+        return q.filter(model.clinic_id == _active_clinic_id) if _active_clinic_id else q
+
+    today_income_row = _clinic_scope(
         db.query(func.sum(Bill.total))
         .filter(
             Bill.doctor_id    == doctor.id,
             Bill.paid_at      >= _today_start,
             Bill.paid_at      <= _today_end,
             Bill.payment_mode != PaymentMode.free,
-        )
-        .scalar()
-    )
+        ), Bill
+    ).scalar()
     today_income = float(today_income_row or 0)
 
     # Last transaction — TODAY only
-    last_bill = (
+    last_bill = _clinic_scope(
         db.query(Bill)
         .filter(
             Bill.doctor_id == doctor.id,
             Bill.paid_at   >= _today_start,
             Bill.paid_at   <= _today_end,
-        )
-        .order_by(Bill.paid_at.desc())
-        .first()
-    )
+        ), Bill
+    ).order_by(Bill.paid_at.desc()).first()
 
     # Recent 5 bills — TODAY only
-    recent_bills_dash = (
+    recent_bills_dash = _clinic_scope(
         db.query(Bill)
         .filter(
             Bill.doctor_id == doctor.id,
             Bill.paid_at   >= _today_start,
             Bill.paid_at   <= _today_end,
-        )
-        .options(joinedload(Bill.visit).joinedload(Visit.patient))  # eager-load
-        .order_by(Bill.paid_at.desc())
-        .limit(5)
-        .all()
-    )
+        ), Bill
+    ).options(joinedload(Bill.visit).joinedload(Visit.patient)) \
+     .order_by(Bill.paid_at.desc()).limit(5).all()
 
     # ── Pending dues ───────────────────────────────────────────────── #
     # 1) Visits that are BILLING_PENDING — seen but no bill collected yet
@@ -198,16 +200,15 @@ def dashboard(
     )
 
     # 2) Bills saved but payment not yet recorded (paid_at is None)
-    _unpaid_bills = (
+    _unpaid_bills = _clinic_scope(
         db.query(Bill)
         .filter(
             Bill.doctor_id    == doctor.id,
             Bill.paid_at      == None,
             Bill.total        >  0,
             Bill.payment_mode != PaymentMode.free,
-        )
-        .all()
-    )
+        ), Bill
+    ).all()
 
     pending_visits_count  = len(_pending_visits)
     pending_dues_amount   = float(sum(b.total or 0 for b in _unpaid_bills))

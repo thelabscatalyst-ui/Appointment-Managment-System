@@ -22,7 +22,7 @@ from database.models import (
 )
 from config import settings
 from services.auth_service import (
-    get_clinic_owner, hash_password, verify_password,
+    get_clinic_owner, hash_password, verify_password, get_current_doctor,
 )
 
 router = APIRouter(prefix="/clinic", tags=["clinic"])
@@ -49,14 +49,14 @@ def _get_clinic_doctors(clinic_id: int, db: Session) -> list[Doctor]:
 
 
 def _get_owner_clinic(doctor_id: int, db: Session) -> Clinic | None:
-    membership = (
-        db.query(ClinicDoctor)
-        .filter(ClinicDoctor.doctor_id == doctor_id, ClinicDoctor.role == "owner")
-        .first()
-    )
-    if not membership:
-        return None
-    return db.query(Clinic).filter(Clinic.id == membership.clinic_id).first()
+    """The clinic this doctor owns.
+
+    Was a bare role=='owner' .first() with no is_active filter, so it could
+    return a clinic whose membership had been deactivated — and could differ
+    from the clinic get_clinic_owner had just validated.
+    """
+    from services.clinic_context import owned_clinic
+    return owned_clinic(db, doctor_id)
 
 
 def _is_admin_authenticated(request: Request, doctor_id: int) -> bool:
@@ -151,13 +151,18 @@ def clinic_admin_dashboard(
 
     doctor_stats = []
     for d in doctors:
+        # Scoped to THIS clinic. Without the clinic filter these counted an
+        # associate's shifts at other clinics — including a competitor's —
+        # into this owner's totals.
         today_count = db.query(Appointment).filter(
             Appointment.doctor_id == d.id,
+            Appointment.clinic_id == clinic.id,
             Appointment.appointment_date == today,
             Appointment.status != AppointmentStatus.cancelled,
         ).count()
         week_count = db.query(Appointment).filter(
             Appointment.doctor_id == d.id,
+            Appointment.clinic_id == clinic.id,
             Appointment.appointment_date >= week_start,
             Appointment.appointment_date <= today,
             Appointment.status != AppointmentStatus.cancelled,
@@ -420,3 +425,42 @@ def doctor_invite_accept(
     db.commit()
 
     return RedirectResponse(url="/dashboard?joined=1", status_code=303)
+
+
+# ─────────────────────────────────────────────────────────────────────────── #
+#  Active clinic switching                                                     #
+# ─────────────────────────────────────────────────────────────────────────── #
+
+@router.post("/switch")
+def switch_clinic(
+    request: Request,
+    clinic_id: int = Form(...),
+    next: str = Form(default="/dashboard"),
+    doctor: Doctor = Depends(get_current_doctor),
+    db: Session = Depends(get_db),
+):
+    """Change which clinic the doctor is working in.
+
+    Deliberately depends on get_current_doctor, NOT get_paying_doctor. If this
+    were plan-gated, a doctor whose personal plan lapsed while their active
+    clinic is their own practice would be redirected to /billing on every
+    request — including this one — and could never switch back to the paid
+    clinic where they still have legitimate access.
+
+    The requested clinic is validated against live membership; a stale or
+    forged id simply leaves the context unchanged.
+    """
+    from services.clinic_context import get_membership, set_active_clinic_cookie
+
+    # Same open-redirect guard the logout route uses: only site-relative paths.
+    safe_next = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
+
+    if not get_membership(db, doctor.id, clinic_id):
+        return RedirectResponse(url=safe_next, status_code=303)
+
+    response = RedirectResponse(url=safe_next, status_code=303)
+    set_active_clinic_cookie(response, doctor.id, clinic_id)
+    # Switching clinics changes what the admin gate applies to, so make them
+    # re-authenticate rather than carrying a cookie minted for the old clinic.
+    response.delete_cookie(ADMIN_AUTH_COOKIE)
+    return response

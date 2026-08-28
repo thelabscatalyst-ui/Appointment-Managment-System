@@ -395,7 +395,7 @@ def logout(next: str = Query(default="")):
     # Clear EVERY auth cookie. Previously only access_token was deleted, so a
     # logged-out session left a live pin_session / clinic_admin_auth behind —
     # logging back in silently skipped the PIN gate.
-    for cookie in ("access_token", "pin_session", "clinic_admin_auth"):
+    for cookie in ("access_token", "pin_session", "clinic_admin_auth", "active_clinic"):
         response.delete_cookie(cookie)
     return response
 
@@ -576,6 +576,6 @@ def reset_password_submit(
     # Every prior session is dead (token_version bumped) — clear this
     # browser's cookies too so nothing stale lingers.
     response = RedirectResponse(url="/login?reset=1", status_code=303)
-    for cookie in ("access_token", "pin_session", "clinic_admin_auth"):
+    for cookie in ("access_token", "pin_session", "clinic_admin_auth", "active_clinic"):
         response.delete_cookie(cookie)
     return response

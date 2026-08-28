@@ -179,6 +179,7 @@ async def login_rate_limit(request: Request, call_next):
 async def inject_clinic_owner_state(request: Request, call_next):
     """Sets request.state.is_clinic_owner so base.html navbar can show Clinic Admin link."""
     request.state.is_clinic_owner = False
+    request.state.membership_count = 0
     # Support contact, read by templates that offer a human fallback
     # (verify_email.html, plan_lapsed.html). Set here rather than threaded
     # through every route context — same pattern as is_clinic_owner.
@@ -193,18 +194,17 @@ async def inject_clinic_owner_state(request: Request, call_next):
                 from database.models import ClinicDoctor, Clinic
                 db = SessionLocal()
                 try:
-                    owns = (
-                        db.query(ClinicDoctor)
-                        .join(Clinic, Clinic.id == ClinicDoctor.clinic_id)
-                        .filter(
-                            ClinicDoctor.doctor_id == payload["doctor_id"],
-                            ClinicDoctor.role == "owner",
-                            ClinicDoctor.is_active == True,
-                            Clinic.plan_type == "clinic",
-                        )
-                        .first()
+                    from services.clinic_context import (
+                        is_clinic_owner as _is_clinic_owner,
+                        active_memberships as _active_memberships,
                     )
-                    request.state.is_clinic_owner = owns is not None
+                    request.state.is_clinic_owner = _is_clinic_owner(
+                        db, payload["doctor_id"])
+                    # Membership count drives whether the clinic switcher is
+                    # rendered at all — single-clinic doctors must see no
+                    # change anywhere in the UI.
+                    request.state.membership_count = len(
+                        _active_memberships(db, payload["doctor_id"]))
                 finally:
                     db.close()
             except Exception:
@@ -354,6 +354,32 @@ async def plan_expired_handler(request: Request, exc: PlanExpired):
     # Associates and clinic-plan doctors can't renew themselves — show lapsed page
     if getattr(exc, "reason", "personal") == "clinic":
         return RedirectResponse(url="/plan-lapsed", status_code=303)
+
+    # Deadlock guard: access is now per-clinic, so a doctor whose PERSONAL
+    # plan lapsed while their active clinic is their own practice would be
+    # bounced to /billing on every request. If they still have live access at
+    # some other clinic, say so on a page they can act from, rather than
+    # trapping them behind a paywall for a practice they may not want to renew.
+    try:
+        token = request.cookies.get("access_token")
+        payload = decode_token(token) if token else None
+        if payload and payload.get("doctor_id"):
+            from database.connection import SessionLocal
+            from database.models import Doctor as _Doctor
+            from services.clinic_context import active_memberships, clinic_plan_active
+            from database.models import Clinic as _Clinic
+            db = SessionLocal()
+            try:
+                for m in active_memberships(db, payload["doctor_id"]):
+                    c = db.query(_Clinic).filter(_Clinic.id == m.clinic_id).first()
+                    if c and clinic_plan_active(c, db):
+                        return RedirectResponse(
+                            url="/plan-lapsed?other_clinic=1", status_code=303)
+            finally:
+                db.close()
+    except Exception:
+        pass
+
     return RedirectResponse(url="/billing", status_code=303)
 
 
