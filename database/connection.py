@@ -453,6 +453,40 @@ def _run_migrations():
         except Exception:
             conn.rollback()
 
+        # ── Owner account: keep thelabscatalyst@gmail.com on the Clinic tier ──
+        # "Clinic Account" at signup did nothing until the account_type field
+        # was actually read, so every account created before that — including
+        # this one — has plan_type='trial' on its clinic and therefore sees no
+        # Clinic Admin. Nothing recorded which historical accounts chose the
+        # clinic option, so this cannot be a blanket migration without also
+        # promoting genuine solo doctors; it is scoped to the one account.
+        #
+        # Rolling, like the arjunmehta test-account block above, so the tier
+        # does not silently lapse mid-testing. Idempotent: safe on every boot.
+        try:
+            from datetime import datetime as _dt2, timedelta as _td2
+            _owner_email = "thelabscatalyst@gmail.com"
+            _end = _dt2.utcnow() + _td2(days=30)
+            _row = conn.execute(text(
+                "SELECT cl.id FROM clinics cl "
+                "JOIN clinic_doctors cd ON cd.clinic_id = cl.id "
+                "JOIN doctors d ON d.id = cd.doctor_id "
+                "WHERE d.email = :em AND cd.role = 'owner'"
+            ), {"em": _owner_email}).fetchone()
+            if _row:
+                conn.execute(text(
+                    "UPDATE clinics SET plan_type = 'clinic', plan_expires_at = :end, "
+                    "plan_grace_until = :grace, max_doctors = 5 WHERE id = :cid"
+                ), {"end": _end, "grace": _end + _td2(days=7), "cid": _row[0]})
+                # Their own trial had already lapsed; refresh it so the account
+                # is usable rather than bouncing to /billing.
+                conn.execute(text(
+                    "UPDATE doctors SET trial_ends_at = :end WHERE email = :em"
+                ), {"end": _end, "em": _owner_email})
+                conn.commit()
+        except Exception:
+            conn.rollback()
+
         # ── Hold feature: add 'on_hold' to the visitstatus enum ──────────────
         # PostgreSQL uses a native enum type; a new Python enum member must be
         # added to the DB type or inserting it raises. No-op on SQLite (VARCHAR).
