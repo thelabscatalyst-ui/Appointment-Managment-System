@@ -105,8 +105,12 @@ def _fire_due_recurring(doctor_id: int, db: Session) -> None:
 
 # ── income sum helper ──────────────────────────────────────────────────────── #
 
-def _income_sum(doctor_id: int, start: date, end: date, db: Session) -> float:
-    row = (
+def _income_sum(doctor_id: int, start: date, end: date, db: Session,
+                clinic_id: int | None = None) -> float:
+    """Revenue belongs to the clinic the work happened at, never to the doctor
+    personally — an associate's takings at someone else's clinic must not
+    appear in their own P&L."""
+    q = (
         db.query(func.sum(Bill.total))
         .filter(
             Bill.doctor_id == doctor_id,
@@ -114,22 +118,25 @@ def _income_sum(doctor_id: int, start: date, end: date, db: Session) -> float:
             Bill.paid_at   <= _dt_end(end),
             Bill.payment_mode != PaymentMode.free,
         )
-        .scalar()
     )
-    return _f(row)
+    if clinic_id is not None:
+        q = q.filter(Bill.clinic_id == clinic_id)
+    return _f(q.scalar())
 
 
-def _expense_sum(doctor_id: int, start: date, end: date, db: Session) -> float:
-    row = (
+def _expense_sum(doctor_id: int, start: date, end: date, db: Session,
+                 clinic_id: int | None = None) -> float:
+    q = (
         db.query(func.sum(Expense.amount))
         .filter(
             Expense.doctor_id    == doctor_id,
             Expense.expense_date >= start,
             Expense.expense_date <= end,
         )
-        .scalar()
     )
-    return _f(row)
+    if clinic_id is not None:
+        q = q.filter(Expense.clinic_id == clinic_id)
+    return _f(q.scalar())
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -144,6 +151,9 @@ async def income_dashboard(
 ):
     _fire_due_recurring(doctor.id, db)
 
+    # Money is attributed to the clinic the work happened at.
+    _acid = getattr(request.state, "active_clinic_id", None)
+
     today      = date.today()
     this_year  = today.year
     this_month = today.month
@@ -156,10 +166,10 @@ async def income_dashboard(
     lm_first, lm_last = _month_range(lm_year, lm_month)
 
     # ── KPI: income ───────────────────────────────────────────────────── #
-    today_income      = _income_sum(doctor.id, today,  today,  db)
-    month_income      = _income_sum(doctor.id, m_first, m_last, db)
-    last_month_income = _income_sum(doctor.id, lm_first, lm_last, db)
-    year_income       = _income_sum(doctor.id, date(this_year,1,1), date(this_year,12,31), db)
+    today_income      = _income_sum(doctor.id, today,  today,  db, _acid)
+    month_income      = _income_sum(doctor.id, m_first, m_last, db, _acid)
+    last_month_income = _income_sum(doctor.id, lm_first, lm_last, db, _acid)
+    year_income       = _income_sum(doctor.id, date(this_year,1,1), date(this_year,12,31), db, _acid)
 
     mom_pct = (
         ((month_income - last_month_income) / last_month_income * 100)
@@ -167,9 +177,9 @@ async def income_dashboard(
     )
 
     # ── KPI: expenses ─────────────────────────────────────────────────── #
-    month_expense      = _expense_sum(doctor.id, m_first, m_last, db)
-    last_month_expense = _expense_sum(doctor.id, lm_first, lm_last, db)
-    year_expense       = _expense_sum(doctor.id, date(this_year,1,1), date(this_year,12,31), db)
+    month_expense      = _expense_sum(doctor.id, m_first, m_last, db, _acid)
+    last_month_expense = _expense_sum(doctor.id, lm_first, lm_last, db, _acid)
+    year_expense       = _expense_sum(doctor.id, date(this_year,1,1), date(this_year,12,31), db, _acid)
 
     pnl_month      = month_income      - month_expense
     pnl_last_month = last_month_income - last_month_expense
@@ -580,6 +590,8 @@ async def expenses_page(
 ):
     _fire_due_recurring(doctor.id, db)
 
+    _acid2 = getattr(request.state, "active_clinic_id", None)
+
     today = date.today()
     if not month: month = today.month
     if not year:  year  = today.year
@@ -602,12 +614,12 @@ async def expenses_page(
     month_expense = sum(_f(e.amount) for e in expenses)
 
     # Income this month (for inline P&L)
-    month_income = _income_sum(doctor.id, m_first, m_last, db)
+    month_income = _income_sum(doctor.id, m_first, m_last, db, _acid2)
     pnl          = month_income - month_expense
 
     # Year totals
-    year_expense = _expense_sum(doctor.id, date(year,1,1), date(year,12,31), db)
-    year_income  = _income_sum (doctor.id, date(year,1,1), date(year,12,31), db)
+    year_expense = _expense_sum(doctor.id, date(year,1,1), date(year,12,31), db, _acid2)
+    year_income  = _income_sum (doctor.id, date(year,1,1), date(year,12,31), db, _acid2)
 
     # Category totals for the bar breakdown
     cat_totals: dict[str, float] = defaultdict(float)

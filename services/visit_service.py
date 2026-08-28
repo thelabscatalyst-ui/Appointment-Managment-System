@@ -26,29 +26,42 @@ from database.models import (
 #  Token assignment                                                             #
 # --------------------------------------------------------------------------- #
 
-def _next_token_number(db: Session, doctor_id: int, visit_date: date) -> int:
-    """Return the next monotonic token number for this doctor today."""
+def _clinic_filter(q, clinic_id):
+    """Restrict a queue query to one clinic.
+
+    Tokens and queue positions are per (doctor, clinic, day). Without this, a
+    doctor running a morning shift at their own clinic and an evening shift
+    elsewhere shared ONE token sequence — and promoting an emergency at one
+    clinic renumbered the other clinic's live queue.
+    """
+    return q.filter(Visit.clinic_id == clinic_id) if clinic_id is not None else q
+
+
+def _next_token_number(db: Session, doctor_id: int, visit_date: date,
+                       clinic_id: Optional[int] = None) -> int:
+    """Return the next monotonic token number for this doctor+clinic today."""
     from sqlalchemy import func
-    result = (
+    result = _clinic_filter(
         db.query(func.max(Visit.token_number))
-        .filter(Visit.doctor_id == doctor_id, Visit.visit_date == visit_date)
-        .scalar()
-    )
+        .filter(Visit.doctor_id == doctor_id, Visit.visit_date == visit_date),
+        clinic_id,
+    ).scalar()
     return (result or 0) + 1
 
 
-def _queue_end_position(db: Session, doctor_id: int, visit_date: date) -> int:
+def _queue_end_position(db: Session, doctor_id: int, visit_date: date,
+                        clinic_id: Optional[int] = None) -> int:
     """Return a queue_position one after the current last waiting/serving visit."""
     from sqlalchemy import func
-    result = (
+    result = _clinic_filter(
         db.query(func.max(Visit.queue_position))
         .filter(
             Visit.doctor_id == doctor_id,
             Visit.visit_date == visit_date,
             Visit.status.in_([VisitStatus.waiting, VisitStatus.serving]),
-        )
-        .scalar()
-    )
+        ),
+        clinic_id,
+    ).scalar()
     return (result or 0) + 1
 
 
@@ -80,21 +93,21 @@ def check_in(
     doctor = db.query(Doctor).filter(Doctor.id == doctor_id).first()
     policy = (doctor.walkin_policy or "booked_jumps") if doctor else "booked_jumps"
 
-    token_number = _next_token_number(db, doctor_id, today)
+    token_number = _next_token_number(db, doctor_id, today, clinic_id)
 
     # --- Determine queue_position ---
     if is_emergency:
         # Emergency: insert at position 0 (pushes everyone else down by 1)
-        _shift_queue_down(db, doctor_id, today, from_position=0)
+        _shift_queue_down(db, doctor_id, today, from_position=0, clinic_id=clinic_id)
         queue_position = 0
         source = VisitSource.appointment if appointment_id else VisitSource.walk_in
     elif appointment_id and policy == "booked_jumps":
         appt = db.query(Appointment).filter(Appointment.id == appointment_id).first()
-        queue_position = _compute_booked_position(db, doctor_id, today, appt, now)
+        queue_position = _compute_booked_position(db, doctor_id, today, appt, now, clinic_id)
         source = VisitSource.appointment
     else:
         # Walk-in or fcfs/ask policy
-        queue_position = _queue_end_position(db, doctor_id, today)
+        queue_position = _queue_end_position(db, doctor_id, today, clinic_id)
         source = VisitSource.appointment if appointment_id else VisitSource.walk_in
 
     visit = Visit(
@@ -130,7 +143,8 @@ def check_in(
 
 def _compute_booked_position(
     db: Session, doctor_id: int, today: date,
-    appt: Optional[Appointment], now: datetime
+    appt: Optional[Appointment], now: datetime,
+    clinic_id: Optional[int] = None
 ) -> int:
     """
     Slot a booked patient into the queue based on drift from scheduled time.
@@ -142,17 +156,17 @@ def _compute_booked_position(
       > +120 min (very late)     → end of queue (receptionist shown alert)
     """
     if not appt:
-        return _queue_end_position(db, doctor_id, today)
+        return _queue_end_position(db, doctor_id, today, clinic_id)
 
     slot_dt  = datetime.combine(today, appt.appointment_time)
     drift    = (now - slot_dt).total_seconds() / 60  # minutes; positive = late
 
     if drift < -30 or drift > 30:
-        return _queue_end_position(db, doctor_id, today)
+        return _queue_end_position(db, doctor_id, today, clinic_id)
 
     # Around the slot — find position by slot time ordering
     # Count how many waiting/serving visits have appointment slots BEFORE this one
-    earlier = (
+    earlier = _clinic_filter(
         db.query(Visit)
         .join(Appointment, Visit.appointment_id == Appointment.id, isouter=True)
         .filter(
@@ -160,27 +174,28 @@ def _compute_booked_position(
             Visit.visit_date == today,
             Visit.status.in_([VisitStatus.waiting, VisitStatus.serving]),
             Appointment.appointment_time < appt.appointment_time,
-        )
-        .count()
-    )
+        ),
+        clinic_id,
+    ).count()
     # Insert after earlier booked visits, bump the rest
     position = earlier + 1
-    _shift_queue_down(db, doctor_id, today, from_position=position)
+    _shift_queue_down(db, doctor_id, today, from_position=position, clinic_id=clinic_id)
     return position
 
 
-def _shift_queue_down(db: Session, doctor_id: int, today: date, from_position: int):
+def _shift_queue_down(db: Session, doctor_id: int, today: date, from_position: int,
+                      clinic_id: Optional[int] = None):
     """Increment queue_position for all waiting visits at or after from_position."""
-    visits = (
+    visits = _clinic_filter(
         db.query(Visit)
         .filter(
             Visit.doctor_id == doctor_id,
             Visit.visit_date == today,
             Visit.status.in_([VisitStatus.waiting, VisitStatus.serving]),
             Visit.queue_position >= from_position,
-        )
-        .all()
-    )
+        ),
+        clinic_id,
+    ).all()
     for v in visits:
         v.queue_position += 1
 
@@ -189,7 +204,8 @@ def _shift_queue_down(db: Session, doctor_id: int, today: date, from_position: i
 #  State transitions                                                            #
 # --------------------------------------------------------------------------- #
 
-def call_next(db: Session, doctor_id: int, visit_date: Optional[date] = None) -> Optional[Visit]:
+def call_next(db: Session, doctor_id: int, visit_date: Optional[date] = None,
+              clinic_id: Optional[int] = None) -> Optional[Visit]:
     """
     Call the next waiting patient:
       1. The currently SERVING visit (if any) is NOT auto-closed — caller handles that.
@@ -198,16 +214,15 @@ def call_next(db: Session, doctor_id: int, visit_date: Optional[date] = None) ->
     Returns the newly-serving Visit, or None if queue is empty.
     """
     today = visit_date or date.today()
-    nxt = (
+    nxt = _clinic_filter(
         db.query(Visit)
         .filter(
             Visit.doctor_id == doctor_id,
             Visit.visit_date == today,
             Visit.status == VisitStatus.waiting,
-        )
-        .order_by(Visit.is_emergency.desc(), Visit.queue_position.asc())
-        .first()
-    )
+        ),
+        clinic_id,
+    ).order_by(Visit.is_emergency.desc(), Visit.queue_position.asc()).first()
     if not nxt:
         return None
 
@@ -229,7 +244,7 @@ def done_and_call_next(
     """
     visit.status = VisitStatus.billing_pending
     db.commit()
-    return call_next(db, visit.doctor_id, visit.visit_date)
+    return call_next(db, visit.doctor_id, visit.visit_date, visit.clinic_id)
 
 
 def close_visit(db: Session, visit: Visit, bill_id: int):
@@ -249,7 +264,7 @@ def hold_visit(db: Session, visit: Visit) -> Optional[Visit]:
     """
     visit.status = VisitStatus.on_hold
     db.commit()
-    return call_next(db, visit.doctor_id, visit.visit_date)
+    return call_next(db, visit.doctor_id, visit.visit_date, visit.clinic_id)
 
 
 def resume_visit(db: Session, visit: Visit) -> Visit:
@@ -269,7 +284,7 @@ def resume_visit(db: Session, visit: Visit) -> Visit:
         .first()
     )
     if serving:
-        _shift_queue_down(db, visit.doctor_id, visit.visit_date, from_position=0)
+        _shift_queue_down(db, visit.doctor_id, visit.visit_date, from_position=0, clinic_id=visit.clinic_id)
         visit.queue_position = 0
         visit.status         = VisitStatus.waiting
     else:
@@ -283,7 +298,7 @@ def resume_visit(db: Session, visit: Visit) -> Visit:
 def skip_visit(db: Session, visit: Visit) -> Visit:
     """Skip a waiting visit — move it to the end of the queue."""
     today = visit.visit_date
-    end   = _queue_end_position(db, visit.doctor_id, today)
+    end   = _queue_end_position(db, visit.doctor_id, today, visit.clinic_id)
     visit.queue_position = end
     visit.status         = VisitStatus.skipped
     db.commit()
@@ -293,7 +308,7 @@ def skip_visit(db: Session, visit: Visit) -> Visit:
 
 def promote_emergency(db: Session, visit: Visit) -> Visit:
     """Promote any waiting visit to emergency — insert at top of queue."""
-    _shift_queue_down(db, visit.doctor_id, visit.visit_date, from_position=0)
+    _shift_queue_down(db, visit.doctor_id, visit.visit_date, from_position=0, clinic_id=visit.clinic_id)
     visit.queue_position = 0
     visit.is_emergency   = True
     db.commit()

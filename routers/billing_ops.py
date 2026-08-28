@@ -33,12 +33,28 @@ templates = Jinja2Templates(directory="templates")
 
 # ── helpers ──────────────────────────────────────────────────────────────── #
 
-def _get_primary_clinic(doctor: Doctor, db: Session):
-    m = db.query(ClinicDoctor).filter(
-        ClinicDoctor.doctor_id == doctor.id,
-        ClinicDoctor.is_active == True,
-    ).first()
-    return m.clinic if m else None
+def _get_primary_clinic(doctor: Doctor, db: Session, request=None):
+    """The clinic this work should be attributed to.
+
+    Was an arbitrary `.first()` active membership with no role filter and no
+    ORDER BY — for a two-clinic doctor it returned whichever row the database
+    yielded first, so every visit and bill they ever created was stamped with
+    that one clinic regardless of where the work happened. Now it follows the
+    clinic the request is actually operating in.
+    """
+    from services.clinic_context import active_memberships
+    from database.models import Clinic
+
+    if request is not None:
+        clinic = getattr(request.state, "active_clinic", None)
+        if clinic is not None:
+            return clinic
+        cid = getattr(request.state, "active_clinic_id", None)
+        if cid:
+            return db.query(Clinic).filter(Clinic.id == cid).first()
+
+    ms = active_memberships(db, doctor.id)   # owner-first, deterministic
+    return ms[0].clinic if ms else None
 
 
 def _get_visit(visit_id: int, doctor_id: int, db: Session) -> Optional[Visit]:
@@ -166,7 +182,7 @@ async def create_bill(
     if action not in ("save", "close"):
         action = "close"
 
-    primary_clinic = _get_primary_clinic(doctor, db)
+    primary_clinic = _get_primary_clinic(doctor, db, request)
 
     # ── Parse numeric fields ──────────────────────────────────────────────── #
     try:

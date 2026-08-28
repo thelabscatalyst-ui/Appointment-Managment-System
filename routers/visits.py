@@ -41,14 +41,28 @@ templates = Jinja2Templates(directory="templates")
 #  Helpers                                                                     #
 # --------------------------------------------------------------------------- #
 
-def _get_primary_clinic(doctor: Doctor, db: Session):
-    membership = db.query(ClinicDoctor).filter(
-        ClinicDoctor.doctor_id == doctor.id,
-        ClinicDoctor.is_active == True,
-    ).first()
-    if membership:
-        return membership.clinic
-    return None
+def _get_primary_clinic(doctor: Doctor, db: Session, request=None):
+    """The clinic this work should be attributed to.
+
+    Was an arbitrary `.first()` active membership with no role filter and no
+    ORDER BY — for a two-clinic doctor it returned whichever row the database
+    yielded first, so every visit and bill they ever created was stamped with
+    that one clinic regardless of where the work happened. Now it follows the
+    clinic the request is actually operating in.
+    """
+    from services.clinic_context import active_memberships
+    from database.models import Clinic
+
+    if request is not None:
+        clinic = getattr(request.state, "active_clinic", None)
+        if clinic is not None:
+            return clinic
+        cid = getattr(request.state, "active_clinic_id", None)
+        if cid:
+            return db.query(Clinic).filter(Clinic.id == cid).first()
+
+    ms = active_memberships(db, doctor.id)   # owner-first, deterministic
+    return ms[0].clinic if ms else None
 
 
 # --------------------------------------------------------------------------- #
@@ -76,7 +90,7 @@ async def visits_today(
             pass
 
     serving, waiting, closed = vs.get_today_visits(db, doctor.id, target_date)
-    primary_clinic = _get_primary_clinic(doctor, db)
+    primary_clinic = _get_primary_clinic(doctor, db, request)
 
     # Today's scheduled (not yet arrived) appointments — for the "Expected" strip
     scheduled_today = (
@@ -121,7 +135,7 @@ async def check_in_walkin(
     doctor: Doctor    = Depends(get_paying_doctor),
 ):
     patient = get_or_create_patient(doctor.id, name.strip(), phone.strip(), db)
-    primary_clinic = _get_primary_clinic(doctor, db)
+    primary_clinic = _get_primary_clinic(doctor, db, request)
 
     vs.check_in(
         db,
@@ -159,7 +173,7 @@ async def check_in_appointment(
     if existing:
         return RedirectResponse("/appointments", status_code=303)
 
-    primary_clinic = _get_primary_clinic(doctor, db)
+    primary_clinic = _get_primary_clinic(doctor, db, request)
     vs.check_in(
         db,
         doctor_id      = doctor.id,
@@ -264,7 +278,7 @@ async def close_free(
     if not visit:
         return RedirectResponse("/appointments", status_code=303)
 
-    primary_clinic = _get_primary_clinic(doctor, db)
+    primary_clinic = _get_primary_clinic(doctor, db, request)
     _auto_complete_appointment(db, visit)
     bill = Bill(
         visit_id     = visit.id,

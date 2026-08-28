@@ -417,12 +417,21 @@ async def save_schedule(
 ):
     form = await request.form()
 
+    # Schedules are per (doctor, clinic). Without the clinic filter the delete
+    # below wiped a doctor's hours at EVERY clinic before re-inserting only the
+    # ones just submitted — so saving hours for an evening shift destroyed the
+    # morning clinic's schedule. Live data loss for any two-clinic doctor.
+    _sched_clinic_id = getattr(request.state, "active_clinic_id", None)
+
     for i in range(7):
-        # Delete all existing schedules for this day (clean slate)
-        db.query(DoctorSchedule).filter(
+        # Delete existing schedules for this day AT THIS CLINIC (clean slate)
+        _del = db.query(DoctorSchedule).filter(
             DoctorSchedule.doctor_id == doctor.id,
             DoctorSchedule.day_of_week == i,
-        ).delete(synchronize_session=False)
+        )
+        if _sched_clinic_id is not None:
+            _del = _del.filter(DoctorSchedule.clinic_id == _sched_clinic_id)
+        _del.delete(synchronize_session=False)
 
         if form.get(f"active_{i}") != "on":
             continue   # day is off — leave deleted
@@ -449,6 +458,7 @@ async def save_schedule(
                 continue       # overlaps previous shift — skip
             db.add(DoctorSchedule(
                 doctor_id=doctor.id, day_of_week=i,
+                clinic_id=_sched_clinic_id,
                 start_time=st, end_time=et,
                 slot_duration=slot_dur, max_patients=max_pat,
                 walk_in_buffer=walk_buf,

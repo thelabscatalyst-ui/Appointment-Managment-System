@@ -533,6 +533,81 @@ def _run_migrations():
                 f"             WHERE cd2.doctor_id = {_tbl}.doctor_id)"
             )
 
+        # ── v6: token numbering becomes per (doctor, clinic, day) ────────────
+        # The old constraint was (doctor_id, visit_date, token_number), so a
+        # doctor working two clinics in one day shared a single token sequence.
+        # Must run BEFORE the index loop below: on SQLite this rebuilds the
+        # table, and DROP TABLE takes every ix_visits_* index with it.
+        if _is_sqlite:
+            _visits_ddl = conn.execute(text(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name='visits'"
+            )).scalar() or ""
+            if _visits_ddl and "uq_visit_token_per_clinic_day" not in _visits_ddl:
+                try:
+                    # Columns are named explicitly rather than INSERT..SELECT *.
+                    # The ORM order and the hand-written CREATE above currently
+                    # agree, but they are maintained independently — a silent
+                    # drift would scramble a clinical queue.
+                    _cols = (
+                        "id, doctor_id, patient_id, clinic_id, appointment_id, "
+                        "visit_date, token_number, queue_position, status, "
+                        "is_emergency, source, check_in_time, call_time, "
+                        "complete_time, bill_id, notes, created_by"
+                    )
+                    conn.execute(text("ALTER TABLE visits RENAME TO visits_old"))
+                    conn.execute(text(
+                        "CREATE TABLE visits ("
+                        "  id             INTEGER PRIMARY KEY AUTOINCREMENT, "
+                        "  doctor_id      INTEGER NOT NULL REFERENCES doctors(id), "
+                        "  patient_id     INTEGER NOT NULL REFERENCES patients(id), "
+                        "  clinic_id      INTEGER REFERENCES clinics(id), "
+                        "  appointment_id INTEGER REFERENCES appointments(id), "
+                        "  visit_date     DATE    NOT NULL, "
+                        "  token_number   INTEGER NOT NULL, "
+                        "  queue_position INTEGER, "
+                        "  status         VARCHAR(20) NOT NULL DEFAULT 'waiting', "
+                        "  is_emergency   BOOLEAN NOT NULL DEFAULT 0, "
+                        "  source         VARCHAR(20) NOT NULL DEFAULT 'walk_in', "
+                        "  check_in_time  TIMESTAMP, "
+                        "  call_time      TIMESTAMP, "
+                        "  complete_time  TIMESTAMP, "
+                        "  bill_id        INTEGER, "
+                        "  notes          TEXT, "
+                        "  created_by     INTEGER, "
+                        "  CONSTRAINT uq_visit_token_per_clinic_day "
+                        "    UNIQUE (doctor_id, clinic_id, visit_date, token_number)"
+                        ")"
+                    ))
+                    conn.execute(text(
+                        f"INSERT INTO visits ({_cols}) SELECT {_cols} FROM visits_old"
+                    ))
+                    conn.execute(text("DROP TABLE visits_old"))
+                    # DROP TABLE took every index with it, including the
+                    # single-column ones the ORM created via Column(index=True)
+                    # — create_all already ran, so it will not recreate them.
+                    # The composite loop below only covers its own two.
+                    for _rix in (
+                        "CREATE INDEX IF NOT EXISTS ix_visits_id ON visits (id)",
+                        "CREATE INDEX IF NOT EXISTS ix_visits_doctor_id ON visits (doctor_id)",
+                        "CREATE INDEX IF NOT EXISTS ix_visits_patient_id ON visits (patient_id)",
+                        "CREATE INDEX IF NOT EXISTS ix_visits_clinic_id ON visits (clinic_id)",
+                        "CREATE INDEX IF NOT EXISTS ix_visits_visit_date ON visits (visit_date)",
+                        "CREATE INDEX IF NOT EXISTS ix_visits_status ON visits (status)",
+                    ):
+                        conn.execute(text(_rix))
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+        else:
+            # PostgreSQL: a unique INDEX rather than a constraint, because
+            # there is no ADD CONSTRAINT IF NOT EXISTS — the index form is what
+            # makes this re-runnable.
+            _safe_exec(conn,
+                "ALTER TABLE visits DROP CONSTRAINT IF EXISTS uq_visit_token_per_doctor_day")
+            _safe_exec(conn,
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_visit_token_per_clinic_day "
+                "ON visits (doctor_id, clinic_id, visit_date, token_number)")
+
         # ── Performance: composite indexes on the hottest filter columns ─────
         # (doctor_id + date) covers the appointment-list and queue queries.
         # CREATE INDEX IF NOT EXISTS works on both SQLite and PostgreSQL.
