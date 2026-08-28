@@ -26,6 +26,21 @@
   <a href="/dashboard" class="navbar-brand">MedTrack</a>
   <div style="display:flex;align-items:center;gap:0;">
     <div class="navbar-controls">
+      <!-- Clinic switcher — only when the doctor belongs to more than one
+           clinic, so the single-clinic majority sees no change at all. -->
+      {% if (request.state.membership_count or 0) > 1 and request.state.active_clinic %}
+      <form method="POST" action="/clinic/switch" style="display:inline-flex;align-items:center;margin-right:4px;">
+        <input type="hidden" name="next" value="{{ request.url.path }}">
+        <select name="clinic_id" onchange="this.form.submit()" class="navbar-settings-link"
+                style="background:transparent;border:1px solid rgba(255,220,170,.25);border-radius:6px;padding:4px 8px;font-size:12px;max-width:170px;">
+          {% for m in (request.state.clinic_memberships or []) %}
+          <option value="{{ m.clinic_id }}" {% if m.clinic_id == request.state.active_clinic_id %}selected{% endif %}>
+            {{ m.clinic_name }}{% if m.role != 'owner' %} (associate){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
       <!-- Clinic Admin (clinic owners only) -->
       {% if request.state.is_clinic_owner %}
       <a href="/clinic/admin" class="navbar-settings-link">Clinic Admin</a>
@@ -437,7 +452,25 @@ window.showToast = function (message, type) {
     'deleted':   ['Deleted', 'success'],
     'blocked':   ['Date blocked', 'success'],
     'unblocked': ['Block removed', 'success'],
+    'removed':   ['Doctor removed from clinic', 'success'],
+    'restored':  ['Doctor restored', 'success'],
+    'revoked':   ['Invite revoked', 'success'],
   };
+  /* Explain refusals instead of bouncing silently to the dashboard. */
+  var DENIED = {
+    'clinic_admin': 'Clinic Admin is only available to clinic owners.',
+    '1':            'You do not have access to that page.',
+  };
+  var deniedVal = params.get('denied');
+  if (deniedVal && DENIED[deniedVal]) window.showToast(DENIED[deniedVal], 'error');
+  var ERRS = {
+    'owner':    'The clinic owner cannot be removed.',
+    'self':     'You cannot remove yourself.',
+    'cap':      'Plan limit reached — upgrade to add more doctors.',
+    'notfound': 'That doctor is not in this clinic.',
+  };
+  var errVal = params.get('err');
+  if (errVal && ERRS[errVal]) window.showToast(ERRS[errVal], 'error');
   Object.keys(MAP).forEach(function (key) {
     var val = params.get(key);
     if (val === '1' || val === 'true') {

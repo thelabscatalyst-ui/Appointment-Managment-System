@@ -274,9 +274,19 @@ def send_doctor_invite(
         ClinicDoctor.clinic_id == clinic.id, ClinicDoctor.is_active == True
     ).count()
     max_doctors = getattr(clinic, "max_doctors", 1) or 1
-    if active_doctor_count >= max_doctors:
+
+    # Pending invites count against the cap. Counting only accepted members
+    # let an owner send 20 invites on 5 seats and end up 15 doctors over.
+    pending_count = db.query(ClinicDoctorInvite).filter(
+        ClinicDoctorInvite.clinic_id == clinic.id,
+        ClinicDoctorInvite.used_at   == None,
+        ClinicDoctorInvite.expires_at > datetime.utcnow(),
+    ).count()
+
+    if active_doctor_count + pending_count >= max_doctors:
         plan_label = "Solo plan (single doctor)" if max_doctors <= 1 else f"current plan (max {max_doctors} doctors)"
-        return _render(error=f"Doctor limit reached for your {plan_label}. Upgrade to Clinic plan to add more doctors.")
+        extra = f" ({active_doctor_count} joined, {pending_count} invite(s) pending)" if pending_count else ""
+        return _render(error=f"Doctor limit reached for your {plan_label}{extra}. Upgrade to Clinic plan to add more doctors.")
 
     existing_doctor = db.query(Doctor).filter(Doctor.email == email).first()
     if existing_doctor:
@@ -287,12 +297,16 @@ def send_doctor_invite(
         if already:
             return _render(error=f"{email} is already a doctor in this clinic.")
 
-    # Revoke any existing unused invite
-    db.query(ClinicDoctorInvite).filter(
+    # Supersede any existing unused invite. Soft-revoked (used_at set) rather
+    # than deleted: every validity query in the app already filters on
+    # used_at IS NULL, so this needs no new column, and the audit trail of who
+    # was invited when survives.
+    for _old in db.query(ClinicDoctorInvite).filter(
         ClinicDoctorInvite.clinic_id == clinic.id,
         ClinicDoctorInvite.email     == email,
         ClinicDoctorInvite.used_at   == None,
-    ).delete()
+    ).all():
+        _old.used_at = datetime.utcnow()
     db.commit()
 
     token = secrets.token_urlsafe(32)
@@ -415,6 +429,25 @@ def doctor_invite_accept(
             "error": f"This invite was sent to {invite.email}, not {logged_in_doctor.email}.",
         }, status_code=403)
 
+    # Seat cap is re-checked at ACCEPT time, not just at send. Previously
+    # neither acceptance path checked it at all, so invites sent before a
+    # downgrade could still be redeemed and push the clinic over its plan.
+    # used_at is deliberately left NULL so the link still works once the
+    # owner upgrades — burning it would strand the invitee.
+    _cap = getattr(clinic, "max_doctors", 1) or 1
+    _members = db.query(ClinicDoctor).filter(
+        ClinicDoctor.clinic_id == invite.clinic_id,
+        ClinicDoctor.is_active == True,
+    ).count()
+    if _members >= _cap:
+        return templates.TemplateResponse(request, "clinic/doctor_invite.html", {
+            "invite": invite, "clinic": clinic,
+            "logged_in_doctor": logged_in_doctor, "already_member": False,
+            "error": (f"{clinic.name} has reached its plan limit of {_cap} "
+                      f"doctor(s). Ask the clinic owner to upgrade — your "
+                      f"invite link stays valid."),
+        }, status_code=409)
+
     db.add(ClinicDoctor(
         clinic_id = invite.clinic_id,
         doctor_id = logged_in_doctor.id,
@@ -464,3 +497,103 @@ def switch_clinic(
     # re-authenticate rather than carrying a cookie minted for the old clinic.
     response.delete_cookie(ADMIN_AUTH_COOKIE)
     return response
+
+
+# ─────────────────────────────────────────────────────────────────────────── #
+#  Membership lifecycle                                                        #
+# ─────────────────────────────────────────────────────────────────────────── #
+
+@router.post("/admin/doctors/{membership_id}/deactivate")
+def deactivate_doctor(
+    membership_id: int,
+    request: Request,
+    doctor: Doctor = Depends(require_clinic_admin),
+    db: Session = Depends(get_db),
+):
+    """Remove a doctor from the clinic, freeing their seat.
+
+    Deactivates rather than deletes: their visits and bills must stay
+    attributed to this clinic, and the foreign keys must hold. Before this
+    there was NO way to remove a doctor at all — is_active was never set False
+    anywhere in the codebase, so a seat once used was consumed forever.
+    """
+    clinic = _get_owner_clinic(doctor.id, db)
+    if not clinic:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    m = db.query(ClinicDoctor).filter(
+        ClinicDoctor.id == membership_id,
+        ClinicDoctor.clinic_id == clinic.id,
+    ).first()
+
+    if not m:
+        return RedirectResponse(url="/clinic/admin/doctors?err=notfound", status_code=303)
+    if m.role == "owner":
+        # Would orphan the clinic — no one could administer it again.
+        return RedirectResponse(url="/clinic/admin/doctors?err=owner", status_code=303)
+    if m.doctor_id == doctor.id:
+        return RedirectResponse(url="/clinic/admin/doctors?err=self", status_code=303)
+
+    m.is_active = False
+    db.commit()
+    return RedirectResponse(url="/clinic/admin/doctors?removed=1", status_code=303)
+
+
+@router.post("/admin/doctors/{membership_id}/reactivate")
+def reactivate_doctor(
+    membership_id: int,
+    request: Request,
+    doctor: Doctor = Depends(require_clinic_admin),
+    db: Session = Depends(get_db),
+):
+    """Re-add a previously removed doctor, subject to the seat cap."""
+    clinic = _get_owner_clinic(doctor.id, db)
+    if not clinic:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    m = db.query(ClinicDoctor).filter(
+        ClinicDoctor.id == membership_id,
+        ClinicDoctor.clinic_id == clinic.id,
+    ).first()
+    if not m:
+        return RedirectResponse(url="/clinic/admin/doctors?err=notfound", status_code=303)
+
+    cap = getattr(clinic, "max_doctors", 1) or 1
+    active = db.query(ClinicDoctor).filter(
+        ClinicDoctor.clinic_id == clinic.id,
+        ClinicDoctor.is_active == True,
+    ).count()
+    if active >= cap:
+        return RedirectResponse(url="/clinic/admin/doctors?err=cap", status_code=303)
+
+    m.is_active = True
+    db.commit()
+    return RedirectResponse(url="/clinic/admin/doctors?restored=1", status_code=303)
+
+
+@router.post("/admin/invites/{invite_id}/revoke")
+def revoke_invite(
+    invite_id: int,
+    request: Request,
+    doctor: Doctor = Depends(require_clinic_admin),
+    db: Session = Depends(get_db),
+):
+    """Cancel a pending invite and free the seat it was holding.
+
+    Marks used_at rather than deleting, so every existing validity query
+    (which all filter used_at IS NULL) rejects it with no new column, and the
+    record of who was invited survives.
+    """
+    clinic = _get_owner_clinic(doctor.id, db)
+    if not clinic:
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    inv = db.query(ClinicDoctorInvite).filter(
+        ClinicDoctorInvite.id == invite_id,
+        ClinicDoctorInvite.clinic_id == clinic.id,
+        ClinicDoctorInvite.used_at == None,
+    ).first()
+    if inv:
+        inv.used_at = datetime.utcnow()
+        db.commit()
+    return RedirectResponse(url="/clinic/admin/doctors?revoked=1", status_code=303)

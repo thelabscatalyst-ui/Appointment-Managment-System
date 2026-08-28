@@ -2665,7 +2665,10 @@ class TestClinicAccountSignup:
         resp = client.get("/clinic/admin", cookies={"access_token": cookie},
                           follow_redirects=False)
         assert resp.status_code == 303
-        assert resp.headers.get("location") == "/dashboard"
+        # Still blocked — but the redirect now carries a reason so the user
+        # gets a toast instead of silently landing back on the dashboard.
+        assert resp.headers.get("location").startswith("/dashboard")
+        assert "denied=clinic_admin" in resp.headers.get("location")
 
     def test_clinic_signup_seat_limit_matches_paid_clinic_tier(self, client):
         from database.models import Clinic
@@ -3054,5 +3057,327 @@ class TestClinicIdBackfill:
                     "  WHERE cd.doctor_id = x.doctor_id AND cd.clinic_id = x.clinic_id)"
                 )).scalar()
                 assert orphans == 0, f"{tbl} has {orphans} rows in a clinic the doctor isn't in"
+        finally:
+            db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Phases 4-8 — multi-clinic roles, access and lifecycle
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _mk_clinic(db, name, slug, plan="clinic", owner_id=None, max_doctors=5,
+               expires_days=30):
+    from database.models import Clinic
+    c = Clinic(name=name, slug=slug, plan_type=plan, owner_doctor_id=owner_id,
+               max_doctors=max_doctors,
+               plan_expires_at=datetime.utcnow() + timedelta(days=expires_days))
+    db.add(c); db.commit(); db.refresh(c)
+    return c
+
+
+class TestPerClinicAccess:
+    """Access used to be GLOBAL: any one qualifying membership unlocked the
+    doctor everywhere, so two doctors could invite each other and both get a
+    free personal practice forever."""
+
+    def test_associate_at_lapsed_clinic_gets_clinic_reason_not_personal(self, client):
+        """An associate cannot renew, so they must land on /plan-lapsed —
+        not /billing, which would ask them to pay for something they don't
+        control."""
+        from database.models import Clinic, ClinicDoctor
+        register(client, email="pca-assoc@test.com")
+        db = TestSession()
+        try:
+            d = db.query(Doctor).filter(Doctor.email == "pca-assoc@test.com").first()
+            # Strip their own entitlement and their owned clinic.
+            d.trial_ends_at = None
+            d.plan_expires_at = None
+            db.query(ClinicDoctor).filter(ClinicDoctor.doctor_id == d.id).delete()
+            lapsed = _mk_clinic(db, "Lapsed Clinic", "pca-lapsed", expires_days=-5)
+            db.add(ClinicDoctor(clinic_id=lapsed.id, doctor_id=d.id,
+                                role="associate", is_active=True))
+            db.commit()
+        finally:
+            db.close()
+
+        cookie = login(client, "pca-assoc@test.com").cookies.get("access_token")
+        r = client.get("/patients", cookies={"access_token": cookie},
+                       follow_redirects=False)
+        assert r.status_code == 303
+        assert r.headers.get("location") == "/plan-lapsed", (
+            "associate at a lapsed clinic must go to /plan-lapsed, not /billing")
+
+    def test_associate_at_paid_clinic_has_access(self, client):
+        from database.models import ClinicDoctor
+        register(client, email="pca-ok@test.com")
+        db = TestSession()
+        try:
+            d = db.query(Doctor).filter(Doctor.email == "pca-ok@test.com").first()
+            d.trial_ends_at = None; d.plan_expires_at = None
+            db.query(ClinicDoctor).filter(ClinicDoctor.doctor_id == d.id).delete()
+            paid = _mk_clinic(db, "Paid Clinic", "pca-paid", expires_days=30)
+            db.add(ClinicDoctor(clinic_id=paid.id, doctor_id=d.id,
+                                role="associate", is_active=True))
+            db.commit()
+        finally:
+            db.close()
+        cookie = login(client, "pca-ok@test.com").cookies.get("access_token")
+        r = client.get("/patients", cookies={"access_token": cookie},
+                       follow_redirects=False)
+        assert r.status_code == 200
+
+
+class TestClinicSwitching:
+    def test_switcher_hidden_for_single_clinic_doctor(self, client):
+        register(client, email="sw-single@test.com")
+        cookie = login(client, "sw-single@test.com").cookies.get("access_token")
+        r = client.get("/dashboard", cookies={"access_token": cookie})
+        assert r.status_code == 200
+        assert 'action="/clinic/switch"' not in r.text, (
+            "single-clinic doctors must see no switcher at all")
+
+    def test_switch_rejects_a_clinic_you_do_not_belong_to(self, client):
+        """The cookie is only a hint — membership is the authority."""
+        from database.models import ClinicDoctor
+        register(client, email="sw-outsider@test.com")
+        db = TestSession()
+        try:
+            other = _mk_clinic(db, "Not Yours", "sw-notyours")
+            other_id = other.id
+        finally:
+            db.close()
+        cookie = login(client, "sw-outsider@test.com").cookies.get("access_token")
+        r = client.post("/clinic/switch",
+                        data={"clinic_id": other_id, "next": "/dashboard"},
+                        cookies={"access_token": cookie}, follow_redirects=False)
+        assert r.status_code == 303
+        # No active_clinic cookie should have been minted for a clinic they
+        # are not a member of.
+        assert not r.cookies.get("active_clinic")
+
+    def test_switch_is_not_plan_gated(self, client):
+        """If /clinic/switch were plan-gated, a doctor whose personal plan
+        lapsed while sitting in their own practice could never switch back to
+        the clinic where they still have access — a permanent trap."""
+        import inspect
+        from routers.clinic import switch_clinic
+        from services.auth_service import get_current_doctor, get_paying_doctor
+        # Inspect the real dependency, not the docstring.
+        deps = [p.default.dependency
+                for p in inspect.signature(switch_clinic).parameters.values()
+                if hasattr(p.default, "dependency")]
+        assert get_current_doctor in deps
+        assert get_paying_doctor not in deps
+
+
+class TestSeatLifecycle:
+    def _owner_admin_cookies(self, client, email):
+        register(client, email=email, account_type="clinic")
+        tok = login(client, email).cookies.get("access_token")
+        r = client.post("/clinic/admin/auth", data={"password": "Kv9$mPq2#Zx8L"},
+                        cookies={"access_token": tok}, follow_redirects=False)
+        return {"access_token": tok, "clinic_admin_auth": r.cookies.get("clinic_admin_auth")}
+
+    def test_pending_invites_count_against_the_cap(self, client):
+        """Counting only accepted members let an owner send 20 invites on 5
+        seats and end up 15 doctors over."""
+        from database.models import Clinic, ClinicDoctorInvite
+        ck = self._owner_admin_cookies(client, "seat-cap@test.com")
+        db = TestSession()
+        try:
+            d = db.query(Doctor).filter(Doctor.email == "seat-cap@test.com").first()
+            c = db.query(Clinic).filter(Clinic.owner_doctor_id == d.id).first()
+            c.max_doctors = 2      # owner + one more
+            db.commit()
+        finally:
+            db.close()
+
+        r1 = client.post("/clinic/admin/doctors/invite",
+                         data={"invite_email": "cap-a@test.com"},
+                         cookies=ck, follow_redirects=False)
+        assert r1.status_code == 200
+        # Second invite would take the clinic to 3 on a 2-seat plan.
+        r2 = client.post("/clinic/admin/doctors/invite",
+                         data={"invite_email": "cap-b@test.com"},
+                         cookies=ck, follow_redirects=False)
+        assert r2.status_code == 400
+        assert "limit reached" in r2.text.lower()
+
+    def test_deactivate_frees_a_seat_and_owner_is_protected(self, client):
+        from database.models import Clinic, ClinicDoctor
+        ck = self._owner_admin_cookies(client, "seat-deact@test.com")
+        db = TestSession()
+        try:
+            owner = db.query(Doctor).filter(Doctor.email == "seat-deact@test.com").first()
+            clinic = db.query(Clinic).filter(Clinic.owner_doctor_id == owner.id).first()
+            register(client, email="seat-assoc@test.com")
+            assoc = db.query(Doctor).filter(Doctor.email == "seat-assoc@test.com").first()
+            m = ClinicDoctor(clinic_id=clinic.id, doctor_id=assoc.id,
+                             role="associate", is_active=True)
+            db.add(m); db.commit(); db.refresh(m)
+            owner_m = db.query(ClinicDoctor).filter(
+                ClinicDoctor.clinic_id == clinic.id,
+                ClinicDoctor.doctor_id == owner.id).first()
+            mid, owner_mid = m.id, owner_m.id
+        finally:
+            db.close()
+
+        # Owner membership must be refused — deactivating it orphans the clinic.
+        r = client.post(f"/clinic/admin/doctors/{owner_mid}/deactivate",
+                        cookies=ck, follow_redirects=False)
+        assert "err=owner" in r.headers.get("location", "")
+
+        r = client.post(f"/clinic/admin/doctors/{mid}/deactivate",
+                        cookies=ck, follow_redirects=False)
+        assert "removed=1" in r.headers.get("location", "")
+        db = TestSession()
+        try:
+            m = db.query(ClinicDoctor).filter(ClinicDoctor.id == mid).first()
+            assert m.is_active is False
+            assert m.doctor_id is not None, "must deactivate, never delete"
+        finally:
+            db.close()
+
+    def test_revoked_invite_cannot_be_used(self, client):
+        from database.models import Clinic, ClinicDoctorInvite
+        ck = self._owner_admin_cookies(client, "seat-revoke@test.com")
+        client.post("/clinic/admin/doctors/invite",
+                    data={"invite_email": "revoke-me@test.com"},
+                    cookies=ck, follow_redirects=False)
+        db = TestSession()
+        try:
+            inv = db.query(ClinicDoctorInvite).filter(
+                ClinicDoctorInvite.email == "revoke-me@test.com").first()
+            inv_id, token = inv.id, inv.token
+        finally:
+            db.close()
+
+        r = client.post(f"/clinic/admin/invites/{inv_id}/revoke",
+                        cookies=ck, follow_redirects=False)
+        assert "revoked=1" in r.headers.get("location", "")
+
+        # The link must now be dead for registration too.
+        resp = client.post("/register", data={
+            "name": "Dr Revoked", "email": "revoke-me@test.com",
+            "phone": _next_phone(), "password": "Kv9$mPq2#Zx8L",
+            "clinic_name": "", "city": "Y", "specialization": "General",
+            "clinic_invite": token, "account_type": "solo",
+        }, follow_redirects=False)
+        assert resp.status_code == 400
+        assert "invalid or has expired" in resp.text
+
+
+class TestInvitedDoctorOwnPractice:
+    """An invited doctor used to get no clinic and no trial, so they could
+    never practise independently."""
+
+    def _invite(self, client, owner_email, invitee_email):
+        from database.models import Clinic, ClinicDoctorInvite
+        import secrets
+        register(client, email=owner_email, account_type="clinic")
+        db = TestSession()
+        try:
+            o = db.query(Doctor).filter(Doctor.email == owner_email).first()
+            c = db.query(Clinic).filter(Clinic.owner_doctor_id == o.id).first()
+            tok = secrets.token_urlsafe(16)
+            db.add(ClinicDoctorInvite(clinic_id=c.id, email=invitee_email,
+                                      token=tok,
+                                      expires_at=datetime.utcnow() + timedelta(days=7)))
+            db.commit()
+            return tok
+        finally:
+            db.close()
+
+    def test_opting_in_creates_own_clinic_and_trial(self, client):
+        from database.models import ClinicDoctor
+        tok = self._invite(client, "own-owner@test.com", "own-yes@test.com")
+        r = client.post("/register", data={
+            "name": "Dr Own", "email": "own-yes@test.com",
+            "phone": _next_phone(), "password": "Kv9$mPq2#Zx8L",
+            "clinic_name": "My Own Practice", "city": "X",
+            "specialization": "General", "clinic_invite": tok,
+            "account_type": "solo", "also_own_practice": "1",
+        }, follow_redirects=False)
+        assert r.status_code == 303
+        db = TestSession()
+        try:
+            d = db.query(Doctor).filter(Doctor.email == "own-yes@test.com").first()
+            ms = db.query(ClinicDoctor).filter(ClinicDoctor.doctor_id == d.id).all()
+            roles = sorted(m.role for m in ms)
+            assert roles == ["associate", "owner"], f"expected both roles, got {roles}"
+            assert d.trial_ends_at is not None, "own practice needs its own trial"
+        finally:
+            db.close()
+
+    def test_declining_keeps_associate_only(self, client):
+        from database.models import ClinicDoctor
+        tok = self._invite(client, "own-owner2@test.com", "own-no@test.com")
+        r = client.post("/register", data={
+            "name": "Dr NoOwn", "email": "own-no@test.com",
+            "phone": _next_phone(), "password": "Kv9$mPq2#Zx8L",
+            "clinic_name": "", "city": "X", "specialization": "General",
+            "clinic_invite": tok, "account_type": "solo",
+        }, follow_redirects=False)
+        assert r.status_code == 303
+        db = TestSession()
+        try:
+            d = db.query(Doctor).filter(Doctor.email == "own-no@test.com").first()
+            ms = db.query(ClinicDoctor).filter(ClinicDoctor.doctor_id == d.id).all()
+            assert [m.role for m in ms] == ["associate"]
+            assert d.trial_ends_at is None
+        finally:
+            db.close()
+
+
+class TestAssociateSurface:
+    def test_associate_billing_page_does_not_sell_them_a_plan(self, client):
+        """A covered associate was shown an 'expired' banner and three live
+        purchase buttons; buying changed nothing visible."""
+        from database.models import ClinicDoctor
+        register(client, email="as-bill@test.com")
+        db = TestSession()
+        try:
+            d = db.query(Doctor).filter(Doctor.email == "as-bill@test.com").first()
+            db.query(ClinicDoctor).filter(ClinicDoctor.doctor_id == d.id).delete()
+            c = _mk_clinic(db, "Covering Clinic", "as-cover")
+            db.add(ClinicDoctor(clinic_id=c.id, doctor_id=d.id,
+                                role="associate", is_active=True))
+            db.commit()
+        finally:
+            db.close()
+        cookie = login(client, "as-bill@test.com").cookies.get("access_token")
+        r = client.get("/billing", cookies={"access_token": cookie})
+        assert r.status_code == 200
+        assert "Covering Clinic" in r.text
+        assert "Subscribe" not in r.text, "must not offer a plan to a covered associate"
+
+
+class TestClinicIdentityInPatientMessages:
+    def test_message_names_the_clinic_not_the_doctors_own_field(self, client):
+        """Patient messages read Doctor.clinic_name, which is NULL for an
+        invite-registered associate — so patients were told to attend
+        'Dr X's clinic' with no address while booked into a real clinic."""
+        from services.notification_service import _clinic_identity
+        from database.models import Clinic
+
+        db = TestSession()
+        try:
+            c = Clinic(name="Real Clinic Name", slug="ci-real", plan_type="clinic",
+                       city="Nashik", address="12 MG Road")
+            db.add(c); db.commit(); db.refresh(c)
+
+            class _D:  # associate with no personal clinic fields, as created by invite
+                name = "Priya Sharma"
+                clinic_name = None
+                clinic_address = None
+                city = None
+
+            name, addr = _clinic_identity(_D(), db, c.id)
+            assert name == "Real Clinic Name"
+            assert addr and "MG Road" in addr
+
+            # No clinic to resolve -> falls back to the doctor's own fields.
+            name2, _ = _clinic_identity(_D(), db, None)
+            assert name2 == "Dr. Priya Sharma's clinic"
         finally:
             db.close()

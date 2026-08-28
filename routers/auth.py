@@ -99,6 +99,54 @@ def register_page(
     })
 
 
+def _create_owned_clinic(db: Session, doctor, slug: str, name: str,
+                         clinic_name: str, city: str,
+                         is_clinic_signup: bool, trial_ends_at):
+    """Create the doctor's own Clinic plus their owner membership.
+
+    Shared by the solo path and the invited-doctor-who-also-practises path so
+    the slug-uniquing and seat logic exist once.
+
+    A "Clinic Account" signup gets Clinic Admin for the trial window:
+    plan_expires_at mirrors the doctor's own trial_ends_at, so it lapses at
+    the same moment a solo trial would.
+    """
+    clinic_slug = slug + "-clinic"
+    base_clinic_slug = clinic_slug
+    counter = 1
+    while db.query(Clinic).filter(Clinic.slug == clinic_slug).first():
+        clinic_slug = f"{base_clinic_slug}-{counter}"
+        counter += 1
+
+    clinic_seats = 1
+    if is_clinic_signup:
+        from services.payment_service import PLAN_CONFIG
+        clinic_seats = PLAN_CONFIG["clinic"]["seats"]   # matches the paid Clinic tier
+
+    clinic = Clinic(
+        name=clinic_name.strip() or f"{name}'s Clinic",
+        address=None,
+        city=city.strip() or None,
+        slug=clinic_slug,
+        plan_type="clinic" if is_clinic_signup else "trial",
+        plan_expires_at=trial_ends_at if is_clinic_signup else None,
+        max_doctors=clinic_seats,
+        owner_doctor_id=doctor.id,
+    )
+    db.add(clinic)
+    db.commit()
+    db.refresh(clinic)
+
+    db.add(ClinicDoctor(
+        clinic_id=clinic.id,
+        doctor_id=doctor.id,
+        role="owner",
+        is_active=True,
+    ))
+    db.commit()
+    return clinic
+
+
 @router.post("/register", response_class=HTMLResponse)
 def register(
     request: Request,
@@ -113,6 +161,7 @@ def register(
     clinic_invite: str = Form(""),
     medical_reg_number: str = Form(""),
     account_type: str = Form("solo"),
+    also_own_practice: str = Form(""),
     db: Session = Depends(get_db),
 ):
     invite_token = clinic_invite.strip()
@@ -218,6 +267,20 @@ def register(
         valid_invite.used_at = datetime.utcnow()
         db.commit()
 
+        # An invited doctor may also run their own practice — a real doctor
+        # often does clinic shifts AND sees their own patients. Without this
+        # they got no clinic and no trial at all, so they could never practise
+        # independently; their only route was a second account on another
+        # email. Their own practice is on the normal 14-day trial and is
+        # billed separately from the clinic seat (access is per-clinic).
+        if also_own_practice.strip():
+            own_trial = datetime.utcnow() + timedelta(days=14)
+            doctor.trial_ends_at = own_trial
+            doctor.clinic_name = clinic_name.strip() or None
+            db.commit()
+            _create_owned_clinic(db, doctor, slug, name, clinic_name, city,
+                                 False, own_trial)
+
     else:
         # ── Solo/clinic path: 14-day trial + auto clinic ───────────────────
         is_clinic_signup = account_type.strip().lower() == "clinic"
@@ -251,39 +314,8 @@ def register(
         # separately paid for a duo/clinic/hospital/enterprise plan, which
         # is the only other place plan_type ever becomes "clinic"
         # (routers/doctors.py billing_verify).
-        clinic_slug = slug + "-clinic"
-        base_clinic_slug = clinic_slug
-        counter = 1
-        while db.query(Clinic).filter(Clinic.slug == clinic_slug).first():
-            clinic_slug = f"{base_clinic_slug}-{counter}"
-            counter += 1
-
-        clinic_seats = 1
-        if is_clinic_signup:
-            from services.payment_service import PLAN_CONFIG
-            clinic_seats = PLAN_CONFIG["clinic"]["seats"]  # matches the paid Clinic tier
-
-        clinic = Clinic(
-            name=clinic_name.strip() or f"{name}'s Clinic",
-            address=None,
-            city=city.strip() or None,
-            slug=clinic_slug,
-            plan_type="clinic" if is_clinic_signup else "trial",
-            plan_expires_at=trial_ends_at if is_clinic_signup else None,
-            max_doctors=clinic_seats,
-            owner_doctor_id=doctor.id,
-        )
-        db.add(clinic)
-        db.commit()
-        db.refresh(clinic)
-
-        db.add(ClinicDoctor(
-            clinic_id=clinic.id,
-            doctor_id=doctor.id,
-            role="owner",
-            is_active=True,
-        ))
-        db.commit()
+        _create_owned_clinic(db, doctor, slug, name, clinic_name, city,
+                             is_clinic_signup, trial_ends_at)
 
     # Send the verification code after the response — the Resend round-trip
     # must not delay the redirect. Passes the ID only; the wrapper opens its

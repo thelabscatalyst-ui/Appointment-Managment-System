@@ -1081,6 +1081,32 @@ def billing_page(
     from datetime import datetime as dt
     from config import settings as cfg
     from services.payment_service import PLAN_CONFIG
+    from services.clinic_context import (
+        active_memberships, owned_clinic, ROLE_ASSOCIATE,
+    )
+    from database.models import Clinic as _ClinicM
+
+    # An associate covered by a clinic's plan was shown a full-width "expired"
+    # banner, "No Active Plan", and three live purchase buttons. If they
+    # bought one, billing_verify found no owned clinic, so they got a personal
+    # plan on their Doctor row and NOTHING visible changed — settings still
+    # read "Clinic Member". They paid and saw nothing. Send them to a page
+    # that names who actually controls their billing instead.
+    _mine = owned_clinic(db, doctor.id)
+    if _mine is None:
+        _assoc = next((m for m in active_memberships(db, doctor.id)
+                       if m.role == ROLE_ASSOCIATE), None)
+        if _assoc:
+            _c = db.query(_ClinicM).filter(_ClinicM.id == _assoc.clinic_id).first()
+            _owner = None
+            if _c and _c.owner_doctor_id:
+                _owner = db.query(Doctor).filter(Doctor.id == _c.owner_doctor_id).first()
+            return templates.TemplateResponse(request, "billing_associate.html", {
+                "doctor": doctor,
+                "clinic": _c,
+                "clinic_owner": _owner,
+                "active": "billing",
+            })
 
     now = dt.utcnow()
     trial_ok   = doctor.trial_ends_at  and doctor.trial_ends_at  > now
@@ -1242,10 +1268,37 @@ def billing_verify(
             if plan in multi_doctor_plans:
                 _clinic.plan_type      = "clinic"
                 _clinic.plan_expires_at = end_date
+                # max_doctors was never synced here, so buying Hospital (15
+                # seats) left the clinic capped at 1 and the second invite
+                # was refused. Doctor.plan_seats WAS written but nothing has
+                # ever read it — max_doctors is what actually gates invites.
+                _seats = seats if seats is not None else 9999
+
+                # Downgrade guard: min_seats_needed is computed for the UI but
+                # was never enforced server-side, so a 5-doctor clinic could
+                # buy Solo and orphan four working doctors. The payment has
+                # already cleared by the time we get here, so clamp rather
+                # than reject — never strand doctors mid-clinic-day.
+                _active_members = (
+                    db.query(_ClinicDoctor)
+                    .filter(
+                        _ClinicDoctor.clinic_id == _clinic.id,
+                        _ClinicDoctor.is_active == True,
+                    ).count()
+                )
+                _clinic.max_doctors = max(_seats, _active_members)
+                _clinic.plan_grace_until = end_date + timedelta(days=7)
             else:
                 # Downgraded / solo plan — strip clinic-tier features
                 _clinic.plan_type      = "trial"
                 _clinic.plan_expires_at = None
+                _clinic.max_doctors    = max(1, (
+                    db.query(_ClinicDoctor)
+                    .filter(
+                        _ClinicDoctor.clinic_id == _clinic.id,
+                        _ClinicDoctor.is_active == True,
+                    ).count()
+                ))
 
     db.commit()
     return RedirectResponse(url="/dashboard?upgraded=1", status_code=303)

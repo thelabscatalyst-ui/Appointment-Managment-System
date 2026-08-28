@@ -69,12 +69,53 @@ def _send_with_fallback(
     return ok, NotificationChannel.whatsapp, sid
 
 
+
+# ------------------------------------------------------------------ #
+#  Clinic identity for patient-facing messages                         #
+# ------------------------------------------------------------------ #
+
+def _clinic_identity(doctor, db=None, clinic_id=None):
+    """(name, address) to show the patient.
+
+    Doctor.clinic_name/clinic_address are per-doctor free text. Reading them
+    directly meant a doctor working a shift at someone else's clinic sent the
+    patient THEIR OWN clinic name — and an invite-registered associate has
+    those fields NULL by construction, so patients were told to attend
+    "Dr. Priya Sharma's clinic" with no address at all, while physically
+    booked into a real clinic with a real address.
+
+    Resolve from the Clinic row the work is attributed to; fall back to the
+    doctor's own fields only when there is no clinic (solo, pre-backfill).
+    """
+    if db is not None and clinic_id:
+        try:
+            from database.models import Clinic
+            c = db.query(Clinic).filter(Clinic.id == clinic_id).first()
+            if c and c.name:
+                city = getattr(c, "city", None)
+                addr = getattr(c, "address", None)
+                full = ", ".join(x for x in (addr, city) if x)
+                if full:
+                    return c.name, full
+                # Clinic named but not addressed — better than the doctor's
+                # unrelated personal address.
+                return c.name, None
+        except Exception:
+            pass
+    name = doctor.clinic_name or f"Dr. {doctor.name}'s clinic"
+    addr = None
+    if doctor.clinic_address:
+        addr = f"{doctor.clinic_address}, {doctor.city or ''}".rstrip(", ")
+    return name, addr
+
+
 # ------------------------------------------------------------------ #
 #  Message builders                                                    #
 # ------------------------------------------------------------------ #
 
-def _confirmation_msg(appt: Appointment, doctor) -> str:
-    clinic_name = doctor.clinic_name or f"Dr. {doctor.name}'s clinic"
+def _confirmation_msg(appt: Appointment, doctor, db=None) -> str:
+    clinic_name, clinic_addr = _clinic_identity(
+        doctor, db, getattr(appt, "clinic_id", None))
     date_str = appt.appointment_date.strftime("%-d %b %Y")
     t = appt.appointment_time
     hour = t.hour % 12 or 12
@@ -87,16 +128,14 @@ def _confirmation_msg(appt: Appointment, doctor) -> str:
         f"Date: *{date_str}*  Time: *{time_str}*",
         f"Duration: {appt.duration_mins} mins",
     ]
-    if doctor.clinic_address:
-        lines.append(
-            f"Address: {doctor.clinic_address}, {doctor.city or ''}".rstrip(", ")
-        )
+    if clinic_addr:
+        lines.append(f"Address: {clinic_addr}")
     lines.append("\nPlease arrive 5 minutes early. To reschedule, call the clinic directly.")
     return "\n".join(lines)
 
 
-def _reminder_msg(appt: Appointment, doctor, reminder_type: str) -> str:
-    clinic   = doctor.clinic_name or f"Dr. {doctor.name}'s clinic"
+def _reminder_msg(appt: Appointment, doctor, reminder_type: str, db=None) -> str:
+    clinic, _ = _clinic_identity(doctor, db, getattr(appt, "clinic_id", None))
     t        = appt.appointment_time
     hour     = t.hour % 12 or 12
     ampm     = "AM" if t.hour < 12 else "PM"
@@ -152,7 +191,7 @@ def notify_appointment_confirmed(appt: Appointment, doctor, db: Session):
     Failure is logged but never raises — the booking always succeeds.
     """
     _ = appt.patient  # ensure lazy-loaded
-    message = _confirmation_msg(appt, doctor)
+    message = _confirmation_msg(appt, doctor, db)
 
     success, channel, result = _send_with_fallback(appt.patient.phone, message)
     status = "sent" if success else "failed"
@@ -193,7 +232,7 @@ def notify_reminder(appt: Appointment, doctor, db: Session, reminder_type: str):
     Called by the background scheduler.
     """
     _ = appt.patient  # ensure lazy-loaded
-    message = _reminder_msg(appt, doctor, reminder_type)
+    message = _reminder_msg(appt, doctor, reminder_type, db)
 
     success, channel, result = _send_with_fallback(appt.patient.phone, message)
     notif_type = (

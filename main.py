@@ -180,6 +180,9 @@ async def inject_clinic_owner_state(request: Request, call_next):
     """Sets request.state.is_clinic_owner so base.html navbar can show Clinic Admin link."""
     request.state.is_clinic_owner = False
     request.state.membership_count = 0
+    request.state.clinic_memberships = []
+    request.state.active_clinic = None
+    request.state.active_clinic_id = None
     # Support contact, read by templates that offer a human fallback
     # (verify_email.html, plan_lapsed.html). Set here rather than threaded
     # through every route context — same pattern as is_clinic_owner.
@@ -203,8 +206,22 @@ async def inject_clinic_owner_state(request: Request, call_next):
                     # Membership count drives whether the clinic switcher is
                     # rendered at all — single-clinic doctors must see no
                     # change anywhere in the UI.
-                    request.state.membership_count = len(
-                        _active_memberships(db, payload["doctor_id"]))
+                    _ms = _active_memberships(db, payload["doctor_id"])
+                    request.state.membership_count = len(_ms)
+                    # Detached plain dicts: the Session closes in the finally
+                    # below, so ORM objects would raise DetachedInstanceError
+                    # when the template touched a lazy attribute.
+                    if len(_ms) > 1:
+                        from database.models import Clinic as _C
+                        _rows = []
+                        for _m in _ms:
+                            _c = db.query(_C).filter(_C.id == _m.clinic_id).first()
+                            _rows.append({
+                                "clinic_id": _m.clinic_id,
+                                "role": _m.role,
+                                "clinic_name": (_c.name if _c else f"Clinic {_m.clinic_id}"),
+                            })
+                        request.state.clinic_memberships = _rows
                 finally:
                     db.close()
             except Exception:
@@ -328,7 +345,16 @@ async def auth_check(request: Request):
 
 @app.exception_handler(403)
 async def forbidden_handler(request: Request, exc: HTTPException):
-    return RedirectResponse(url="/dashboard", status_code=303)
+    """403 -> dashboard, but say why.
+
+    This used to discard exc.detail and redirect silently, so an associate
+    who clicked or typed /clinic/admin simply landed back on their dashboard
+    with no explanation at all.
+    """
+    reason = getattr(exc, "detail", "") or ""
+    if "clinic" in str(reason).lower():
+        return RedirectResponse(url="/dashboard?denied=clinic_admin", status_code=303)
+    return RedirectResponse(url="/dashboard?denied=1", status_code=303)
 
 
 @app.exception_handler(ClinicAdminAuthRequired)

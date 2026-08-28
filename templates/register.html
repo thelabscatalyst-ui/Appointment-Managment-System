@@ -245,6 +245,27 @@
               </button>
             </div>
             <input type="hidden" name="account_type" id="account_type" value="solo">
+            {% else %}
+            <!-- Joining a clinic by invite. A doctor doing shifts at someone
+                 else's clinic very often also sees their own patients, so ask
+                 rather than assume: previously an invited doctor got no
+                 practice and no trial at all, and could never work
+                 independently without creating a second account. -->
+            <label
+              style="display:flex;gap:10px;align-items:flex-start;padding:14px 16px;margin-bottom:20px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;">
+              <input type="checkbox" name="also_own_practice" id="also_own_practice" value="1"
+                style="margin-top:3px;flex-shrink:0;" />
+              <span>
+                <span style="display:block;font-size:0.86rem;font-weight:600;color:var(--text);">
+                  I also run my own practice
+                </span>
+                <span style="display:block;font-size:0.78rem;color:var(--muted);margin-top:2px;">
+                  Sets up your own clinic alongside this one, with a 14-day free
+                  trial. You can see your own patients as well as the clinic's.
+                </span>
+              </span>
+            </label>
+            <input type="hidden" name="account_type" value="solo">
             {% endif %}
 
             <div class="form-group">
