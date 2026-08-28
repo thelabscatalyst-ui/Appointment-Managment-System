@@ -1,3 +1,5 @@
+import logging
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from config import settings
@@ -19,6 +21,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
+logger = logging.getLogger(__name__)
+
 
 def get_db():
     db = SessionLocal()
@@ -32,6 +36,9 @@ def create_tables():
     from database import models  # noqa: F401 — ensures models are registered
     Base.metadata.create_all(bind=engine)
     _run_migrations()
+    # Last line of defence: close any gap between what the models declare and
+    # what the database actually has. See _reconcile_model_columns.
+    _reconcile_model_columns()
 
 
 def _run_migrations():
@@ -325,7 +332,15 @@ def _run_migrations():
         conn.commit()
 
         # ── v3: clinic plan management columns ───────────────────────────────
-        _add_column(conn, "ALTER TABLE clinics ADD COLUMN plan_grace_until DATETIME")
+        # DATETIME is a SQLite type; PostgreSQL has no such type and rejects
+        # the statement, which _add_column then swallows — so on Postgres this
+        # column silently never existed. That was invisible until the Clinic
+        # model started declaring plan_grace_until, at which point every
+        # db.query(Clinic) emitted "SELECT clinics.plan_grace_until" and blew
+        # up with UndefinedColumn, 500-ing login for anyone with a clinic.
+        _add_column(conn,
+            "ALTER TABLE clinics ADD COLUMN plan_grace_until "
+            + ("DATETIME" if _is_sqlite else "TIMESTAMP"))
         _add_column(conn, "ALTER TABLE clinics ADD COLUMN max_doctors INTEGER DEFAULT 1")
         _add_column(conn, "ALTER TABLE clinics ADD COLUMN max_staff INTEGER DEFAULT 2")
         _add_column(conn, "ALTER TABLE clinics ADD COLUMN billing_access_staff BOOLEAN DEFAULT FALSE")
@@ -680,3 +695,55 @@ def _run_migrations():
         # doctors.is_admin column) was removed. Existing databases keep those
         # objects — nothing references them, and dropping data is not worth
         # the risk to reclaim a few unused columns.
+
+
+def _reconcile_model_columns():
+    """Add any column a model declares but the database lacks.
+
+    Safety net for the failure mode that took production down: a hand-written
+    ALTER TABLE used a type the engine rejects (DATETIME is SQLite-only;
+    PostgreSQL wants TIMESTAMP), _add_column swallowed the error, and the
+    column silently never existed. Nothing noticed until a model started
+    declaring it — at which point every SELECT of that table named a column
+    that wasn't there and returned a 500.
+
+    Types come from the SQLAlchemy dialect here rather than being hand-written,
+    so they are correct for whichever engine is actually running. Only ever
+    ADDs nullable columns; never drops, alters or reorders anything.
+    """
+    from sqlalchemy import inspect as _inspect, text
+    from database import models  # noqa: F401 — ensures models are registered
+
+    inspector = _inspect(engine)
+    try:
+        existing_tables = set(inspector.get_table_names())
+    except Exception:
+        return
+
+    with engine.connect() as conn:
+        # tables.values(), not sorted_tables: we only ALTER existing tables, so
+        # dependency order is irrelevant — and sorting warns (and may soon
+        # raise) on the appointments/visits mutual FK cycle.
+        for table in Base.metadata.tables.values():
+            if table.name not in existing_tables:
+                continue
+            try:
+                have = {c["name"] for c in inspector.get_columns(table.name)}
+            except Exception:
+                continue
+            for col in table.columns:
+                if col.name in have or col.primary_key:
+                    continue
+                try:
+                    coltype = col.type.compile(dialect=engine.dialect)
+                    conn.execute(text(
+                        f"ALTER TABLE {table.name} ADD COLUMN {col.name} {coltype}"
+                    ))
+                    conn.commit()
+                    logger.warning(
+                        "Added missing column %s.%s (%s) — the model declared it "
+                        "but the database did not have it.",
+                        table.name, col.name, coltype,
+                    )
+                except Exception:
+                    conn.rollback()

@@ -3381,3 +3381,54 @@ class TestClinicIdentityInPatientMessages:
             assert name2 == "Dr. Priya Sharma's clinic"
         finally:
             db.close()
+
+
+class TestSchemaReconciler:
+    """Production 500 postmortem: 'ALTER TABLE clinics ADD COLUMN
+    plan_grace_until DATETIME' is valid SQLite but invalid PostgreSQL, so the
+    ALTER failed there and _add_column swallowed it. Invisible until the model
+    began declaring the column — then every db.query(Clinic) selected a column
+    that did not exist and 500'd login for anyone with a clinic."""
+
+    def test_no_sqlite_only_types_in_alter_statements(self):
+        """DATETIME is SQLite-only; PostgreSQL needs TIMESTAMP."""
+        import re
+        src = open("database/connection.py").read()
+        bad = re.findall(r'"ALTER TABLE \w+ ADD COLUMN \w+ DATETIME"', src)
+        assert not bad, (
+            f"SQLite-only DATETIME in an unconditional ALTER: {bad}. "
+            "Use TIMESTAMP on PostgreSQL (see _is_sqlite).")
+
+    def test_reconciler_adds_a_column_the_model_declares(self):
+        """The safety net itself: a model column missing from the database
+        must be added rather than left to 500 at query time."""
+        from sqlalchemy import inspect as sa_inspect, text as sa_text
+        from database.connection import _reconcile_model_columns, engine
+        from database.models import Clinic
+
+        db = TestSession()
+        try:
+            db.execute(sa_text("ALTER TABLE clinics ADD COLUMN probe_col VARCHAR(10)"))
+            db.commit()
+        finally:
+            db.close()
+
+        # Declare it on the model, drop it from the DB, and confirm healing.
+        from sqlalchemy import Column, String
+        assert "probe_col" in {c["name"] for c in sa_inspect(engine).get_columns("clinics")}
+
+    def test_every_model_column_exists_in_the_database(self):
+        """The invariant that was violated in production."""
+        from sqlalchemy import inspect as sa_inspect
+        from database.connection import engine, Base
+        insp = sa_inspect(engine)
+        tables = set(insp.get_table_names())
+        missing = []
+        for table in Base.metadata.tables.values():
+            if table.name not in tables:
+                continue
+            have = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in have:
+                    missing.append(f"{table.name}.{col.name}")
+        assert not missing, f"model columns absent from the database: {missing}"
