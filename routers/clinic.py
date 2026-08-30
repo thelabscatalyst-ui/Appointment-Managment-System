@@ -324,7 +324,10 @@ def send_doctor_invite(
     # UI reported success. An invite is a rare, deliberate action; a second of
     # latency is worth knowing the truth.
     from services.invite_service import send_invite_email, build_invite_url
-    base_url = str(request.base_url).rstrip("/")
+    from services.url_service import request_base_url
+    # Not str(request.base_url): behind Railway's TLS-terminating proxy that
+    # reports scheme "http", producing links that break under HSTS.
+    base_url = request_base_url(request)
     ok, detail = send_invite_email(email, token, clinic.name, doctor.name, base_url)
     accept_url = build_invite_url(token, base_url)
 

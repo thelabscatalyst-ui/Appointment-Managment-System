@@ -3480,3 +3480,56 @@ class TestInviteDeliveryHonesty:
             assert inv is not None and inv.used_at is None
         finally:
             db.close()
+
+
+class TestPublicUrlResolution:
+    """Emailed links must be absolute, https, and not attacker-steerable.
+
+    The configured PUBLIC_BASE_URL pointed at a domain with no DNS record, so
+    every password-reset and feedback link ever sent 404'd. These lock in the
+    replacement rules in services/url_service.py.
+    """
+
+    def test_request_base_url_honours_forwarded_proto(self):
+        """Railway terminates TLS, so the app sees http:// on an https:// site."""
+        from services.url_service import request_base_url
+
+        class _Req:
+            headers = {"x-forwarded-proto": "https", "host": "app.example.com"}
+            url = type("U", (), {"scheme": "http"})()
+            base_url = "http://app.example.com/"
+
+        assert request_base_url(_Req()) == "https://app.example.com"
+
+    def test_request_base_url_takes_first_proto_in_chain(self):
+        """X-Forwarded-Proto can be a comma-separated chain; the client's is first."""
+        from services.url_service import request_base_url
+
+        class _Req:
+            headers = {"x-forwarded-proto": "https, http", "host": "app.example.com"}
+            url = type("U", (), {"scheme": "http"})()
+            base_url = "http://app.example.com/"
+
+        assert request_base_url(_Req()) == "https://app.example.com"
+
+    def test_public_base_url_prefers_platform_domain(self, monkeypatch):
+        """RAILWAY_PUBLIC_DOMAIN cannot be spoofed by an HTTP client."""
+        from services import url_service
+
+        monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "web-production-abc.up.railway.app")
+        assert url_service.public_base_url() == "https://web-production-abc.up.railway.app"
+
+    def test_reset_link_ignores_the_host_header(self, monkeypatch):
+        """/forgot-password is public: a spoofed Host must not steer the link.
+
+        If reset URLs were built from the request, an attacker could submit a
+        victim's address with Host: evil.test and have the victim mailed a
+        working reset link pointing at their server.
+        """
+        from services import password_reset_service, url_service
+
+        monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "real-host.up.railway.app")
+        url = password_reset_service._build_reset_url("tok123")
+        assert url.startswith("https://real-host.up.railway.app/reset-password?token=")
+        assert "evil" not in url
+        assert url_service.public_base_url() == "https://real-host.up.railway.app"

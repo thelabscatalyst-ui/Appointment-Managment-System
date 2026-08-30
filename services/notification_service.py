@@ -376,7 +376,8 @@ def _create_feedback_link(bill, doctor, patient, db: Session) -> str:
             db.add(fb)
             db.commit()
             db.refresh(fb)
-        base = settings.PUBLIC_BASE_URL.rstrip("/")
+        from services.url_service import public_base_url
+        base = public_base_url()
         return f"{base}/feedback/{fb.token}"
     except Exception as e:
         logger.warning(f"Feedback link creation failed for bill #{bill.id}: {e}")

@@ -34,7 +34,8 @@ def build_invite_url(token: str, base_url: str | None = None) -> str:
     recipient even when the mail itself arrived. The live request host cannot
     be wrong in that way.
     """
-    base = (base_url or settings.PUBLIC_BASE_URL).rstrip("/")
+    from services.url_service import public_base_url
+    base = (base_url or public_base_url()).rstrip("/")
     return f"{base}/clinic/doctor-invite/{token}"
 
 

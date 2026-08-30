@@ -27,6 +27,7 @@ from config import settings
 from database.models import Doctor, PasswordReset
 from services.auth_service import hash_password, verify_password
 from services.email_service import send_email, render_email, button
+from services.url_service import public_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,10 @@ MAX_LINKS_PER_HOUR = 5
 
 
 def _build_reset_url(token: str) -> str:
-    base = settings.PUBLIC_BASE_URL.rstrip("/")
+    # Deliberately NOT derived from the request: /forgot-password is public, so
+    # a spoofed Host header would mail the victim a reset link pointing at the
+    # attacker's server. See services/url_service.py.
+    base = public_base_url()
     return f"{base}/reset-password?token={token}"
 
 
