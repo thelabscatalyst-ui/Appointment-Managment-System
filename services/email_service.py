@@ -71,6 +71,39 @@ def code_block(code: str) -> str:
     )
 
 
+
+def html_to_text(html: str) -> str:
+    """A readable plain-text alternative for an HTML email body.
+
+    Sending text/html with no text/plain part is one of the oldest spam
+    heuristics there is — legitimate mailers send both, bulk senders often
+    don't. SpamAssassin scores it (MIME_HTML_ONLY) and Gmail weighs it too.
+
+    This is not a general HTML renderer; it only has to handle the small,
+    known set of markup produced by render_email/button/code_block above.
+    Links are kept as "label (url)" so the recipient can still act on the
+    mail in a text-only client.
+    """
+    import re
+    from html import unescape
+
+    text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", "", html)
+    # Anchors become "label (url)" before tags are stripped, or the URL is lost.
+    text = re.sub(
+        r'(?is)<a\b[^>]*href="([^"]*)"[^>]*>(.*?)</a>',
+        lambda m: f"{re.sub(r'(?s)<[^>]+>', '', m.group(2)).strip()} ({m.group(1)})",
+        text,
+    )
+    text = re.sub(r"(?i)<(br|/p|/div|/h[1-6]|/tr)\s*/?>", "\n", text)
+    text = re.sub(r"(?s)<[^>]+>", "", text)
+    text = unescape(text)
+    # Collapse the whitespace the inline-styled markup leaves behind.
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r" ?\n ?", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def send_email(
     to: str,
     subject: str,
@@ -116,6 +149,9 @@ def send_email(
             "to": [recipient],
             "subject": subject,
             "html": html,
+            # Always multipart. See html_to_text for why HTML-only mail is
+            # penalised by spam filters.
+            "text": html_to_text(html),
         }
         effective_reply_to = reply_to or settings.EMAIL_REPLY_TO
         if effective_reply_to:

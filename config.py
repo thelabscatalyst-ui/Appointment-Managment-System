@@ -37,7 +37,11 @@ class Settings(BaseSettings):
 
     # Public base URL used to build patient-facing links (e.g. the feedback
     # link in the WhatsApp bill receipt). Override in .env for staging/local.
-    PUBLIC_BASE_URL: str = "https://www.medtrack.life"
+    # The domain mail links point at. Must match the EMAIL_FROM domain --
+    # a link domain that differs from the sender is a phishing signal, and
+    # this previously pointed at medtrack.life, which has no DNS record at
+    # all, so every emailed link 404'd and the mail went to spam.
+    PUBLIC_BASE_URL: str = "https://www.clinicos.store"
 
     # Set ENVIRONMENT=development in local .env to allow http:// cookies.
     # In production (Railway) leave unset — defaults to "production" so

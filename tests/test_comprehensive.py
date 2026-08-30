@@ -3512,11 +3512,26 @@ class TestPublicUrlResolution:
 
         assert request_base_url(_Req()) == "https://app.example.com"
 
-    def test_public_base_url_prefers_platform_domain(self, monkeypatch):
-        """RAILWAY_PUBLIC_DOMAIN cannot be spoofed by an HTTP client."""
+    def test_configured_domain_beats_the_platform_domain(self, monkeypatch):
+        """The branded host wins: links must match the domain that sent them."""
+        from config import settings
         from services import url_service
 
         monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "web-production-abc.up.railway.app")
+        monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://www.clinicos.store")
+        assert url_service.public_base_url() == "https://www.clinicos.store"
+
+    def test_platform_domain_is_the_fallback_when_unconfigured(self, monkeypatch):
+        """An unconfigured deploy still gets working links, not dead ones.
+
+        RAILWAY_PUBLIC_DOMAIN is injected by the platform, so unlike the Host
+        header no HTTP client can influence it.
+        """
+        from config import settings
+        from services import url_service
+
+        monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "web-production-abc.up.railway.app")
+        monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "")
         assert url_service.public_base_url() == "https://web-production-abc.up.railway.app"
 
     def test_reset_link_ignores_the_host_header(self, monkeypatch):
@@ -3526,10 +3541,50 @@ class TestPublicUrlResolution:
         victim's address with Host: evil.test and have the victim mailed a
         working reset link pointing at their server.
         """
-        from services import password_reset_service, url_service
+        from config import settings
+        from services import password_reset_service
 
-        monkeypatch.setenv("RAILWAY_PUBLIC_DOMAIN", "real-host.up.railway.app")
+        monkeypatch.setattr(settings, "PUBLIC_BASE_URL", "https://real-host.example")
         url = password_reset_service._build_reset_url("tok123")
-        assert url.startswith("https://real-host.up.railway.app/reset-password?token=")
-        assert "evil" not in url
-        assert url_service.public_base_url() == "https://real-host.up.railway.app"
+        assert url == "https://real-host.example/reset-password?token=tok123"
+
+
+class TestEmailPlainTextAlternative:
+    """Every outbound email must carry a text/plain part.
+
+    HTML-only mail scores against you in essentially every spam filter
+    (SpamAssassin's MIME_HTML_ONLY, and Gmail's own heuristics). A real
+    invite landed in Gmail's junk folder; this was one of the signals.
+    """
+
+    def test_links_survive_as_visible_urls(self):
+        from services.email_service import html_to_text, button
+        text = html_to_text(button("https://www.clinicos.store/x/tok", "Accept invitation"))
+        assert "Accept invitation" in text
+        assert "https://www.clinicos.store/x/tok" in text
+
+    def test_tags_and_entities_are_gone(self):
+        from services.email_service import html_to_text, render_email
+        text = html_to_text(render_email("<h2>Hi &amp; welcome</h2><p>Body</p>"))
+        assert "<" not in text and ">" not in text
+        assert "&amp;" not in text and "Hi & welcome" in text
+
+    def test_no_runs_of_blank_lines_from_inline_styles(self):
+        from services.email_service import html_to_text, render_email
+        assert "\n\n\n" not in html_to_text(render_email("<p>One</p><p>Two</p>"))
+
+    def test_link_domain_matches_sender_domain(self):
+        """A link host outside the sending domain reads as phishing.
+
+        Links pointed at medtrack.life while mail came from clinicos.store --
+        and medtrack.life had no DNS record at all.
+        """
+        from config import settings
+        from services.url_service import public_base_url
+
+        sender = settings.EMAIL_FROM
+        sender_domain = sender[sender.index("<") + 1:sender.index(">")].split("@")[-1] \
+            if "<" in sender else sender.split("@")[-1]
+        link_host = public_base_url().split("://")[-1].split("/")[0]
+        assert link_host.endswith(sender_domain), (
+            f"links point at {link_host} but mail is sent from {sender_domain}")

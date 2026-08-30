@@ -90,6 +90,14 @@ def main() -> int:
     elif base_host:
         print("  [ok]      resolves")
 
+    # Mail filters compare the domain a link points at against the domain that
+    # sent the mail. A mismatch reads as phishing, and is a common reason a
+    # perfectly authenticated email still lands in the junk folder.
+    if domain and base_host and not base_host.endswith(domain):
+        print(f"  [WARN]    links point at {base_host} but mail is sent from {domain}.")
+        print(f"            Mismatched link/sender domains are a spam signal — set")
+        print(f"            PUBLIC_BASE_URL to a host under {domain}.")
+
     if not args.send:
         print("\nNo email sent. Re-run with --send <address> to send exactly one test.\n")
         return 0

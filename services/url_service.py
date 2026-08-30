@@ -44,8 +44,15 @@ def _railway_origin() -> str | None:
 
 
 def public_base_url() -> str:
-    """Absolute origin for links built without a request in hand."""
-    return (_railway_origin() or settings.PUBLIC_BASE_URL or "").rstrip("/")
+    """Absolute origin for links built without a request in hand.
+
+    An explicitly configured PUBLIC_BASE_URL wins, because it is the branded
+    domain and mail filters treat a link domain that differs from the sending
+    domain as a phishing signal. RAILWAY_PUBLIC_DOMAIN is the fallback so a
+    deploy with nothing configured still produces working links instead of
+    silently dead ones.
+    """
+    return (settings.PUBLIC_BASE_URL or _railway_origin() or "").rstrip("/")
 
 
 def request_base_url(request) -> str:
