@@ -453,6 +453,18 @@ def _run_migrations():
         except Exception:
             conn.rollback()
 
+        # ── Clinic names: collapse " 's Clinic" -> "'s Clinic" ──
+        # The auto-generated name interpolated an unstripped signup field, so a
+        # trailing space in the doctor's name became a space before the
+        # apostrophe: "Rajesh Mehta 's Clinic". Cosmetic, but it is the label on
+        # the navbar clinic switcher, so it is on screen constantly. The source
+        # is fixed in routers/auth.py; this repairs the rows already written.
+        # Idempotent: after the first run no row matches the LIKE.
+        _safe_exec(conn,
+            "UPDATE clinics SET name = REPLACE(name, ' ''s Clinic', '''s Clinic') "
+            "WHERE name LIKE '% ''s Clinic'"
+        )
+
         # ── Owner account: keep thelabscatalyst@gmail.com on the Clinic tier ──
         # "Clinic Account" at signup did nothing until the account_type field
         # was actually read, so every account created before that — including

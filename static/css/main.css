@@ -613,6 +613,66 @@ html.light .navbar-settings-link:hover {
   background: var(--bg-3);
 }
 
+/* Clinic switcher — a <select>, but it sits in a row of navbar buttons and has
+   to read as one of them. Every metric below is deliberately identical to
+   .navbar-settings-link; the differences are only what a select needs:
+   appearance:none to drop the OS control chrome, a drawn chevron in its place,
+   and an ellipsis for clinic names too long for the bar. */
+.navbar-clinic-switch {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #c4b49e;
+  background-color: transparent;
+  padding: 6px 30px 6px 12px;   /* right pad clears the chevron */
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 220, 170, 0.18);
+  height: 32px;                 /* matches .theme-toggle / .logout-btn */
+  max-width: 200px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c4b49e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+.navbar-clinic-switch:hover {
+  color: #f2e8d8;
+  border-color: rgba(255, 220, 170, 0.38);
+  background-color: var(--bg-3);
+}
+.navbar-clinic-switch:focus-visible {
+  outline: 2px solid rgba(255, 220, 170, 0.45);
+  outline-offset: 1px;
+}
+/* The dropdown list itself is painted by the OS, not the page — without an
+   explicit background it inherits the light default and renders unreadable
+   dark-on-dark in the dark theme. */
+.navbar-clinic-switch option {
+  background: var(--bg-2, #1a1410);
+  color: var(--text-1, #f2e8d8);
+}
+html.light .navbar-clinic-switch {
+  color: #c8b8a2;
+  border-color: rgba(200, 185, 165, 0.28);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23c8b8a2' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+html.light .navbar-clinic-switch:hover {
+  color: #ddd0be;
+  border-color: rgba(200, 185, 165, 0.48);
+  background-color: rgba(200, 185, 165, 0.10);
+}
+html.light .navbar-clinic-switch option {
+  background: #ffffff;
+  color: #2e1e0c;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main Layout                                                         */
 /* ------------------------------------------------------------------ */
@@ -7898,6 +7958,13 @@ html.light .skeleton::after {
   .navbar-settings-link {
     display: none;
   }
+  /* The switcher is NOT hidden: it is the only control that changes which
+     clinic you are working in, so it has to survive the narrowest layout. */
+  .navbar-clinic-switch {
+    max-width: 128px;
+    font-size: 12px;
+    padding-left: 8px;
+  }
   /* Tighten gaps in controls */
   .navbar-controls {
     gap: 6px;
@@ -8519,6 +8586,10 @@ html.light .skeleton::after {
     min-height: 44px;
     display: flex;
     align-items: center;
+  }
+  .navbar-clinic-switch {
+    min-height: 44px;
+    height: 44px;
   }
 
   /* Patient rows */

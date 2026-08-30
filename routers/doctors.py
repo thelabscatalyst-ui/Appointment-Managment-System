@@ -15,9 +15,10 @@ from database.models import (
     Visit, VisitStatus, ReferralSource,
 )
 from config import settings
+from services.clinic_context import scope_to_active_clinic
 from services.auth_service import (
     get_current_doctor, get_paying_doctor,
-    require_pin, require_pin_auth,
+    require_pin, require_pin_auth, require_clinic_owner_context,
     create_pin_token, decode_pin_token,
     hash_password, verify_password,
 )
@@ -55,12 +56,18 @@ def dashboard(
 ):
     today = date.today()
 
+    # Clinic-scoped like the money below it. Filtering on doctor_id alone put
+    # the doctor's own-practice appointments on the dashboard of the clinic
+    # they were merely doing a shift at.
     all_today = (
-        db.query(Appointment)
-        .options(joinedload(Appointment.patient))   # eager-load — avoids N+1
-        .filter(
-            Appointment.doctor_id   == doctor.id,
-            Appointment.appointment_date == today,
+        scope_to_active_clinic(
+            db.query(Appointment)
+            .options(joinedload(Appointment.patient))   # eager-load — avoids N+1
+            .filter(
+                Appointment.doctor_id   == doctor.id,
+                Appointment.appointment_date == today,
+            ),
+            Appointment, request,
         )
         .order_by(Appointment.appointment_time)
         .all()
@@ -129,8 +136,13 @@ def dashboard(
     )
     is_clinic_owner = own_membership is not None
 
-    primary_clinic = None
-    if own_membership:
+    # The card names the clinic being WORKED IN, not the one owned. It read the
+    # owned clinic unconditionally, so a doctor doing a shift elsewhere saw
+    # their own practice's name on the host clinic's dashboard.
+    primary_clinic = getattr(request.state, "active_clinic", None)
+    if primary_clinic is not None:
+        pass
+    elif own_membership:
         primary_clinic = db.query(ClinicModel).filter(ClinicModel.id == own_membership.clinic_id).first()
     else:
         assoc = db.query(ClinicDoctor).filter(
@@ -189,12 +201,15 @@ def dashboard(
     # ── Pending dues ───────────────────────────────────────────────── #
     # 1) Visits that are BILLING_PENDING — seen but no bill collected yet
     _pending_visits = (
-        db.query(Visit)
-        .options(joinedload(Visit.patient))   # eager-load — avoids N+1
-        .filter(
-            Visit.doctor_id == doctor.id,
-            Visit.visit_date == today,
-            Visit.status     == VisitStatus.billing_pending,
+        scope_to_active_clinic(
+            db.query(Visit)
+            .options(joinedload(Visit.patient))   # eager-load — avoids N+1
+            .filter(
+                Visit.doctor_id == doctor.id,
+                Visit.visit_date == today,
+                Visit.status     == VisitStatus.billing_pending,
+            ),
+            Visit, request,
         )
         .all()
     )
@@ -264,8 +279,12 @@ def settings_page(
     days_data = []
     for i, name in enumerate(DAYS):
         rows = (
-            db.query(DoctorSchedule)
-            .filter(DoctorSchedule.doctor_id == doctor.id, DoctorSchedule.day_of_week == i)
+            scope_to_active_clinic(
+                db.query(DoctorSchedule)
+                .filter(DoctorSchedule.doctor_id == doctor.id,
+                        DoctorSchedule.day_of_week == i),
+                DoctorSchedule, request,
+            )
             .order_by(DoctorSchedule.start_time)
             .all()
         )
@@ -423,17 +442,34 @@ async def save_schedule(
     # morning clinic's schedule. Live data loss for any two-clinic doctor.
     _sched_clinic_id = getattr(request.state, "active_clinic_id", None)
 
+    # Which days a doctor works is a property of the doctor, not of a clinic —
+    # a Sunday off is a Sunday off everywhere. The hours *within* a working day
+    # differ per clinic (mornings at your own practice, evenings elsewhere).
+    #
+    # Hence the asymmetry below: turning a day OFF deletes it at every clinic,
+    # turning it ON writes shifts for the active clinic only.
+    from services.clinic_context import active_memberships
+    _all_clinic_ids = [m.clinic_id for m in active_memberships(db, doctor.id)]
+
     for i in range(7):
-        # Delete existing schedules for this day AT THIS CLINIC (clean slate)
+        _day_off = form.get(f"active_{i}") != "on"
+
         _del = db.query(DoctorSchedule).filter(
             DoctorSchedule.doctor_id == doctor.id,
             DoctorSchedule.day_of_week == i,
         )
-        if _sched_clinic_id is not None:
+        if _day_off:
+            # Shared: clear this weekday everywhere. Restricting the delete to
+            # the active clinic would leave the doctor still on the roster at
+            # the other one on a day they marked as off.
+            if _all_clinic_ids:
+                _del = _del.filter(DoctorSchedule.clinic_id.in_(_all_clinic_ids))
+        elif _sched_clinic_id is not None:
+            # Per-clinic: only this clinic's shifts are being replaced.
             _del = _del.filter(DoctorSchedule.clinic_id == _sched_clinic_id)
         _del.delete(synchronize_session=False)
 
-        if form.get(f"active_{i}") != "on":
+        if _day_off:
             continue   # day is off — leave deleted
 
         slot_dur    = int(form.get(f"slot_{i}",   15))
@@ -521,7 +557,7 @@ def save_profile(
     city: str = Form(""),
     clinic_address: str = Form(""),
     languages: str = Form(""),
-    doctor: Doctor = Depends(require_pin),
+    doctor: Doctor = Depends(require_clinic_owner_context),
     db: Session = Depends(get_db),
 ):
     doctor.clinic_name = clinic_name.strip() or None
@@ -673,12 +709,15 @@ def calendar_view(
 
     # Appointments for this month (non-cancelled)
     month_appts = (
-        db.query(Appointment)
-        .filter(
-            Appointment.doctor_id == doctor.id,
-            Appointment.appointment_date >= first_day,
-            Appointment.appointment_date <= last_day,
-            Appointment.status != AppointmentStatus.cancelled,
+        scope_to_active_clinic(
+            db.query(Appointment)
+            .filter(
+                Appointment.doctor_id == doctor.id,
+                Appointment.appointment_date >= first_day,
+                Appointment.appointment_date <= last_day,
+                Appointment.status != AppointmentStatus.cancelled,
+            ),
+            Appointment, request,
         )
         .all()
     )
@@ -746,12 +785,19 @@ def calendar_view(
 @router.get("/reports", response_class=HTMLResponse)
 def reports_page(
     request: Request,
-    doctor: Doctor = Depends(require_pin),
+    doctor: Doctor = Depends(require_clinic_owner_context),
     db: Session = Depends(get_db),
 ):
     import json
     from datetime import timedelta
     today = date.today()
+
+    # Every figure on this page belongs to one clinic. An owner who runs two
+    # practices was seeing one blended set of totals; unpacked into each
+    # .filter() below so the aggregate shapes stay untouched.
+    _rc = getattr(request.state, "active_clinic_id", None)
+    _scope_appt  = [Appointment.clinic_id == _rc] if _rc else []
+    _scope_visit = [Visit.clinic_id == _rc] if _rc else []
 
     # ---- This week vs last week ----
     start_of_week      = today - timedelta(days=today.weekday())
@@ -760,6 +806,7 @@ def reports_page(
 
     this_week = db.query(func.count(Appointment.id)).filter(
         Appointment.doctor_id == doctor.id,
+        *_scope_appt,
         Appointment.appointment_date >= start_of_week,
         Appointment.appointment_date <= today,
         Appointment.status != AppointmentStatus.cancelled,
@@ -767,6 +814,7 @@ def reports_page(
 
     last_week = db.query(func.count(Appointment.id)).filter(
         Appointment.doctor_id == doctor.id,
+        *_scope_appt,
         Appointment.appointment_date >= start_of_last_week,
         Appointment.appointment_date <= end_of_last_week,
         Appointment.status != AppointmentStatus.cancelled,
@@ -778,6 +826,7 @@ def reports_page(
         func.count(case((Appointment.status == AppointmentStatus.no_show,   1))).label("no_show"),
     ).filter(
         Appointment.doctor_id == doctor.id,
+        *_scope_appt,
         Appointment.status.in_([
             AppointmentStatus.completed,
             AppointmentStatus.no_show,
@@ -798,6 +847,7 @@ def reports_page(
             db.query(Visit.check_in_time, Visit.call_time)
             .filter(
                 Visit.doctor_id == doctor.id,
+                *_scope_visit,
                 Visit.visit_date >= visit_date_from,
                 Visit.visit_date <  visit_date_to,
                 Visit.check_in_time.isnot(None),
@@ -842,6 +892,7 @@ def reports_page(
         db.query(Visit.check_in_time)
         .filter(
             Visit.doctor_id == doctor.id,
+            *_scope_visit,
             Visit.check_in_time.isnot(None),
             Visit.visit_date >= heatmap_from,
         )
@@ -874,6 +925,7 @@ def reports_page(
         .join(Appointment, Patient.id == Appointment.patient_id)
         .filter(
             Appointment.doctor_id == doctor.id,
+            *_scope_appt,
             Appointment.status != AppointmentStatus.cancelled,
         )
         .group_by(Patient.id)
@@ -887,6 +939,7 @@ def reports_page(
         db.query(Appointment.appointment_type, func.count(Appointment.id).label("cnt"))
         .filter(
             Appointment.doctor_id == doctor.id,
+            *_scope_appt,
             Appointment.status != AppointmentStatus.cancelled,
         )
         .group_by(Appointment.appointment_type)

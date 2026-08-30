@@ -208,6 +208,18 @@ class PinRequired(Exception):
         super().__init__("PIN required")
 
 
+class OwnerOnly(Exception):
+    """Raised when an associate reaches a route that belongs to clinic owners.
+
+    Money, reports and clinic configuration are the owner's, not the visiting
+    doctor's. Hiding the nav links is presentation; this is the actual gate,
+    because a bookmark or a typed URL bypasses the template entirely.
+    """
+    def __init__(self, return_url: str = "/dashboard"):
+        self.return_url = return_url
+        super().__init__("Clinic owner only")
+
+
 PIN_SESSION_MINUTES = 30
 
 
@@ -325,6 +337,23 @@ def require_pin(request: Request, doctor=Depends(get_paying_doctor)):
     return doctor
 
 
+def require_clinic_owner_context(request: Request, doctor=Depends(require_pin)):
+    """Owner-only, PIN-protected, plan-gated.
+
+    Layered on require_pin rather than get_paying_doctor so these routes keep
+    the PIN overlay they have always had; the role check is an extra gate, not
+    a replacement.
+
+    Fails closed via is_owner_context: a route that never resolved a clinic
+    reads role None, which is not owner.
+    """
+    from services.clinic_context import is_owner_context
+
+    if not is_owner_context(request):
+        raise OwnerOnly()
+    return doctor
+
+
 def require_pin_auth(request: Request, doctor=Depends(get_current_doctor)):
     """PIN-protected billing routes (no plan gate).
     Same GET/POST split as require_pin.
@@ -439,10 +468,20 @@ def get_clinic_owner(request: Request, db: Session = Depends(get_db)):
     The old version accepted a deactivated owner membership, and let a clinic
     that had stopped paying keep Clinic Admin indefinitely.
     """
-    from services.clinic_context import owned_clinic
+    from services.clinic_context import owned_clinic, resolve_active_clinic, ROLE_ASSOCIATE
     doctor = get_current_doctor(request, db)
     clinic = owned_clinic(db, doctor.id, require_paid=True)
     if not clinic:
         raise HTTPException(status_code=403, detail="Clinic plan required")
+
+    # Refuse while the doctor is working in someone else's clinic. They do own
+    # a clinic, so this is not an authorisation failure — but administering
+    # clinic A from inside clinic B's workspace is exactly the merged-context
+    # confusion the switcher is meant to remove. The nav link is hidden here
+    # too; this covers the bookmark.
+    _active, _membership = resolve_active_clinic(request, doctor, db)
+    if _membership is not None and _membership.role == ROLE_ASSOCIATE:
+        raise OwnerOnly()
+
     request.state.clinic = clinic
     return doctor

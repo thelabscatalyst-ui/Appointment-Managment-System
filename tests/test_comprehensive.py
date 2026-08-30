@@ -42,6 +42,7 @@ from database.models import (
     Doctor, Patient, Appointment, AppointmentStatus, AppointmentType,
     BookedBy, DoctorSchedule, BlockedDate, Visit, VisitStatus,
     Bill, BillItem, PaymentMode, PriceCatalog, PlanType,
+    Clinic, ClinicDoctor,
 )
 from services.appointment_service import get_available_slots, get_or_create_patient
 import services.visit_service as vs
@@ -3588,3 +3589,359 @@ class TestEmailPlainTextAlternative:
         link_host = public_base_url().split("://")[-1].split("/")[0]
         assert link_host.endswith(sender_domain), (
             f"links point at {link_host} but mail is sent from {sender_domain}")
+
+
+# ─────────────────────────────────────────────────────────────────────────── #
+#  Multi-clinic: the owner window and the associate window are separate        #
+# ─────────────────────────────────────────────────────────────────────────── #
+
+def _dual_clinic_doctor(client, email, *, own_clinic="Own Practice",
+                        host_clinic="Host Clinic", slug=None):
+    """A doctor who owns one clinic and is an associate at another.
+
+    Returns (doctor_id, own_clinic_id, host_clinic_id). This is the shape that
+    broke: every query filtered on doctor_id alone, so both clinics' data came
+    back as one merged list no matter which one was selected.
+    """
+    register(client, email=email, account_type="clinic", clinic_name=own_clinic)
+    db = TestSession()
+    try:
+        doc = db.query(Doctor).filter(Doctor.email == email).first()
+        own = db.query(Clinic).filter(Clinic.owner_doctor_id == doc.id).first()
+        # plan_expires_at is required: without it clinic_plan_active() is False
+        # and get_paying_doctor raises PlanExpired(reason="clinic"), so the
+        # associate is bounced to /plan-lapsed before any role check runs — the
+        # test would then pass for entirely the wrong reason.
+        host = Clinic(name=host_clinic, slug=slug or f"host-{doc.id}",
+                      plan_type="clinic", max_doctors=5, owner_doctor_id=None,
+                      plan_expires_at=datetime.utcnow() + timedelta(days=30))
+        db.add(host); db.commit(); db.refresh(host)
+        db.add(ClinicDoctor(clinic_id=host.id, doctor_id=doc.id,
+                            role="associate", is_active=True))
+        db.commit()
+        return doc.id, own.id, host.id
+    finally:
+        db.close()
+
+
+def _appt_at(doctor_id, clinic_id, patient_name, phone, when=None):
+    """One appointment for a doctor, stamped to a specific clinic."""
+    db = TestSession()
+    try:
+        pat = Patient(doctor_id=doctor_id, clinic_id=clinic_id,
+                      name=patient_name, phone=phone)
+        db.add(pat); db.commit(); db.refresh(pat)
+        appt = Appointment(
+            doctor_id=doctor_id, patient_id=pat.id, clinic_id=clinic_id,
+            appointment_date=when or date.today(), appointment_time=time(10, 0),
+            duration_mins=15, status=AppointmentStatus.scheduled,
+        )
+        db.add(appt); db.commit(); db.refresh(appt)
+        return appt.id
+    finally:
+        db.close()
+
+
+def _switch_to(client, clinic_id):
+    """Select a clinic the way the navbar switcher does."""
+    return client.post("/clinic/switch",
+                       data={"clinic_id": clinic_id, "next": "/dashboard"},
+                       follow_redirects=False)
+
+
+class TestClinicWindowSeparation:
+    """Toggling the switcher must switch the whole workspace, not just money.
+
+    Bills and expenses were already clinic-scoped; appointments, visits,
+    schedules and the calendar were not. So switching clinics changed the
+    income figures while the appointment list stayed merged.
+    """
+
+    def test_appointment_list_shows_only_the_active_clinic(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sep-appts@test.com", slug="sep-appts-host")
+        _appt_at(doc_id, own_id, "Own Practice Patient", "9811100001")
+        _appt_at(doc_id, host_id, "Host Clinic Patient", "9811100002")
+
+        auth_cookie(client, "sep-appts@test.com")
+
+        _switch_to(client, own_id)
+        body = client.get("/appointments").text
+        assert "Own Practice Patient" in body
+        assert "Host Clinic Patient" not in body, (
+            "the other clinic's appointment leaked into this one's list")
+
+        _switch_to(client, host_id)
+        body = client.get("/appointments").text
+        assert "Host Clinic Patient" in body
+        assert "Own Practice Patient" not in body, (
+            "own-practice appointments must not appear at the host clinic")
+
+    def test_dashboard_and_calendar_follow_the_switch(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sep-dash@test.com", slug="sep-dash-host")
+        _appt_at(doc_id, own_id, "Dash Own", "9811100011")
+        _appt_at(doc_id, host_id, "Dash Host", "9811100012")
+
+        auth_cookie(client, "sep-dash@test.com")
+
+        _switch_to(client, own_id)
+        assert "Dash Host" not in client.get("/dashboard").text
+        assert "Dash Host" not in client.get("/calendar").text
+
+        _switch_to(client, host_id)
+        assert "Dash Own" not in client.get("/dashboard").text
+        assert "Dash Own" not in client.get("/calendar").text
+
+    def test_new_appointments_are_stamped_with_the_active_clinic(self, client):
+        """A row created with clinic_id NULL is invisible to every scoped read.
+
+        Scoping the reads without stamping the writes would make a newly
+        booked appointment vanish the moment it was saved.
+        """
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sep-create@test.com", slug="sep-create-host")
+        auth_cookie(client, "sep-create@test.com")
+        _switch_to(client, host_id)
+
+        client.post("/appointments/walkin", data={
+            "patient_name": "Walkin At Host", "patient_phone": "9811100021",
+            "patient_age": "40", "patient_gender": "male",
+        }, follow_redirects=False)
+
+        db = TestSession()
+        try:
+            appt = (db.query(Appointment).join(Patient)
+                      .filter(Patient.phone == "9811100021").first())
+            assert appt is not None, "walk-in was not created"
+            assert appt.clinic_id == host_id, (
+                f"walk-in booked at clinic {host_id} was stamped "
+                f"{appt.clinic_id} — it would be invisible after the next switch")
+        finally:
+            db.close()
+
+
+class TestAssociateCannotReachOwnerPages:
+    """Money, reports and clinic config belong to the clinic owner.
+
+    Hiding the nav links is presentation; these assert the server-side gate,
+    which is what a bookmark or a typed URL actually hits.
+    """
+
+    OWNER_ONLY = ["/income", "/income/transactions", "/expenses", "/reports"]
+
+    def test_blocked_in_associate_context(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "gate-assoc@test.com", slug="gate-assoc-host")
+        auth_cookie(client, "gate-assoc@test.com")
+        _switch_to(client, host_id)
+
+        for path in self.OWNER_ONLY:
+            r = client.get(path, follow_redirects=False)
+            assert r.status_code in (302, 303), (
+                f"{path} returned {r.status_code} to an associate — expected a redirect")
+            assert "denied=owner_only" in r.headers.get("location", ""), (
+                f"{path} redirected without explaining why")
+
+    def test_allowed_in_owner_context(self, client):
+        """The same doctor, same session — only the selected clinic differs."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "gate-owner@test.com", slug="gate-owner-host")
+        auth_cookie(client, "gate-owner@test.com")
+        _switch_to(client, own_id)
+
+        for path in self.OWNER_ONLY:
+            r = client.get(path, follow_redirects=False)
+            assert r.status_code == 200, (
+                f"{path} returned {r.status_code} to the clinic owner")
+
+    def test_owner_only_nav_is_hidden_in_associate_context(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "gate-nav@test.com", slug="gate-nav-host")
+        auth_cookie(client, "gate-nav@test.com")
+
+        _switch_to(client, own_id)
+        assert 'href="/reports"' in client.get("/dashboard").text
+
+        _switch_to(client, host_id)
+        body = client.get("/dashboard").text
+        for href in ('href="/reports"', 'href="/income"', 'href="/expenses"'):
+            assert href not in body, f"{href} still rendered in associate mode"
+        # Settings is the exception: it is the only route to the Working Hours
+        # card, which is the associate's own availability at this clinic.
+        assert 'href="/doctors/settings"' in body
+
+    def test_settings_hides_clinic_config_but_keeps_working_hours(self, client):
+        """An associate still needs to set their own availability."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "gate-settings@test.com", slug="gate-settings-host")
+        auth_cookie(client, "gate-settings@test.com")
+        _switch_to(client, host_id)
+
+        r = client.get("/doctors/settings")
+        assert r.status_code == 200
+        assert "Working Hours" in r.text
+        for owner_card in ("Clinic Profile", "Price Catalog", "Patient Booking Link"):
+            assert owner_card not in r.text, (
+                f"{owner_card} is the clinic's, not the associate's")
+
+
+class TestScheduleIsPerClinicButDaysAreShared:
+    """Hours differ per clinic; which days you work does not.
+
+    A doctor cannot be at two clinics at once, so a day marked off has to be
+    off everywhere — but the times within a working day are exactly what
+    differs between a morning practice and an evening shift.
+    """
+
+    @staticmethod
+    def _save_day(client, day_index, start, end):
+        data = {"avg_consult_mins": "10", f"active_{day_index}": "on",
+                f"slot_{day_index}": "15", f"max_{day_index}": "30",
+                f"walkin_buf_{day_index}": "0",
+                f"shift_start_{day_index}_0": start,
+                f"shift_end_{day_index}_0": end}
+        return client.post("/doctors/settings/schedule", data=data,
+                           follow_redirects=False)
+
+    def test_hours_are_kept_separate_per_clinic(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sched-sep@test.com", slug="sched-sep-host")
+        auth_cookie(client, "sched-sep@test.com")
+
+        _switch_to(client, own_id)
+        self._save_day(client, 0, "09:00", "12:00")
+        _switch_to(client, host_id)
+        self._save_day(client, 0, "17:00", "20:00")
+
+        db = TestSession()
+        try:
+            rows = db.query(DoctorSchedule).filter(
+                DoctorSchedule.doctor_id == doc_id,
+                DoctorSchedule.day_of_week == 0).all()
+            by_clinic = {r.clinic_id: (r.start_time, r.end_time) for r in rows}
+            assert by_clinic.get(own_id) == (time(9, 0), time(12, 0)), (
+                f"own-practice morning hours lost: {by_clinic}")
+            assert by_clinic.get(host_id) == (time(17, 0), time(20, 0)), (
+                f"host-clinic evening hours lost: {by_clinic}")
+        finally:
+            db.close()
+
+    def test_settings_shows_only_the_active_clinics_hours(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sched-view@test.com", slug="sched-view-host")
+        auth_cookie(client, "sched-view@test.com")
+
+        _switch_to(client, own_id)
+        self._save_day(client, 0, "09:00", "12:00")
+        _switch_to(client, host_id)
+        self._save_day(client, 0, "17:00", "20:00")
+
+        _switch_to(client, own_id)
+        body = client.get("/doctors/settings").text
+        assert 'value="09:00"' in body
+        assert 'value="17:00"' not in body, (
+            "the other clinic's shift is showing on this clinic's settings page")
+
+    def test_turning_a_day_off_applies_to_every_clinic(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sched-dayoff@test.com", slug="sched-dayoff-host")
+        auth_cookie(client, "sched-dayoff@test.com")
+
+        _switch_to(client, own_id)
+        self._save_day(client, 0, "09:00", "12:00")
+        _switch_to(client, host_id)
+        self._save_day(client, 0, "17:00", "20:00")
+
+        # Monday off, submitted while working at the host clinic.
+        _switch_to(client, host_id)
+        client.post("/doctors/settings/schedule",
+                    data={"avg_consult_mins": "10"}, follow_redirects=False)
+
+        db = TestSession()
+        try:
+            remaining = db.query(DoctorSchedule).filter(
+                DoctorSchedule.doctor_id == doc_id,
+                DoctorSchedule.day_of_week == 0).all()
+            assert remaining == [], (
+                "a day marked off must clear at every clinic, not just the "
+                f"active one — still rostered at {[r.clinic_id for r in remaining]}")
+        finally:
+            db.close()
+
+
+class TestOwnerAppointmentsAreNotReachableByAssociates:
+    """An associate must not be able to act as, or read, the owner's list."""
+
+    def test_associate_cannot_view_the_owners_appointments(self, client):
+        register(client, email="owner-appt@test.com", account_type="clinic",
+                 clinic_name="Shared Clinic")
+        db = TestSession()
+        try:
+            owner = db.query(Doctor).filter(Doctor.email == "owner-appt@test.com").first()
+            clinic = db.query(Clinic).filter(Clinic.owner_doctor_id == owner.id).first()
+            owner_id, clinic_id = owner.id, clinic.id
+        finally:
+            db.close()
+
+        register(client, email="assoc-appt@test.com", account_type="solo",
+                 clinic_name="Assoc Own")
+        db = TestSession()
+        try:
+            assoc = db.query(Doctor).filter(Doctor.email == "assoc-appt@test.com").first()
+            db.add(ClinicDoctor(clinic_id=clinic_id, doctor_id=assoc.id,
+                                role="associate", is_active=True))
+            db.commit()
+        finally:
+            db.close()
+
+        _appt_at(owner_id, clinic_id, "Owners Private Patient", "9811100031")
+
+        auth_cookie(client, "assoc-appt@test.com")
+        _switch_to(client, clinic_id)
+
+        body = client.get("/appointments").text
+        assert "Owners Private Patient" not in body
+
+        # ?doctor_id= is the owner's doctor-selector. An associate passing the
+        # owner's id must not be able to act as them.
+        body = client.get(f"/appointments?doctor_id={owner_id}").text
+        assert "Owners Private Patient" not in body, (
+            "an associate impersonated the clinic owner via ?doctor_id")
+
+    def test_clinic_admin_is_refused_while_working_elsewhere(self, client):
+        """Owning a clinic is not enough — you must be inside it.
+
+        is_clinic_owner is a global "owns some clinic" flag, so the Clinic
+        Admin link and route stayed live while the doctor was toggled into a
+        clinic they only visit.
+        """
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "gate-admin@test.com", slug="gate-admin-host")
+        auth_cookie(client, "gate-admin@test.com")
+
+        _switch_to(client, own_id)
+        assert 'href="/clinic/admin"' in client.get("/dashboard").text
+
+        _switch_to(client, host_id)
+        assert 'href="/clinic/admin"' not in client.get("/dashboard").text
+        r = client.get("/clinic/admin", follow_redirects=False)
+        assert r.status_code in (302, 303), (
+            f"/clinic/admin returned {r.status_code} from an associate context")
+
+    def test_clinic_card_names_the_clinic_being_worked_in(self, client):
+        """The dashboard header card read the OWNED clinic unconditionally."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "gate-card@test.com", slug="gate-card-host",
+            own_clinic="My Own Practice", host_clinic="Sunrise Multispeciality")
+        auth_cookie(client, "gate-card@test.com")
+
+        _switch_to(client, host_id)
+        body = client.get("/dashboard").text
+        # The switcher legitimately lists every clinic, so exclude it before
+        # asserting on what the page itself claims.
+        import re as _re
+        page = _re.sub(r"(?s)<select.*?</select>", "", body)
+        assert "Sunrise Multispeciality" in page
+        assert "My Own Practice" not in page, (
+            "the owned clinic's name is still on the host clinic's dashboard")

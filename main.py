@@ -23,7 +23,7 @@ from database.connection import create_tables
 from routers import auth, appointments, doctors, patients, public, admin, clinic, visits, billing_ops, income, prescriptions, feedback
 from services.scheduler_service import start_scheduler, stop_scheduler
 from services.auth_service import (
-    PlanExpired, PinRequired, EmailNotVerified, decode_token, create_access_token, should_renew,
+    PlanExpired, PinRequired, OwnerOnly, EmailNotVerified, decode_token, create_access_token, should_renew,
 )
 from routers.clinic import ClinicAdminAuthRequired
 from config import settings
@@ -183,6 +183,10 @@ async def inject_clinic_owner_state(request: Request, call_next):
     request.state.clinic_memberships = []
     request.state.active_clinic = None
     request.state.active_clinic_id = None
+    # Defaulted here so templates on routes that never resolve a clinic (those
+    # using get_current_doctor alone) read None instead of raising. None is not
+    # 'owner', so the owner-only nav stays hidden — fail closed.
+    request.state.active_role = None
     # Support contact, read by templates that offer a human fallback
     # (verify_email.html, plan_lapsed.html). Set here rather than threaded
     # through every route context — same pattern as is_clinic_owner.
@@ -412,6 +416,16 @@ async def plan_expired_handler(request: Request, exc: PlanExpired):
 @app.get("/plan-lapsed")
 async def plan_lapsed_page(request: Request):
     return templates.TemplateResponse(request, "plan_lapsed.html", {})
+
+
+@app.exception_handler(OwnerOnly)
+async def owner_only_handler(request: Request, exc: OwnerOnly):
+    """An associate reached an owner-only route. Send them home with a reason.
+
+    303 for every method: these are whole pages, and a GET that 307'd would
+    re-issue the blocked request at the new URL.
+    """
+    return RedirectResponse(url=f"{exc.return_url}?denied=owner_only", status_code=303)
 
 
 @app.exception_handler(PinRequired)

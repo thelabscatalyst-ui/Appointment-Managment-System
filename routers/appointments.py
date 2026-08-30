@@ -12,6 +12,7 @@ from database.models import (
     Prescription,
 )
 from services.auth_service import get_paying_doctor, get_appt_doctor
+from services.clinic_context import scope_to_active_clinic
 from services.appointment_service import (
     get_available_slots, is_slot_available, is_slot_available_for_edit,
     get_or_create_patient, has_open_appointment_on_date,
@@ -110,8 +111,8 @@ def appointments_list(
     except ValueError:
         view_date = today
 
-    clinic_doctors = _get_owner_clinic_doctors(doctor, db)
-    viewing_doctor = _resolve_target_doctor(doctor_id, doctor, db)
+    clinic_doctors = _get_owner_clinic_doctors(doctor, db, request)
+    viewing_doctor = _resolve_target_doctor(doctor_id, doctor, db, request)
 
     # Done statuses sink to the bottom; within each group newest-created first
     done_last = sa_case(
@@ -121,14 +122,18 @@ def appointments_list(
         else_=0,
     )
 
-    appt_query = (
+    # Scoped to the clinic being worked in, not just the doctor. Without this
+    # a doctor who owns a practice and also does shifts elsewhere saw both
+    # clinics' appointments in one list, and switching clinics changed nothing.
+    appt_query = scope_to_active_clinic(
         db.query(Appointment)
         .join(Appointment.patient)
         .options(joinedload(Appointment.patient))   # eager-load — avoids N+1
         .filter(
             Appointment.doctor_id == viewing_doctor.id,
             Appointment.appointment_date == view_date,
-        )
+        ),
+        Appointment, request,
     )
     if q.strip():
         appt_query = appt_query.filter(
@@ -145,11 +150,11 @@ def appointments_list(
     walkin_available = False
     if view_date == today:
         _dow = today.weekday()
-        _scheds = db.query(DoctorSchedule).filter(
+        _scheds = scope_to_active_clinic(db.query(DoctorSchedule).filter(
             DoctorSchedule.doctor_id == viewing_doctor.id,
             DoctorSchedule.day_of_week == _dow,
             DoctorSchedule.is_active == True,
-        ).all()
+        ), DoctorSchedule, request).all()
         walkin_available = bool(_scheds)
 
     # ── Queue data (today only) ───────────────────────────────────────
@@ -162,9 +167,12 @@ def appointments_list(
 
     if view_date == today:
         day_visits = (
-            db.query(Visit)
-            .options(joinedload(Visit.patient))   # eager-load — avoids N+1
-            .filter(Visit.doctor_id == viewing_doctor.id, Visit.visit_date == today)
+            scope_to_active_clinic(
+                db.query(Visit)
+                .options(joinedload(Visit.patient))   # eager-load — avoids N+1
+                .filter(Visit.doctor_id == viewing_doctor.id, Visit.visit_date == today),
+                Visit, request,
+            )
             .order_by(Visit.is_emergency.desc(), Visit.queue_position.asc())
             .all()
         )
@@ -263,12 +271,13 @@ def appointments_list(
 
 @router.get("/slots")
 def available_slots(
+    request: Request,
     date_str: str = Query(..., alias="date"),
     for_doctor_id: int = Query(default=0),
     doctor: Doctor = Depends(get_paying_doctor),
     db: Session = Depends(get_db),
 ):
-    target = _resolve_target_doctor(for_doctor_id, doctor, db)
+    target = _resolve_target_doctor(for_doctor_id, doctor, db, request)
     try:
         appt_date = date.fromisoformat(date_str)
     except ValueError:
@@ -295,7 +304,7 @@ def new_appointment_page(
     except ValueError:
         initial_date = today
 
-    clinic_doctors = _get_owner_clinic_doctors(doctor, db)
+    clinic_doctors = _get_owner_clinic_doctors(doctor, db, request)
 
     # Pre-fill from patient if patient_id provided
     form_data = {}
@@ -359,9 +368,9 @@ async def create_appointment(
     doctor: Doctor = Depends(get_paying_doctor),
     db: Session = Depends(get_db),
 ):
-    target = _resolve_target_doctor(for_doctor_id, doctor, db)
+    target = _resolve_target_doctor(for_doctor_id, doctor, db, request)
     today = date.today()
-    clinic_doctors = _get_owner_clinic_doctors(doctor, db)
+    clinic_doctors = _get_owner_clinic_doctors(doctor, db, request)
     form_data = {
         "patient_name": patient_name,
         "patient_phone": patient_phone,
@@ -446,6 +455,7 @@ async def create_appointment(
     appt = Appointment(
         doctor_id=target.id,
         patient_id=patient.id,
+        clinic_id=_active_clinic_id(request),
         appointment_date=appt_date_obj,
         appointment_time=appt_time_obj,
         duration_mins=duration,
@@ -482,12 +492,13 @@ async def create_appointment(
 
 @router.get("/patient-lookup")
 def patient_phone_lookup(
+    request: Request,
     phone: str = Query(...),
     for_doctor_id: int = Query(default=0),
     doctor: Doctor = Depends(get_paying_doctor),
     db: Session = Depends(get_db),
 ):
-    target = _resolve_target_doctor(for_doctor_id, doctor, db)
+    target = _resolve_target_doctor(for_doctor_id, doctor, db, request)
     phone = phone.strip()
     if not phone.isdigit() or len(phone) != 10:
         return JSONResponse({"found": False})
@@ -525,7 +536,7 @@ async def create_walkin(
     doctor: Doctor = Depends(get_paying_doctor),
     db: Session = Depends(get_db),
 ):
-    target = _resolve_target_doctor(for_doctor_id, doctor, db)
+    target = _resolve_target_doctor(for_doctor_id, doctor, db, request)
     name  = patient_name.strip()
     phone = patient_phone.strip()
     emergency = is_emergency == "on"
@@ -556,6 +567,7 @@ async def create_walkin(
     appt = Appointment(
         doctor_id=target.id,
         patient_id=patient.id,
+        clinic_id=_active_clinic_id(request),
         appointment_date=appt_date,
         appointment_time=appt_time,
         duration_mins=15,
@@ -835,6 +847,7 @@ async def save_follow_up(
             new_appt = Appointment(
                 doctor_id        = doctor.id,
                 patient_id       = appt.patient_id,
+                clinic_id        = appt.clinic_id,
                 appointment_date = fu_date,
                 appointment_time = first_slot,
                 duration_mins    = duration,

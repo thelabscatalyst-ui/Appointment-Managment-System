@@ -124,7 +124,9 @@ def _create_owned_clinic(db: Session, doctor, slug: str, name: str,
         clinic_seats = PLAN_CONFIG["clinic"]["seats"]   # matches the paid Clinic tier
 
     clinic = Clinic(
-        name=clinic_name.strip() or f"{name}'s Clinic",
+        # name.strip(): a trailing space in the signup field produced
+        # "Rajesh Mehta 's Clinic" in the navbar switcher.
+        name=clinic_name.strip() or f"{name.strip()}'s Clinic",
         address=None,
         city=city.strip() or None,
         slug=clinic_slug,

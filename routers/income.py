@@ -32,7 +32,7 @@ from database.models import (
     PaymentMode,
     RecurringExpense,
 )
-from services.auth_service import get_paying_doctor, require_pin
+from services.auth_service import get_paying_doctor, require_pin, require_clinic_owner_context
 
 router    = APIRouter(tags=["income"])
 templates = Jinja2Templates(directory="templates")
@@ -147,7 +147,7 @@ def _expense_sum(doctor_id: int, start: date, end: date, db: Session,
 async def income_dashboard(
     request: Request,
     db:      Session = Depends(get_db),
-    doctor:  Doctor  = Depends(require_pin),
+    doctor:  Doctor  = Depends(require_clinic_owner_context),
 ):
     # Money is attributed to the clinic the work happened at.
     _acid_scope = getattr(request.state, "active_clinic_id", None)
@@ -414,7 +414,7 @@ async def transactions_page(
     page:    int = _Q(default=1),
     view:    str = _Q(default="monthly"),   # "monthly" | "yearly"
     db:      Session = Depends(get_db),
-    doctor:  Doctor  = Depends(require_pin),
+    doctor:  Doctor  = Depends(require_clinic_owner_context),
 ):
     # Money is attributed to the clinic the work happened at.
     _acid_scope = getattr(request.state, "active_clinic_id", None)
@@ -599,7 +599,7 @@ async def expenses_page(
     month:   int = 0,
     year:    int = 0,
     db:      Session = Depends(get_db),
-    doctor:  Doctor  = Depends(get_paying_doctor),
+    doctor:  Doctor  = Depends(require_clinic_owner_context),
 ):
     # Money is attributed to the clinic the work happened at.
     _acid_scope = getattr(request.state, "active_clinic_id", None)
@@ -687,7 +687,7 @@ async def expenses_page(
 async def add_expense(
     request: Request,
     db:      Session = Depends(get_db),
-    doctor:  Doctor  = Depends(get_paying_doctor),
+    doctor:  Doctor  = Depends(require_clinic_owner_context),
 ):
     form = await request.form()
 
@@ -733,7 +733,7 @@ async def delete_expense(
     expense_id: int,
     request:    Request,
     db:         Session = Depends(get_db),
-    doctor:     Doctor  = Depends(get_paying_doctor),
+    doctor:     Doctor  = Depends(require_clinic_owner_context),
 ):
     # Money is attributed to the clinic the work happened at.
     _acid_scope = getattr(request.state, "active_clinic_id", None)
@@ -763,7 +763,7 @@ async def delete_expense(
 async def add_recurring(
     request: Request,
     db:      Session = Depends(get_db),
-    doctor:  Doctor  = Depends(get_paying_doctor),
+    doctor:  Doctor  = Depends(require_clinic_owner_context),
 ):
     form = await request.form()
 
@@ -807,7 +807,7 @@ async def toggle_recurring(
     rule_id: int,
     request: Request,
     db:      Session = Depends(get_db),
-    doctor:  Doctor  = Depends(get_paying_doctor),
+    doctor:  Doctor  = Depends(require_clinic_owner_context),
 ):
     rule = db.query(RecurringExpense).filter(
         RecurringExpense.id        == rule_id,
@@ -828,7 +828,7 @@ async def delete_recurring(
     rule_id: int,
     request: Request,
     db:      Session = Depends(get_db),
-    doctor:  Doctor  = Depends(get_paying_doctor),
+    doctor:  Doctor  = Depends(require_clinic_owner_context),
 ):
     rule = db.query(RecurringExpense).filter(
         RecurringExpense.id        == rule_id,

@@ -412,9 +412,20 @@ async def book_appointment(
         appt_type = AppointmentType.new_patient
 
     # Create appointment
+    # This is the doctor's personal booking link, so the appointment belongs to
+    # the practice they own — not to a clinic they merely do shifts at.
+    from services.clinic_context import owned_clinic, active_memberships
+    _own = owned_clinic(db, doctor.id)
+    if _own is None:
+        _ms = active_memberships(db, doctor.id)
+        _own_id = _ms[0].clinic_id if _ms else None
+    else:
+        _own_id = _own.id
+
     appt = Appointment(
         doctor_id=doctor.id,
         patient_id=patient.id,
+        clinic_id=_own_id,
         appointment_date=appt_date_obj,
         appointment_time=appt_time_obj,
         duration_mins=15,

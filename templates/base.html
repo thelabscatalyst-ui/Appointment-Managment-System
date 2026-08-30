@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}MedTrack{% endblock %}</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=163" />
+  <link rel="stylesheet" href="/static/css/main.css?v=164" />
   {% block head %}{% endblock %}
   <script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');</script>
   <script src="/static/js/form-draft.js" defer></script>
@@ -29,23 +29,27 @@
       <!-- Clinic switcher — only when the doctor belongs to more than one
            clinic, so the single-clinic majority sees no change at all. -->
       {% if (request.state.membership_count or 0) > 1 and request.state.active_clinic %}
-      <form method="POST" action="/clinic/switch" style="display:inline-flex;align-items:center;margin-right:4px;">
+      <form method="POST" action="/clinic/switch" style="display:inline-flex;align-items:center;">
         <input type="hidden" name="next" value="{{ request.url.path }}">
-        <select name="clinic_id" onchange="this.form.submit()" class="navbar-settings-link"
-                style="background:transparent;border:1px solid rgba(255,220,170,.25);border-radius:6px;padding:4px 8px;font-size:12px;max-width:170px;">
+        <select name="clinic_id" onchange="this.form.submit()"
+                class="navbar-clinic-switch" aria-label="Switch clinic">
           {% for m in (request.state.clinic_memberships or []) %}
-          <option value="{{ m.clinic_id }}" {% if m.clinic_id == request.state.active_clinic_id %}selected{% endif %}>
-            {{ m.clinic_name }}{% if m.role != 'owner' %} (associate){% endif %}
-          </option>
+          <option value="{{ m.clinic_id }}" {% if m.clinic_id == request.state.active_clinic_id %}selected{% endif %}>{{ m.clinic_name }}{% if m.role != 'owner' %} · associate{% endif %}</option>
           {% endfor %}
         </select>
       </form>
       {% endif %}
-      <!-- Clinic Admin (clinic owners only) -->
-      {% if request.state.is_clinic_owner %}
+      <!-- Clinic Admin — owners only, AND only while working in a clinic they
+           own. is_clinic_owner alone is a global "owns some clinic" flag, so
+           it kept offering clinic administration to a doctor who was currently
+           an associate somewhere else. -->
+      {% if request.state.is_clinic_owner and request.state.active_role != 'associate' %}
       <a href="/clinic/admin" class="navbar-settings-link">Clinic Admin</a>
       {% endif %}
-      <!-- Settings -->
+      <!-- Settings stays visible in associate mode: it hosts the Working Hours
+           card, which is the associate's own availability at this clinic and
+           the one thing there they may edit. The clinic-owned cards inside
+           (profile, price catalog, booking link) are hidden by the template. -->
       <a href="/doctors/settings" class="navbar-settings-link">Settings</a>
       <!-- Theme toggle -->
       <button type="button" class="theme-toggle" id="themeToggle" title="Toggle theme" onclick="toggleTheme()">
@@ -159,6 +163,7 @@
       </svg>
       Calendar
     </a>
+    {% if request.state.active_role != 'associate' %}
     <a href="/income" class="mobile-nav-item {% if active == 'income' or active == 'reports' or active == 'expenses' %}mobile-nav-item--active{% endif %}" aria-label="More">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
@@ -167,6 +172,7 @@
       </svg>
       More
     </a>
+    {% endif %}
   </div>
 </nav>
 
@@ -221,6 +227,7 @@
       <span class="dock-tooltip">Calendar</span>
     </a>
 
+    {% if request.state.active_role != 'associate' %}
     <a href="/reports" class="dock-item {% if active == 'reports' %}dock-item--active{% endif %}">
       <div class="dock-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -230,7 +237,9 @@
       </div>
       <span class="dock-tooltip">Reports</span>
     </a>
+    {% endif %}
 
+    {% if request.state.active_role != 'associate' %}
     <a href="/income" class="dock-item {% if active == 'income' %}dock-item--active{% endif %}">
       <div class="dock-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -241,7 +250,9 @@
       </div>
       <span class="dock-tooltip">Income</span>
     </a>
+    {% endif %}
 
+    {% if request.state.active_role != 'associate' %}
     <a href="/expenses" class="dock-item {% if active == 'expenses' %}dock-item--active{% endif %}">
       <div class="dock-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -252,6 +263,7 @@
       </div>
       <span class="dock-tooltip">Expenses</span>
     </a>
+    {% endif %}
 
   </nav>
 </div>
@@ -459,6 +471,7 @@ window.showToast = function (message, type) {
   /* Explain refusals instead of bouncing silently to the dashboard. */
   var DENIED = {
     'clinic_admin': 'Clinic Admin is only available to clinic owners.',
+    'owner_only':   'Income, reports and clinic settings belong to the clinic owner. Switch to your own clinic to see yours.',
     '1':            'You do not have access to that page.',
   };
   var deniedVal = params.get('denied');

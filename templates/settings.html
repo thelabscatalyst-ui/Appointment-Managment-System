@@ -200,7 +200,16 @@
     <div class="settings-card-header">
       <div>
         <div class="settings-card-title">Working Hours</div>
+        {# Which clinic these hours belong to is not obvious once a doctor works
+           at two — the times are per clinic, so name the one being edited. #}
+        {% if request.state.active_clinic and (request.state.membership_count or 0) > 1 %}
+        <div class="settings-card-sub">
+          Hours at <strong>{{ request.state.active_clinic.name }}</strong>.
+          Times are set per clinic; the days you work are shared across all of them.
+        </div>
+        {% else %}
         <div class="settings-card-sub">Set the days and times your clinic is open</div>
+        {% endif %}
       </div>
       <button type="submit" class="btn btn-primary btn-sm">Save Hours</button>
     </div>
@@ -328,6 +337,7 @@
 </form>
 
 <!-- ───────────────────────────────────────────────────── -->
+{% if request.state.active_role != 'associate' %}
 <!--  2. Clinic Profile                                     -->
 <!-- ───────────────────────────────────────────────────── -->
 <form method="POST" action="/doctors/settings/profile">
@@ -364,6 +374,7 @@
     </div>
   </div>
 </form>
+{% endif %}
 
 <!-- ───────────────────────────────────────────────────── -->
 <!--  2b. Account Details                                   -->
@@ -502,6 +513,7 @@
 </div>
 
 <!-- ───────────────────────────────────────────────────── -->
+{% if request.state.active_role != 'associate' %}
 <!--  5. Booking Link                                       -->
 <!-- ───────────────────────────────────────────────────── -->
 {% if doctor.slug %}
@@ -528,10 +540,12 @@
   </div>
 </div>
 {% endif %}
+{% endif %}
 
 <!-- ───────────────────────────────────────────────────── -->
 <!--  6. PIN Protection                                     -->
 <!-- ───────────────────────────────────────────────────── -->
+{% if request.state.active_role != 'associate' %}
 <!-- ── Price Catalog ── -->
 <div class="settings-card">
   <div class="settings-card-header" style="margin-bottom:20px;">
@@ -583,6 +597,7 @@
     <button type="submit" class="btn btn-primary btn-sm">Add</button>
   </form>
 </div>
+{% endif %}
 
 <!-- ── PIN Protection ── -->
 <div class="settings-card">

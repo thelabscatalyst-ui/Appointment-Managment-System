@@ -76,6 +76,54 @@ def is_owner_of(db: Session, doctor_id: int, clinic_id: int) -> bool:
 
 
 # --------------------------------------------------------------------------- #
+#  Request-scoped role and clinic                                               #
+#                                                                               #
+#  get_paying_doctor/get_appt_doctor stash the resolved clinic and role on      #
+#  request.state. These read it back. Everything that decides "what may this    #
+#  doctor see right now" goes through here, so the answer cannot drift between  #
+#  a route and the template it renders.                                         #
+# --------------------------------------------------------------------------- #
+
+def active_role(request) -> str | None:
+    """The caller's role in the clinic they are currently working in."""
+    return getattr(getattr(request, "state", None), "active_role", None)
+
+
+def is_owner_context(request) -> bool:
+    """True when the active clinic is one this doctor owns.
+
+    Deliberately fails closed: an unset role (a route that never resolved a
+    clinic) is not owner context. Adding a new owner-only route and forgetting
+    to depend on get_paying_doctor should hide the page, not expose it.
+    """
+    return active_role(request) == ROLE_OWNER
+
+
+def is_associate_context(request) -> bool:
+    """True when the active clinic belongs to someone else."""
+    return active_role(request) == ROLE_ASSOCIATE
+
+
+def scope_to_active_clinic(query, model, request):
+    """Restrict a query to the clinic this request is operating in.
+
+    Every clinical table carries a nullable clinic_id (Appointment, Visit,
+    DoctorSchedule, Bill, Expense...). Filtering on doctor_id alone merges a
+    doctor's own practice with the clinic they moonlight at, which is exactly
+    what made switching clinics change the money on screen but not the
+    appointments.
+
+    No active clinic (a doctor with no live membership at all) returns the
+    query untouched rather than empty — that doctor has nowhere else for their
+    data to belong, so scoping it away would blank their own workspace.
+    """
+    clinic_id = getattr(getattr(request, "state", None), "active_clinic_id", None)
+    if clinic_id is None:
+        return query
+    return query.filter(model.clinic_id == clinic_id)
+
+
+# --------------------------------------------------------------------------- #
 #  Plan state                                                                   #
 # --------------------------------------------------------------------------- #
 

@@ -18,6 +18,11 @@
           <div class="welcome-step-desc">Add the days you see patients, your start and end times, and how long each slot takes.</div>
         </div>
       </div>
+      {# Steps 2 and 3 are clinic configuration, which an associate cannot
+         reach — telling them to do it sends them to a page with those cards
+         hidden. Numbering stays 1..4 for owners and reads 1,4 for associates,
+         which is honest: those steps genuinely are not theirs. #}
+      {% if request.state.active_role != 'associate' %}
       <div class="welcome-step">
         <div class="welcome-step-num">2</div>
         <div>
@@ -32,6 +37,7 @@
           <div class="welcome-step-desc">Preset your charges · consultation fee, X-ray, dressing, injection · so billing is one tap.</div>
         </div>
       </div>
+      {% endif %}
       <div class="welcome-step">
         <div class="welcome-step-num">4</div>
         <div>
@@ -184,8 +190,11 @@ function dismissWelcome() {
   </a>
   <div class="stat-card">
     <div class="stat-label">Clinic</div>
-    <div class="stat-value stat-value--sm">{{ doctor.clinic_name or (primary_clinic.name if primary_clinic else "—") }}</div>
-    <div class="stat-sub">{{ doctor.city or (primary_clinic.city if primary_clinic else "") }}</div>
+    {# primary_clinic is the clinic being worked in. doctor.clinic_name is the
+       doctor's OWN practice name, so preferring it printed the wrong clinic on
+       the dashboard of every clinic the doctor merely visits. #}
+    <div class="stat-value stat-value--sm">{{ (primary_clinic.name if primary_clinic else None) or doctor.clinic_name or "—" }}</div>
+    <div class="stat-sub">{{ (primary_clinic.city if primary_clinic else None) or doctor.city or "" }}</div>
   </div>
 </div>
 
@@ -288,6 +297,9 @@ function dismissWelcome() {
     </div>
   </div>
 
+  {# Money belongs to the clinic owner. Server-side gate lives on
+     the /income and /expenses routes themselves. #}
+  {% if request.state.active_role != 'associate' %}
   <!-- ── RIGHT: Income + Expense ─────────────────────────────────────────── -->
   <div class="dash-right">
 
@@ -385,6 +397,7 @@ function dismissWelcome() {
     </div>
 
   </div><!-- end dash-right -->
+  {% endif %}
 </div><!-- end dash-body-grid -->
 
 {% endblock %}

@@ -24,7 +24,7 @@ from database.models import (
     Doctor, Patient, Visit, VisitStatus, Bill, BillItem,
     PriceCatalog, PaymentMode, ClinicDoctor, Appointment,
 )
-from services.auth_service import get_paying_doctor
+from services.auth_service import get_paying_doctor, require_clinic_owner_context
 import services.visit_service as vs
 
 router = APIRouter(tags=["billing_ops"])
@@ -547,7 +547,7 @@ async def download_bill_pdf(
 @router.get("/price-catalog", response_class=JSONResponse)
 async def get_catalog(
     db: Session    = Depends(get_db),
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(require_clinic_owner_context),
 ):
     items = (
         db.query(PriceCatalog)
@@ -565,7 +565,7 @@ async def add_catalog_item(
     price: float = Form(...),
     pinned: bool = Form(False),
     db: Session  = Depends(get_db),
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(require_clinic_owner_context),
 ):
     item = PriceCatalog(
         doctor_id     = doctor.id,
@@ -584,7 +584,7 @@ async def delete_catalog_item(
     item_id: int,
     request: Request,
     db: Session    = Depends(get_db),
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(require_clinic_owner_context),
 ):
     item = db.query(PriceCatalog).filter(
         PriceCatalog.id == item_id,
@@ -601,7 +601,7 @@ async def toggle_pin(
     item_id: int,
     request: Request,
     db: Session    = Depends(get_db),
-    doctor: Doctor = Depends(get_paying_doctor),
+    doctor: Doctor = Depends(require_clinic_owner_context),
 ):
     item = db.query(PriceCatalog).filter(
         PriceCatalog.id == item_id,
