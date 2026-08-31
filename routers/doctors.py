@@ -370,11 +370,26 @@ def settings_page(
         )
         .first()
     )
-    is_clinic_associate = _assoc_membership is not None
-    assoc_clinic_name   = None
-    if is_clinic_associate and _assoc_membership:
-        _ac = db.query(ClinicModel2).filter(ClinicModel2.id == _assoc_membership.clinic_id).first()
-        assoc_clinic_name = _ac.name if _ac else None
+    # The subscription card follows the ACTIVE clinic, not "is this doctor an
+    # associate anywhere". The global test hid the upgrade button outright for
+    # any doctor who happened to hold an associate seat somewhere — so a doctor
+    # whose own practice had lapsed was shown "billing is handled by your clinic
+    # owner" on their OWN clinic's settings page, with no way to renew it.
+    _active_role = getattr(request.state, "active_role", None)
+    _active_clinic = getattr(request.state, "active_clinic", None)
+
+    if _active_role is not None:
+        is_clinic_associate = _active_role != "owner"
+        assoc_clinic_name = _active_clinic.name if _active_clinic else None
+    else:
+        # No resolved clinic (a doctor with no membership at all): fall back to
+        # the old global test rather than silently claiming they are an owner.
+        is_clinic_associate = _assoc_membership is not None
+        assoc_clinic_name = None
+        if is_clinic_associate and _assoc_membership:
+            _ac = db.query(ClinicModel2).filter(
+                ClinicModel2.id == _assoc_membership.clinic_id).first()
+            assoc_clinic_name = _ac.name if _ac else None
 
     price_catalog = (
         db.query(PriceCatalog)

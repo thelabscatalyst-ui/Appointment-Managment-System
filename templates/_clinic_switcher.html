@@ -1,0 +1,28 @@
+{# Clinic switcher.
+
+   Shown whenever the doctor belongs to more than one clinic — the single-clinic
+   majority sees nothing, exactly as before.
+
+   Deliberately NOT conditional on request.state.active_clinic. It used to be,
+   which meant the switcher disappeared on every page that does not run
+   get_paying_doctor — including /billing and /plan-lapsed, the two pages a
+   doctor with a lapsed plan is sent to. A doctor whose own trial had expired
+   but who was an active associate at a paying clinic was therefore locked out
+   of the clinic funding them, with no control on screen to get there.
+
+   A partial rather than markup in base.html because plan_lapsed.html carries
+   its own standalone navbar and cannot extend base.
+
+   Switching is not an entitlement: POST /clinic/switch re-validates live
+   membership server-side and ignores anything else. #}
+{% if (request.state.membership_count or 0) > 1 %}
+<form method="POST" action="/clinic/switch" style="display:inline-flex;align-items:center;">
+  <input type="hidden" name="next" value="{{ request.url.path }}">
+  <select name="clinic_id" onchange="this.form.submit()"
+          class="navbar-clinic-switch" aria-label="Switch clinic">
+    {% for m in (request.state.clinic_memberships or []) %}
+    <option value="{{ m.clinic_id }}" {% if m.clinic_id == request.state.active_clinic_id %}selected{% endif %}>{{ m.clinic_name }}{% if m.role != 'owner' %} · associate{% endif %}</option>
+    {% endfor %}
+  </select>
+</form>
+{% endif %}

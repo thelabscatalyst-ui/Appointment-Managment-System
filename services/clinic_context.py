@@ -218,7 +218,7 @@ def _decode_active_clinic_cookie(request, doctor_id: int) -> int | None:
     return payload.get("clinic_id")
 
 
-def resolve_active_clinic(request, doctor, db: Session):
+def resolve_active_clinic(request, doctor, db: Session, memberships=None):
     """Which clinic is this doctor working in right now?
 
     Returns (clinic, membership) — both None when the doctor has no live
@@ -230,7 +230,10 @@ def resolve_active_clinic(request, doctor, db: Session):
     """
     from database.models import Clinic
 
-    memberships = active_memberships(db, doctor.id)
+    # memberships is accepted prefetched: this runs on every request, and the
+    # navbar middleware has already loaded exactly this list.
+    if memberships is None:
+        memberships = active_memberships(db, doctor.id)
     if not memberships:
         return None, None
 
@@ -253,9 +256,49 @@ def resolve_active_clinic(request, doctor, db: Session):
         m = valid_ids[cookie_id]
         return db.query(Clinic).filter(Clinic.id == m.clinic_id).first(), m
 
-    # 3. Default: owned clinic first (active_memberships already sorts that way).
-    m = memberships[0]
+    # 3. Default: owned clinic first (active_memberships already sorts that way),
+    #    but skip past memberships whose plan is dead if a live one exists.
+    #
+    #    Owner-first alone stranded a real account: a doctor whose own trial had
+    #    lapsed but who was an active associate at a paying clinic landed on
+    #    their dead practice, got bounced to the paywall, and could never reach
+    #    the clinic that was funding them. Preference only — an explicit choice
+    #    (query param or cookie, both handled above) always wins, so a doctor
+    #    who deliberately switches to their lapsed practice to renew it stays
+    #    there.
+    #    One membership means no alternative to prefer, so skip the plan
+    #    lookups entirely — that is the overwhelmingly common case and this
+    #    code is on every request.
+    if len(memberships) == 1:
+        m = memberships[0]
+    else:
+        m = _first_usable_membership(db, doctor, memberships) or memberships[0]
     return db.query(Clinic).filter(Clinic.id == m.clinic_id).first(), m
+
+
+def _first_usable_membership(db: Session, doctor, memberships):
+    """The first membership in order whose plan actually grants access.
+
+    Mirrors the entitlement rules in auth_service.get_paying_doctor: in a clinic
+    you own, either your personal plan or the clinic's will do; in someone
+    else's, only theirs counts. Returns None when nothing is live, so the caller
+    can fall back and let the normal plan gate produce its usual message.
+    """
+    from database.models import Clinic
+
+    by_id = {c.id: c for c in db.query(Clinic).filter(
+        Clinic.id.in_([m.clinic_id for m in memberships])).all()}
+
+    for m in memberships:
+        clinic = by_id.get(m.clinic_id)
+        if clinic is None:
+            continue
+        if m.role == ROLE_OWNER:
+            if personal_plan_active(doctor) or clinic_plan_active(clinic, db):
+                return m
+        elif clinic_plan_active(clinic, db):
+            return m
+    return None
 
 
 def set_active_clinic_cookie(response, doctor_id: int, clinic_id: int) -> None:

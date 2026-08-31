@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Plan Lapsed · Med Track</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=161" />
+  <link rel="stylesheet" href="/static/css/main.css?v=164" />
   <script>if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light');</script>
 </head>
 <body>
@@ -12,6 +12,7 @@
 <nav class="navbar">
   <span class="navbar-brand">Med Track</span>
   <div class="navbar-controls">
+    {% include "_clinic_switcher.html" %}
     <button type="button" class="theme-toggle" id="themeToggle" title="Toggle theme" onclick="toggleTheme()">
       <svg id="themeIconSun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
         <circle cx="12" cy="12" r="5"/>
@@ -46,8 +47,40 @@
 
     <h1 style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;margin:0 0 10px;">Subscription Lapsed</h1>
     <p style="color:var(--muted);font-size:0.9rem;line-height:1.6;margin:0 0 28px;">
-      Your Med Track subscription has expired. Your data is safe — access will resume the moment the plan is renewed.
+      {% if other_clinics %}
+        This clinic's subscription has expired. Your data is safe — access resumes the moment the plan is renewed.
+      {% else %}
+        Your Med Track subscription has expired. Your data is safe — access will resume the moment the plan is renewed.
+      {% endif %}
     </p>
+
+    {# The handler already knows the doctor has live access somewhere else — it
+       redirects here with that fact and, before this, dropped it on the floor.
+       Say so, and give them one click to get there. #}
+    {% if other_clinics %}
+    <div style="background:var(--bg-2);border:1px solid var(--amber-border,rgba(180,130,60,.35));border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;text-align:left;">
+      <div style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;margin-bottom:10px;">
+        You still have access elsewhere
+      </div>
+      <p style="font-size:0.875rem;color:var(--text);line-height:1.5;margin:0 0 14px;">
+        {% if other_clinics|length == 1 %}
+          Your membership at <strong>{{ other_clinics[0].name }}</strong> is active and paid for by that clinic.
+          You can keep working there without renewing this plan.
+        {% else %}
+          You have active memberships at {{ other_clinics|length }} other clinics, paid for by those clinics.
+        {% endif %}
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        {% for c in other_clinics %}
+        <form method="POST" action="/clinic/switch" style="display:inline;">
+          <input type="hidden" name="clinic_id" value="{{ c.id }}">
+          <input type="hidden" name="next" value="/dashboard">
+          <button type="submit" class="btn btn-primary btn-sm">Go to {{ c.name }} →</button>
+        </form>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Renew CTA -->
     <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;text-align:left;">

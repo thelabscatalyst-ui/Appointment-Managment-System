@@ -3945,3 +3945,256 @@ class TestOwnerAppointmentsAreNotReachableByAssociates:
         assert "Sunrise Multispeciality" in page
         assert "My Own Practice" not in page, (
             "the owned clinic's name is still on the host clinic's dashboard")
+
+
+# ─────────────────────────────────────────────────────────────────────────── #
+#  Multi-clinic: lockout escape, and the security of switching                 #
+# ─────────────────────────────────────────────────────────────────────────── #
+
+def _expire_personal_plan(email):
+    """Kill the doctor's own trial and paid plan, and their owned clinic's."""
+    db = TestSession()
+    try:
+        doc = db.query(Doctor).filter(Doctor.email == email).first()
+        past = datetime.utcnow() - timedelta(days=1)
+        doc.trial_ends_at = past
+        doc.plan_expires_at = past
+        for c in db.query(Clinic).filter(Clinic.owner_doctor_id == doc.id).all():
+            c.plan_expires_at = past
+            c.plan_grace_until = None
+        db.commit()
+    finally:
+        db.close()
+
+
+class TestLapsedDoctorCanStillReachTheirClinic:
+    """The reported lockout.
+
+    A doctor whose own trial expired, but who is an active associate at a
+    clinic that pays, was stranded: resolution picked their owned clinic
+    (owner-first), the plan gate bounced them to the paywall, and the paywall
+    had no switcher on it. Nothing on screen could get them to the clinic that
+    was funding them.
+    """
+
+    def test_default_clinic_skips_the_lapsed_one(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "lapsed-default@test.com", slug="lapsed-default-host")
+        _expire_personal_plan("lapsed-default@test.com")
+
+        auth_cookie(client, "lapsed-default@test.com")
+        r = client.get("/dashboard", follow_redirects=False)
+        assert r.status_code == 200, (
+            f"lapsed owner with a live associate seat got {r.status_code} "
+            f"-> {r.headers.get('location')} instead of a usable workspace")
+
+    def test_paywall_still_applies_to_the_lapsed_clinic(self, client):
+        """Preferring a live clinic must not become a way to dodge the gate."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "lapsed-gate@test.com", slug="lapsed-gate-host")
+        _expire_personal_plan("lapsed-gate@test.com")
+        auth_cookie(client, "lapsed-gate@test.com")
+
+        # Explicitly select the lapsed clinic: the choice is honoured, and so is the gate.
+        _switch_to(client, own_id)
+        r = client.get("/dashboard", follow_redirects=False)
+        assert r.status_code in (302, 303), (
+            "the lapsed clinic must still be gated when explicitly selected")
+
+    def test_switcher_is_present_on_the_paywall(self, client):
+        """The escape hatch has to be on the page they are actually sent to."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "lapsed-paywall@test.com", slug="lapsed-paywall-host")
+        _expire_personal_plan("lapsed-paywall@test.com")
+        auth_cookie(client, "lapsed-paywall@test.com")
+        _switch_to(client, own_id)
+
+        for path in ("/plan-lapsed", "/billing"):
+            body = client.get(path).text
+            assert 'action="/clinic/switch"' in body, (
+                f"{path} has no clinic switcher — a lapsed doctor is stranded there")
+
+    def test_paywall_names_the_clinic_they_can_still_use(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "lapsed-names@test.com", slug="lapsed-names-host",
+            host_clinic="Paying Host Clinic")
+        _expire_personal_plan("lapsed-names@test.com")
+        auth_cookie(client, "lapsed-names@test.com")
+        _switch_to(client, own_id)
+
+        body = client.get("/plan-lapsed").text
+        assert "Paying Host Clinic" in body
+        assert "still have access elsewhere" in body
+
+
+class TestClinicSwitchingSecurity:
+    """Switching context must never widen access.
+
+    The switcher is now rendered on pages that are not plan-gated, so these
+    assert that being able to SEE a clinic in the dropdown is not the same as
+    being entitled to anything in it.
+    """
+
+    def test_cookie_from_another_doctor_is_ignored(self, client):
+        """The cookie is signed, but signing alone is not enough — it must also
+        be bound to the doctor presenting it, or a shared terminal leaks."""
+        from services.clinic_context import ACTIVE_CLINIC_COOKIE, set_active_clinic_cookie
+
+        register(client, email="sec-victim@test.com", account_type="clinic",
+                 clinic_name="Victim Clinic")
+        db = TestSession()
+        try:
+            victim = db.query(Doctor).filter(Doctor.email == "sec-victim@test.com").first()
+            victim_clinic = db.query(Clinic).filter(
+                Clinic.owner_doctor_id == victim.id).first()
+            victim_id, victim_clinic_id = victim.id, victim_clinic.id
+        finally:
+            db.close()
+
+        # A validly-signed cookie — for the WRONG doctor.
+        class _Resp:
+            def __init__(self): self.cookies = {}
+            def set_cookie(self, k, v, **kw): self.cookies[k] = v
+        holder = _Resp()
+        set_active_clinic_cookie(holder, victim_id, victim_clinic_id)
+
+        register(client, email="sec-attacker@test.com", account_type="solo",
+                 clinic_name="Attacker Clinic")
+        auth_cookie(client, "sec-attacker@test.com")
+        client.cookies.set(ACTIVE_CLINIC_COOKIE, holder.cookies[ACTIVE_CLINIC_COOKIE])
+
+        body = client.get("/dashboard").text
+        assert "Victim Clinic" not in body, (
+            "another doctor's active-clinic cookie changed this doctor's context")
+        client.cookies.delete(ACTIVE_CLINIC_COOKIE)
+
+    def test_garbage_cookie_is_ignored_not_fatal(self, client):
+        from services.clinic_context import ACTIVE_CLINIC_COOKIE
+
+        _dual_clinic_doctor(client, "sec-garbage@test.com", slug="sec-garbage-host")
+        auth_cookie(client, "sec-garbage@test.com")
+        client.cookies.set(ACTIVE_CLINIC_COOKIE, "not.a.jwt")
+        assert client.get("/dashboard", follow_redirects=False).status_code == 200
+        client.cookies.delete(ACTIVE_CLINIC_COOKIE)
+
+    def test_query_param_for_a_foreign_clinic_is_ignored(self, client):
+        """?clinic_id= is honoured for real memberships only."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sec-qs@test.com", slug="sec-qs-host")
+        db = TestSession()
+        try:
+            outsider = Clinic(name="Outsider Clinic", slug="sec-outsider",
+                              plan_type="clinic", owner_doctor_id=None,
+                              plan_expires_at=datetime.utcnow() + timedelta(days=30))
+            db.add(outsider); db.commit(); db.refresh(outsider)
+            outsider_id = outsider.id
+        finally:
+            db.close()
+
+        auth_cookie(client, "sec-qs@test.com")
+        body = client.get(f"/dashboard?clinic_id={outsider_id}").text
+        assert "Outsider Clinic" not in body, (
+            "?clinic_id named a clinic with no membership and was honoured")
+
+    def test_switch_to_a_clinic_you_are_not_in_is_refused(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sec-switch@test.com", slug="sec-switch-host")
+        db = TestSession()
+        try:
+            other = Clinic(name="Not Mine Clinic", slug="sec-notmine",
+                           plan_type="clinic", owner_doctor_id=None,
+                           plan_expires_at=datetime.utcnow() + timedelta(days=30))
+            db.add(other); db.commit(); db.refresh(other)
+            other_id = other.id
+        finally:
+            db.close()
+
+        auth_cookie(client, "sec-switch@test.com")
+        _switch_to(client, other_id)
+        assert "Not Mine Clinic" not in client.get("/dashboard").text
+
+    def test_revoked_membership_drops_out_immediately(self, client):
+        """A deactivated doctor keeps a validly-signed cookie naming the clinic."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sec-revoked@test.com", slug="sec-revoked-host",
+            host_clinic="Revoking Clinic")
+        auth_cookie(client, "sec-revoked@test.com")
+        _switch_to(client, host_id)
+        assert "Revoking Clinic" in client.get("/dashboard").text
+
+        db = TestSession()
+        try:
+            m = db.query(ClinicDoctor).filter(
+                ClinicDoctor.doctor_id == doc_id,
+                ClinicDoctor.clinic_id == host_id).first()
+            m.is_active = False
+            db.commit()
+        finally:
+            db.close()
+
+        # Same cookie, still validly signed — membership is the authority.
+        body = client.get("/dashboard").text
+        assert "Revoking Clinic" not in body, (
+            "a revoked associate kept working via their active-clinic cookie")
+        assert 'action="/clinic/switch"' not in body, (
+            "the switcher still offers a clinic the doctor was removed from")
+
+    def test_switch_drops_the_clinic_admin_session(self, client):
+        """Admin auth is minted for one clinic; it must not ride along."""
+        from routers.clinic import ADMIN_AUTH_COOKIE
+
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sec-admin@test.com", slug="sec-admin-host")
+        auth_cookie(client, "sec-admin@test.com")
+
+        r = _switch_to(client, host_id)
+        # Assert on what the server sent, not on the TestClient jar: a cookie
+        # planted by hand has no domain, so the scoped delete would not match
+        # it and the test would fail for a reason that cannot happen in a real
+        # browser.
+        expiries = [v for k, v in r.headers.items()
+                    if k.lower() == "set-cookie" and ADMIN_AUTH_COOKIE in v]
+        assert expiries, "the switch did not expire the clinic-admin cookie"
+        assert any(('Max-Age=0' in v) or ('expires=' in v.lower()) for v in expiries), (
+            f"clinic-admin cookie was set but not expired on switch: {expiries}")
+
+    def test_switch_next_cannot_be_an_open_redirect(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "sec-redir@test.com", slug="sec-redir-host")
+        auth_cookie(client, "sec-redir@test.com")
+
+        for hostile in ("https://evil.test/steal", "//evil.test/steal"):
+            r = client.post("/clinic/switch",
+                            data={"clinic_id": host_id, "next": hostile},
+                            follow_redirects=False)
+            loc = r.headers.get("location", "")
+            assert "evil.test" not in loc, f"open redirect via next={hostile!r}: {loc}"
+
+    def test_logged_out_visitor_gets_no_clinic_context(self, client):
+        """The middleware resolves context on every request now — not for
+        anonymous ones."""
+        client.cookies.clear()
+        body = client.get("/login").text
+        assert 'action="/clinic/switch"' not in body
+
+    def test_settings_billing_card_follows_the_active_clinic(self, client):
+        """The upgrade button was hidden by a global "is an associate anywhere"
+        test, so a doctor holding any associate seat was told their billing was
+        handled by a clinic owner even on their OWN clinic's settings page —
+        and had no way to renew it."""
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "bill-card@test.com", slug="bill-card-host",
+            host_clinic="Covering Clinic")
+        auth_cookie(client, "bill-card@test.com")
+
+        _switch_to(client, own_id)
+        body = client.get("/doctors/settings").text
+        assert "Access covered by your clinic owner" not in body, (
+            "own clinic's settings claims someone else pays for it")
+        assert ("Upgrade Now" in body or "Manage Plan" in body
+                or "Choose a Plan" in body), "no way to manage the owned plan"
+
+        _switch_to(client, host_id)
+        body = client.get("/doctors/settings").text
+        assert "Access covered by your clinic owner" in body
+        assert "Covering Clinic" in body

@@ -191,6 +191,13 @@ async def inject_clinic_owner_state(request: Request, call_next):
     # (verify_email.html, plan_lapsed.html). Set here rather than threaded
     # through every route context — same pattern as is_clinic_owner.
     request.state.support_whatsapp = settings.SUPPORT_WHATSAPP
+
+    # Static assets carry the session cookie too, and none of them render a
+    # template, so the work below is pure waste on those requests.
+    _path = request.url.path
+    if _path.startswith("/static/") or _path.startswith("/uploads/") or _path == "/favicon.ico":
+        return await call_next(request)
+
     token = request.cookies.get("access_token")
     payload = None      # must exist for the renewal check below, even if logged out
     if token:
@@ -215,17 +222,52 @@ async def inject_clinic_owner_state(request: Request, call_next):
                     # Detached plain dicts: the Session closes in the finally
                     # below, so ORM objects would raise DetachedInstanceError
                     # when the template touched a lazy attribute.
-                    if len(_ms) > 1:
+                    _clinic_by_id = {}
+                    if _ms:
                         from database.models import Clinic as _C
-                        _rows = []
-                        for _m in _ms:
-                            _c = db.query(_C).filter(_C.id == _m.clinic_id).first()
-                            _rows.append({
+                        # One query for every clinic, not one per membership.
+                        _clinic_by_id = {
+                            c.id: c for c in db.query(_C).filter(
+                                _C.id.in_([m.clinic_id for m in _ms])).all()
+                        }
+                    if len(_ms) > 1:
+                        request.state.clinic_memberships = [
+                            {
                                 "clinic_id": _m.clinic_id,
                                 "role": _m.role,
-                                "clinic_name": (_c.name if _c else f"Clinic {_m.clinic_id}"),
-                            })
-                        request.state.clinic_memberships = _rows
+                                "clinic_name": (
+                                    _clinic_by_id[_m.clinic_id].name
+                                    if _m.clinic_id in _clinic_by_id
+                                    else f"Clinic {_m.clinic_id}"),
+                            }
+                            for _m in _ms
+                        ]
+
+                    # Resolve the active clinic HERE, not only in
+                    # get_paying_doctor. Pages that never reach that dependency
+                    # — /billing, /plan-lapsed, the paywall a lapsed doctor is
+                    # sent to — had no active clinic, so the switcher was hidden
+                    # on exactly the pages where a doctor needs it most: an
+                    # associate whose own trial expired could not get back to
+                    # the clinic that funds them.
+                    #
+                    # This grants nothing. resolve_active_clinic re-checks live
+                    # membership on every call, and the plan gate still runs in
+                    # get_paying_doctor; this only decides which clinic the gate
+                    # is applied to, and populates the navbar.
+                    from services.clinic_context import resolve_active_clinic
+                    from database.models import Doctor as _D
+                    _doc = db.query(_D).filter(_D.id == payload["doctor_id"]).first()
+                    if _doc is not None:
+                        _clinic, _mem = resolve_active_clinic(request, _doc, db, _ms)
+                        if _clinic is not None:
+                            # Detached copy: the Session closes below, so the
+                            # template would hit DetachedInstanceError on a
+                            # lazy attribute of the live ORM object.
+                            db.expunge(_clinic)
+                        request.state.active_clinic = _clinic
+                        request.state.active_clinic_id = _clinic.id if _clinic else None
+                        request.state.active_role = _mem.role if _mem else None
                 finally:
                     db.close()
             except Exception:
@@ -415,7 +457,40 @@ async def plan_expired_handler(request: Request, exc: PlanExpired):
 
 @app.get("/plan-lapsed")
 async def plan_lapsed_page(request: Request):
-    return templates.TemplateResponse(request, "plan_lapsed.html", {})
+    """The paywall for access a doctor cannot renew themselves.
+
+    Lists any OTHER clinic where they still have live, paid access, so a doctor
+    whose own plan lapsed is not stranded. Membership is re-read here rather
+    than trusted from the ?other_clinic= query flag the handler sets — the flag
+    only decides whether we were sent here by the deadlock guard; what a doctor
+    may actually reach is always a database question.
+    """
+    other_clinics = []
+    try:
+        token = request.cookies.get("access_token")
+        payload = decode_token(token) if token else None
+        if payload and payload.get("doctor_id"):
+            from database.connection import SessionLocal
+            from database.models import Clinic as _Clinic
+            from services.clinic_context import active_memberships, clinic_plan_active
+            db = SessionLocal()
+            try:
+                active_id = getattr(request.state, "active_clinic_id", None)
+                for m in active_memberships(db, payload["doctor_id"]):
+                    if m.clinic_id == active_id:
+                        continue          # the one they are already stuck on
+                    c = db.query(_Clinic).filter(_Clinic.id == m.clinic_id).first()
+                    if c and clinic_plan_active(c, db):
+                        other_clinics.append({"id": c.id, "name": c.name})
+            finally:
+                db.close()
+    except Exception:
+        # Never let this page fail: it is where doctors land when other things
+        # have already gone wrong.
+        other_clinics = []
+
+    return templates.TemplateResponse(request, "plan_lapsed.html",
+                                      {"other_clinics": other_clinics})
 
 
 @app.exception_handler(OwnerOnly)

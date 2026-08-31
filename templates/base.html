@@ -26,19 +26,7 @@
   <a href="/dashboard" class="navbar-brand">MedTrack</a>
   <div style="display:flex;align-items:center;gap:0;">
     <div class="navbar-controls">
-      <!-- Clinic switcher — only when the doctor belongs to more than one
-           clinic, so the single-clinic majority sees no change at all. -->
-      {% if (request.state.membership_count or 0) > 1 and request.state.active_clinic %}
-      <form method="POST" action="/clinic/switch" style="display:inline-flex;align-items:center;">
-        <input type="hidden" name="next" value="{{ request.url.path }}">
-        <select name="clinic_id" onchange="this.form.submit()"
-                class="navbar-clinic-switch" aria-label="Switch clinic">
-          {% for m in (request.state.clinic_memberships or []) %}
-          <option value="{{ m.clinic_id }}" {% if m.clinic_id == request.state.active_clinic_id %}selected{% endif %}>{{ m.clinic_name }}{% if m.role != 'owner' %} · associate{% endif %}</option>
-          {% endfor %}
-        </select>
-      </form>
-      {% endif %}
+      {% include "_clinic_switcher.html" %}
       <!-- Clinic Admin — owners only, AND only while working in a clinic they
            own. is_clinic_owner alone is a global "owns some clinic" flag, so
            it kept offering clinic administration to a doctor who was currently
