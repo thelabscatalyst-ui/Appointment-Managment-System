@@ -123,6 +123,8 @@ def register_page(
         return RedirectResponse(url="/dashboard", status_code=303)
 
     joining_clinic = None
+    invite_email = None
+    invite_error = None
     if clinic_invite:
         invite = db.query(ClinicDoctorInvite).filter(
             ClinicDoctorInvite.token == clinic_invite,
@@ -131,12 +133,27 @@ def register_page(
         ).first()
         if invite:
             joining_clinic = db.query(Clinic).filter(Clinic.id == invite.clinic_id).first()
+            # The invite is bound to one address and a mismatch is rejected on
+            # submit, so pre-fill it. Leaving it blank invited people to type a
+            # different address, fill the whole form, and only then be told —
+            # which reads as "the invite link doesn't work".
+            invite_email = invite.email
+        else:
+            # Say so NOW, not after they have filled in eight fields. The token
+            # still travels in the hidden field, so the POST refuses too; this
+            # just stops them wasting the effort.
+            invite_error = (
+                "This invite link is no longer valid — it may have expired or "
+                "already been used. Ask the clinic to send you a new one. You "
+                "can still create your own account below."
+            )
 
     plan_hint = plan if plan in ("solo", "clinic") else "solo"
     return templates.TemplateResponse(request, "register.html", {
-        "error": None,
-        "clinic_invite": clinic_invite,
+        "error": invite_error,
+        "clinic_invite": clinic_invite if joining_clinic else "",
         "joining_clinic": joining_clinic,
+        "invite_email": invite_email,
         "plan_hint": plan_hint,
     })
 
@@ -216,10 +233,30 @@ def register(
     norm_phone = _normalise_phone(phone)
 
     def _reject(message: str, status_code: int = 400):
+        # Re-resolve the invite so the retry form is still an INVITE form.
+        # This passed joining_clinic=None unconditionally, so one typo turned
+        # the page back into an ordinary signup: the "I also run my own
+        # practice" choice disappeared and the Solo/Clinic selector took its
+        # place. The invitee then had no way to say what they wanted, and the
+        # account was effectively created for them.
+        _joining = None
+        _invite_email = None
+        if invite_token:
+            _inv = db.query(ClinicDoctorInvite).filter(
+                ClinicDoctorInvite.token == invite_token,
+                ClinicDoctorInvite.used_at == None,          # noqa: E711
+                ClinicDoctorInvite.expires_at > datetime.utcnow(),
+            ).first()
+            if _inv:
+                _joining = db.query(Clinic).filter(Clinic.id == _inv.clinic_id).first()
+                _invite_email = _inv.email
         return templates.TemplateResponse(
             request, "register.html",
             {"error": message, "clinic_invite": invite_token,
-             "joining_clinic": None, "plan_hint": "solo"},
+             "joining_clinic": _joining, "plan_hint": "solo",
+             "invite_email": _invite_email,
+             # Keep the checkbox ticked if they had ticked it.
+             "also_own_practice": bool(also_own_practice.strip())},
             status_code=status_code,
         )
 
@@ -283,6 +320,25 @@ def register(
             )
 
     if valid_invite:
+        # Seats are checked at ACCEPT time, not just when the invite is sent.
+        # /clinic/doctor-invite already did this; registering did not, so an
+        # invite issued while a seat was free could still be redeemed after
+        # the clinic filled up — putting them over their paid headcount.
+        _join_clinic = db.query(Clinic).filter(
+            Clinic.id == valid_invite.clinic_id).first()
+        _cap = (getattr(_join_clinic, "max_doctors", 1) or 1) if _join_clinic else 1
+        _members = db.query(ClinicDoctor).filter(
+            ClinicDoctor.clinic_id == valid_invite.clinic_id,
+            ClinicDoctor.is_active == True,          # noqa: E712
+        ).count()
+        if _members >= _cap:
+            return _reject(
+                f"{_join_clinic.name if _join_clinic else 'This clinic'} has "
+                f"reached its plan limit of {_cap} doctor(s). Ask the clinic "
+                f"owner to upgrade — your invite link stays valid.",
+                status_code=409,
+            )
+
         # ── Clinic member path: no trial, no solo clinic ──────────────────────
         doctor = Doctor(
             name=name,

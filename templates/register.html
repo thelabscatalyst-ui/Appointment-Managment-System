@@ -254,6 +254,8 @@
             <label
               style="display:flex;gap:10px;align-items:flex-start;padding:14px 16px;margin-bottom:20px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;">
               <input type="checkbox" name="also_own_practice" id="also_own_practice" value="1"
+                onchange="toggleOwnPractice()"
+                {% if also_own_practice %}checked{% endif %}
                 style="margin-top:3px;flex-shrink:0;" />
               <span>
                 <span style="display:block;font-size:0.86rem;font-weight:600;color:var(--text);">
@@ -266,6 +268,14 @@
               </span>
             </label>
             <input type="hidden" name="account_type" value="solo">
+
+            <div class="form-group" id="ownPracticeNameGroup"
+                 style="{% if not also_own_practice %}display:none;{% endif %}">
+              <label for="own_clinic_name">Your practice name</label>
+              <input type="text" id="own_clinic_name" name="clinic_name"
+                     value="{{ request.query_params.get('clinic_name', '') }}"
+                     placeholder="Mehta Clinic" />
+            </div>
             {% endif %}
 
             <div class="form-group">
@@ -276,8 +286,21 @@
             <div class="form-row">
               <div class="form-group">
                 <label for="email">Email *</label>
+                {# An invite is bound to one address, and the server rejects a
+                   mismatch outright — so pre-fill it and make it read-only
+                   rather than letting someone type a different address, fill
+                   the whole form, and only then be told. #}
                 <input type="email" id="email" name="email" placeholder="doctor@example.com" required
+                  value="{{ invite_email or '' }}"
+                  {% if invite_email %}readonly
+                  style="opacity:.75;cursor:not-allowed;"{% endif %}
                   autocomplete="email" />
+                {% if invite_email %}
+                <div style="font-size:0.75rem;color:var(--muted);margin-top:5px;">
+                  The invite was sent to this address. To use a different one,
+                  ask the clinic to re-send it.
+                </div>
+                {% endif %}
               </div>
               <div class="form-group">
                 <label for="phone">Phone *</label>
@@ -364,8 +387,20 @@
         if (clinicGrp) { clinicGrp.style.display = 'none'; }
       }
     }
-    // Init with plan hint from server
-    setMode('{{ plan_hint if plan_hint in ["solo","clinic"] else "solo" }}');
+    // Invited signup: the practice-name field only matters if they said they
+    // also run their own practice.
+    function toggleOwnPractice() {
+      var cb = document.getElementById('also_own_practice');
+      var grp = document.getElementById('ownPracticeNameGroup');
+      if (cb && grp) grp.style.display = cb.checked ? 'block' : 'none';
+    }
+    toggleOwnPractice();
+
+    // Init with plan hint from server. Absent on the invited path, where the
+    // Solo/Clinic selector is not rendered at all.
+    if (typeof setMode === 'function' && document.getElementById('btnSolo')) {
+      setMode('{{ plan_hint if plan_hint in ["solo","clinic"] else "solo" }}');
+    }
 
     // Loading state on submit
     document.addEventListener('DOMContentLoaded', function () {
