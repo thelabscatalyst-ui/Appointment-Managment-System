@@ -112,6 +112,9 @@ _PUBLIC_PREFIXES = (
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     """Add security headers to every response."""
+    # Every router builds its own Jinja2Templates, so a template global would
+    # reach only one of them. request.state reaches all of them.
+    request.state.asset_v = settings.ASSET_VERSION
     response = await call_next(request)
     response.headers["X-Content-Type-Options"]  = "nosniff"
     response.headers["X-Frame-Options"]          = "DENY"
@@ -398,11 +401,23 @@ async def unauthorized_handler(request: Request, exc: HTTPException):
 
 @app.get("/auth/check")
 async def auth_check(request: Request):
-    """Lightweight session validity check — JWT decode only, no DB lookup."""
+    """Lightweight session validity check — JWT decode only, no DB lookup.
+
+    Explicitly uncacheable. /auth/ is in _PUBLIC_PREFIXES, so the blanket
+    no-store the middleware applies to private paths does NOT cover this one —
+    and a cached "ok" is worse than useless here: this is what the back/forward
+    guard asks after a page is restored from the browser's bfcache, so a stale
+    200 would keep showing a logged-out doctor their patients.
+    """
     token = request.cookies.get("access_token")
+    headers = {
+        "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
     if not token or not decode_token(token):
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    return JSONResponse({"ok": True})
+        return JSONResponse({"ok": False}, status_code=401, headers=headers)
+    return JSONResponse({"ok": True}, headers=headers)
 
 
 @app.exception_handler(403)

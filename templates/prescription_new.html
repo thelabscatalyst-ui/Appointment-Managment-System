@@ -313,7 +313,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/drugs.js?v=1"></script>
+<script src="/static/js/drugs.js?v={{ request.state.asset_v }}"></script>
 <script>
 /* DRUG_LIST is loaded from /static/js/drugs.js */
 const RX_ID = {{ prescription.id }};

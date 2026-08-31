@@ -442,18 +442,25 @@ def register(
 # ------------------------------------------------------------------ #
 
 @router.get("/login", response_class=HTMLResponse)
-def login_page(request: Request, registered: str = "", next: str = "", reset: str = ""):
+def login_page(request: Request, registered: str = "", next: str = "",
+               reset: str = "", expired: str = ""):
     # Redirect already-logged-in users away from login
     token = request.cookies.get("access_token")
     if token and decode_token(token):
         return RedirectResponse(url="/dashboard", status_code=303)
     success = None
+    error = None
     if reset == "1":
         success = "Password updated. Log in with your new password."
     elif registered == "1":
         success = "Account created! Please log in."
+    elif expired == "1":
+        # session-guard.js sends people here after the Back button restored a
+        # page whose session had already ended. Without a reason on screen it
+        # looks like the app threw them out at random.
+        error = "Your session ended, so that page was closed. Please log in again."
     return templates.TemplateResponse(request, "login.html", {
-        "error": None, "success": success, "next": next,
+        "error": error, "success": success, "next": next,
     })
 
 
@@ -523,6 +530,17 @@ def logout(request: Request, next: str = Query(default="")):
     # logging back in silently skipped the PIN gate.
     for cookie in ("access_token", "pin_session", "clinic_admin_auth", "active_clinic"):
         response.delete_cookie(cookie)
+
+    # Ask the browser to drop its cached copies of this site, including the
+    # back/forward cache. Deleting the cookies is not enough on its own: a
+    # bfcache entry is a fully rendered page held in memory, so Back can put
+    # the previous doctor's patient list back on screen on a shared clinic
+    # machine. Chrome and Edge honour this; static/js/session-guard.js is the
+    # belt-and-braces for the browsers that do not.
+    #
+    # Deliberately "cache" only — "storage" would also wipe localStorage and
+    # take the doctor's light/dark theme choice with it.
+    response.headers["Clear-Site-Data"] = '"cache"'
     return response
 
 

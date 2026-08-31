@@ -4,7 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PIN Required · Med Track</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=161" />
+  <link rel="stylesheet" href="/static/css/main.css?v={{ request.state.asset_v }}" />
+  <!-- Back/forward guard: a bfcache-restored page can show a logged-out
+       doctor their patients. See static/js/session-guard.js. -->
+  <script src="/static/js/session-guard.js?v={{ request.state.asset_v }}"></script>
 </head>
 <body class="auth-body">
 

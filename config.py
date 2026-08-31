@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     # cookies get the Secure flag and only travel over HTTPS.
     ENVIRONMENT: str = "production"
 
+    # Cache-buster for /static assets. Nine templates each pinned their own
+    # number — 147, 161, 164, 165 — because each has its own <head> and only
+    # the one being edited ever got bumped. A returning visitor would then see
+    # stale CSS on whichever page still pointed at an old version. Bump this
+    # once when static assets change.
+    ASSET_VERSION: str = "166"
+
     class Config:
         env_file = ".env"
 

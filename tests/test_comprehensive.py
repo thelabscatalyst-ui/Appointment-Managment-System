@@ -209,7 +209,19 @@ def get_last_appointment(db) -> Appointment:
 
 
 def next_monday() -> str:
-    d = date.today()
+    """The next Monday that is strictly in the FUTURE.
+
+    It used to start from today, so on a Monday it returned today — and the
+    slots endpoint hides times that have already passed. Every slot test then
+    passed in the morning and failed in the afternoon, because by 17:00 a
+    09:00-17:00 schedule is entirely in the past. A suite whose result depends
+    on the wall clock teaches people to ignore it.
+
+    Starting from tomorrow keeps the weekday deterministic (still a Monday, so
+    day_of_week fixtures are unchanged) while guaranteeing every slot in the
+    day is ahead of now.
+    """
+    d = date.today() + timedelta(days=1)
     while d.weekday() != 0:
         d += timedelta(days=1)
     return d.isoformat()
@@ -4361,3 +4373,27 @@ class TestSwitchingAwayFromADeadEnd:
                     follow_redirects=False)
         body = client.get("/dashboard").text
         assert "Live Clinic" in body, "the switch did not take effect"
+
+
+class TestSuiteIsNotTimeDependent:
+    """A test that passes in the morning and fails at 17:00 teaches people to
+    ignore the suite. next_monday() seeded 42 slot tests and used to return
+    TODAY when run on a Monday, which the slots endpoint then filtered away as
+    already past."""
+
+    def test_next_monday_is_always_in_the_future(self):
+        d = date.fromisoformat(next_monday())
+        assert d > date.today(), f"{d} is not in the future"
+
+    def test_next_monday_is_actually_a_monday(self):
+        """Day-of-week fixtures depend on this."""
+        assert date.fromisoformat(next_monday()).weekday() == 0
+
+    def test_slots_are_returned_regardless_of_the_hour(self, client):
+        """The failure this replaced only appeared after ~17:00 on a Monday."""
+        cookie = auth_cookie(client, "timedep@test.com")
+        make_schedule(client, cookie)
+        r = client.get(f"/appointments/slots?date={next_monday()}")
+        assert r.status_code == 200
+        assert len(r.json()["slots"]) > 0, (
+            "no slots for a future Monday — the suite is clock-dependent again")
