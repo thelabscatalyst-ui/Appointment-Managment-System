@@ -6543,6 +6543,17 @@ html.light .expense-cat-badge {
   flex-direction: column;
   align-self: stretch;
 }
+
+/* When the right column is not rendered at all — associate mode, where the
+   income and expense cards belong to the clinic owner — Today's Schedule is
+   the only child and would otherwise keep its 3fr track, leaving the 2fr one
+   empty on screen. Spanning every column is layout-driven rather than a
+   template flag, so it stays correct whatever causes the right column to be
+   absent. :only-child counts element children, so Jinja comments and the
+   whitespace left by a stripped {% if %} do not defeat it. */
+.dash-left:only-child {
+  grid-column: 1 / -1;
+}
 .dash-left .schedule-section {
   flex: 1;
   min-height: 0;
