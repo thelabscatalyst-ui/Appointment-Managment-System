@@ -4198,3 +4198,106 @@ class TestClinicSwitchingSecurity:
         body = client.get("/doctors/settings").text
         assert "Access covered by your clinic owner" in body
         assert "Covering Clinic" in body
+
+
+class TestLoginNextTarget:
+    """Logging in must never land on a 405.
+
+    Production log, verbatim shape:
+
+        POST /clinic/switch             -> 303   (session had expired)
+        GET  /login?next=/clinic/switch -> 200
+        POST /login                     -> 303   login SUCCEEDED
+        GET  /clinic/switch             -> 405 Method Not Allowed
+
+    The 401 handler captured request.url.path for any method, so a POST to a
+    POST-only route became a `next` that could only be followed with GET. The
+    login form carries `next` in a hidden field, so every retry reproduced it
+    and login itself appeared broken.
+    """
+
+    def test_post_to_a_post_only_route_does_not_poison_next(self, client):
+        """An expired session on POST /clinic/switch must not set `next`."""
+        client.cookies.clear()
+        r = client.post("/clinic/switch", data={"clinic_id": 1, "next": "/dashboard"},
+                        follow_redirects=False)
+        assert r.status_code in (302, 303)
+        loc = r.headers.get("location", "")
+        assert "next=" not in loc, (
+            f"a POST was captured as a resumable next target: {loc}")
+
+    def test_login_ignores_a_next_that_cannot_serve_get(self, client):
+        """Even a hand-crafted or bookmarked next= must not produce a 405."""
+        register(client, email="next-guard@test.com", account_type="clinic",
+                 clinic_name="Next Guard Clinic")
+        r = client.post("/login", data={
+            "email": "next-guard@test.com", "password": "Kv9$mPq2#Zx8L",
+            "next": "/clinic/switch",
+        }, follow_redirects=False)
+        assert r.status_code == 303
+
+        # What matters is the outcome, not the exact hop: following the chain
+        # must never yield a 405 (or any error), and must end on a real page.
+        # Two defences make that true — the 401 handler no longer records a
+        # POST as `next`, and /clinic/switch answers a stray GET with a
+        # redirect instead of 405.
+        url, seen = r.headers["location"], []
+        for _ in range(8):
+            resp = client.get(url, follow_redirects=False)
+            seen.append((url, resp.status_code))
+            assert resp.status_code != 405, f"login chain hit a 405: {seen}"
+            assert resp.status_code < 400, f"login chain broke: {seen}"
+            if resp.status_code in (301, 302, 303, 307, 308):
+                url = resp.headers["location"]
+                continue
+            break
+        assert seen[-1][1] == 200, f"login never reached a page: {seen}"
+
+    def test_login_still_honours_a_real_next(self, client):
+        """The guard must not break the feature it protects."""
+        register(client, email="next-ok@test.com", account_type="clinic",
+                 clinic_name="Next OK Clinic")
+        r = client.post("/login", data={
+            "email": "next-ok@test.com", "password": "Kv9$mPq2#Zx8L",
+            "next": "/patients",
+        }, follow_redirects=False)
+        assert r.headers["location"] == "/patients"
+
+    def test_login_still_refuses_an_offsite_next(self, client):
+        register(client, email="next-evil@test.com", account_type="clinic",
+                 clinic_name="Next Evil Clinic")
+        for hostile in ("https://evil.test/x", "//evil.test/x", "/login?x=1"):
+            r = client.post("/login", data={
+                "email": "next-evil@test.com", "password": "Kv9$mPq2#Zx8L",
+                "next": hostile,
+            }, follow_redirects=False)
+            assert "evil.test" not in r.headers["location"]
+            assert not r.headers["location"].startswith("/login")
+
+    def test_stray_get_on_switch_redirects_instead_of_405(self, client):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, "switch-get@test.com", slug="switch-get-host")
+        auth_cookie(client, "switch-get@test.com")
+        r = client.get("/clinic/switch", follow_redirects=False)
+        assert r.status_code != 405, "a stray GET on the switcher still 405s"
+        assert r.status_code in (302, 303)
+
+    def test_clinic_account_login_reaches_a_working_page(self, client):
+        """End to end: the journey a clinic owner actually takes."""
+        register(client, email="clinic-journey@test.com", account_type="clinic",
+                 clinic_name="Journey Clinic")
+        r = client.post("/login", data={"email": "clinic-journey@test.com",
+                                        "password": "Kv9$mPq2#Zx8L"},
+                        follow_redirects=False)
+        assert r.status_code == 303
+
+        url, seen = r.headers["location"], []
+        for _ in range(8):
+            resp = client.get(url, follow_redirects=False)
+            seen.append((url, resp.status_code))
+            assert resp.status_code < 400, f"chain {seen} broke at {url}"
+            if resp.status_code in (301, 302, 303, 307, 308):
+                url = resp.headers["location"]
+                continue
+            break
+        assert seen[-1][1] == 200, f"login chain never reached a page: {seen}"

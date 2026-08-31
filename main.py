@@ -376,6 +376,18 @@ async def unauthorized_handler(request: Request, exc: HTTPException):
     accept = request.headers.get("accept", "")
     if path.startswith("/auth/") or "application/json" in accept:
         return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+    # Only a GET can be resumed after login. Carrying the path of a POST sends
+    # the browser to GET it once the session is restored, which 405s on any
+    # POST-only route — /clinic/switch being the one users actually hit, via
+    # the navbar switcher on a page whose session had expired. The login form
+    # keeps `next` in a hidden field, so every retry landed on the same error
+    # and login itself looked broken.
+    #
+    # A POST cannot be meaningfully replayed by a redirect anyway: the body is
+    # already gone.
+    if request.method != "GET":
+        return RedirectResponse(url="/login", status_code=303)
+
     next_url = quote(path, safe="/")
     return RedirectResponse(url=f"/login?next={next_url}", status_code=303)
 

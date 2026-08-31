@@ -68,6 +68,48 @@ def _unique_slug(base: str, db: Session) -> str:
 #  Register                                                            #
 # ------------------------------------------------------------------ #
 
+def _safe_next(request: Request, raw: str) -> str:
+    """A `next=` target we are willing to redirect a browser to with GET.
+
+    Two separate rules:
+
+      * site-relative only, and never back to /login or /register — the
+        open-redirect and loop guards this has always had;
+      * the path must actually answer GET. A `next` naming a POST-only route
+        (the switcher's /clinic/switch, captured when a session expired
+        mid-page) produced a 405 the moment login succeeded, and since the
+        login form carries `next` in a hidden field, every retry hit it again.
+
+    Route matching is asked of the live app rather than a hardcoded list, so a
+    POST-only route added later is covered without anyone remembering to.
+    """
+    from starlette.routing import Match
+
+    value = (raw or "").strip()
+    if not (value.startswith("/") and not value.startswith("//")):
+        return ""
+    if value.startswith("/login") or value.startswith("/register"):
+        return ""
+
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": value.split("?", 1)[0],
+        "root_path": "",
+        "headers": [],
+        "query_string": b"",
+    }
+    for route in request.app.routes:
+        try:
+            # Match.FULL means path AND method match; a POST-only route on the
+            # same path matches only PARTIAL, which is exactly the 405 case.
+            if route.matches(scope)[0] == Match.FULL:
+                return value
+        except Exception:
+            continue
+    return ""
+
+
 @router.get("/register", response_class=HTMLResponse)
 def register_page(
     request: Request,
@@ -392,10 +434,7 @@ def login(
             )
         token = create_access_token({"doctor_id": doctor.id, "tv": doctor.token_version or 0})
         # Honor the `next` param — only relative paths, no open redirect
-        safe_next = next.strip() if (
-            next and next.startswith("/") and not next.startswith("//")
-            and not next.startswith("/login") and not next.startswith("/register")
-        ) else ""
+        safe_next = _safe_next(request, next)
         redirect_url = safe_next if safe_next else "/workspace-loading"
         response = RedirectResponse(url=redirect_url, status_code=303)
         response.set_cookie(
@@ -416,15 +455,12 @@ def login(
 # ------------------------------------------------------------------ #
 
 @router.get("/logout")
-def logout(next: str = Query(default="")):
+def logout(request: Request, next: str = Query(default="")):
     # Same open-redirect guard as /login's next= handling — relative paths
     # only. Lets a public page (e.g. a clinic invite link) send the doctor
     # straight back after switching accounts, instead of stranding them on
     # /login with no way back except retyping the invite URL from memory.
-    safe_next = next.strip() if (
-        next and next.startswith("/") and not next.startswith("//")
-        and not next.startswith("/login") and not next.startswith("/register")
-    ) else ""
+    safe_next = _safe_next(request, next)
     response = RedirectResponse(url=safe_next or "/login", status_code=303)
     # Clear EVERY auth cookie. Previously only access_token was deleted, so a
     # logged-out session left a live pin_session / clinic_admin_auth behind —

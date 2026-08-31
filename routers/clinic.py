@@ -479,6 +479,15 @@ def doctor_invite_accept(
 #  Active clinic switching                                                     #
 # ─────────────────────────────────────────────────────────────────────────── #
 
+@router.get("/switch")
+def switch_clinic_get():
+    """A GET here is always a mistake — a stale bookmark, a browser resuming a
+    redirect, or a `next=` that captured this POST-only path. Send them home
+    rather than showing a 405 error page. Changes nothing: switching is a POST.
+    """
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+
 @router.post("/switch")
 def switch_clinic(
     request: Request,
