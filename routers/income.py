@@ -711,6 +711,9 @@ async def add_expense(
     if amount > 0:
         db.add(Expense(
             doctor_id    = doctor.id,
+            # Without this the row is invisible to the clinic-scoped queries on
+            # /expenses and /income — added, saved, and gone from the screen.
+            clinic_id    = getattr(request.state, "active_clinic_id", None),
             category     = category,
             amount       = amount,
             expense_date = expense_date,
@@ -787,6 +790,9 @@ async def add_recurring(
     if amount > 0 and label:
         db.add(RecurringExpense(
             doctor_id    = doctor.id,
+            # The monthly materialiser copies rule.clinic_id onto every Expense
+            # it generates, so a NULL here quietly unscopes them all, forever.
+            clinic_id    = getattr(request.state, "active_clinic_id", None),
             category     = category,
             amount       = amount,
             label        = label,

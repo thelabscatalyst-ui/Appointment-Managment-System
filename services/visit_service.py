@@ -324,20 +324,32 @@ def cancel_visit(db: Session, visit: Visit) -> Visit:
 
 
 def move_visit(db: Session, visit: Visit, new_position: int) -> Visit:
-    """
-    Manually reorder a visit in the queue (drag-and-drop support).
-    Shifts other visits to maintain contiguous positions.
-    """
-    old_pos = visit.queue_position or 0
-    today   = visit.visit_date
+    """Manually reorder a visit in the queue (drag-and-drop support).
 
-    if new_position == old_pos:
-        return visit
+    Rewritten — the previous version had three defects:
 
-    waiting_visits = (
+      * it renumbered the losing branch from ZERO (`v.queue_position = i`)
+        while every other queue path is 1-based, so a drag to the front left
+        the displaced patient at position 0;
+      * it was scoped to doctor + date only, so a doctor who works at two
+        clinics had the OTHER clinic's queue renumbered by a drag in this one
+        — the same defect already fixed for emergency promotion;
+      * new_position came straight off a form with no bounds check, so a
+        hand-posted value produced arbitrary positions.
+
+    It also built a `positions` list that was never read.
+
+    The queue is rebuilt as a plain ordered list: pull the visit out, insert it
+    at the clamped index, then number 1..N. That is inherently contiguous and
+    cannot drift.
+    """
+    today = visit.visit_date
+
+    others = (
         db.query(Visit)
         .filter(
             Visit.doctor_id == visit.doctor_id,
+            Visit.clinic_id == visit.clinic_id,   # one clinic's queue only
             Visit.visit_date == today,
             Visit.status == VisitStatus.waiting,
             Visit.id != visit.id,
@@ -346,17 +358,13 @@ def move_visit(db: Session, visit: Visit, new_position: int) -> Visit:
         .all()
     )
 
-    # Remove visit from list, insert at new position, reassign positions
-    positions = [v.queue_position for v in waiting_visits]
-    positions.insert(new_position, old_pos)  # placeholder
+    # 1-based target, clamped to the queue that actually exists.
+    target = max(1, min(int(new_position or 1), len(others) + 1))
 
-    for i, v in enumerate(waiting_visits):
-        if i >= new_position:
-            v.queue_position = i + 1
-        else:
-            v.queue_position = i
+    ordered = others[:target - 1] + [visit] + others[target - 1:]
+    for i, v in enumerate(ordered, start=1):
+        v.queue_position = i
 
-    visit.queue_position = new_position
     db.commit()
     db.refresh(visit)
     return visit

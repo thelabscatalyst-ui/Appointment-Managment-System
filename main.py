@@ -321,25 +321,27 @@ app.include_router(feedback.router)
 
 @app.get("/sitemap.xml", include_in_schema=False)
 def sitemap():
-    content = """<?xml version="1.0" encoding="UTF-8"?>
+    from services.url_service import public_base_url
+    base = public_base_url()
+    content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://www.medtrack.life/</loc>
+    <loc>{base}/</loc>
     <priority>1.0</priority>
     <changefreq>weekly</changefreq>
   </url>
   <url>
-    <loc>https://www.medtrack.life/register</loc>
+    <loc>{base}/register</loc>
     <priority>0.9</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.medtrack.life/login</loc>
+    <loc>{base}/login</loc>
     <priority>0.7</priority>
     <changefreq>monthly</changefreq>
   </url>
   <url>
-    <loc>https://www.medtrack.life/pricing</loc>
+    <loc>{base}/pricing</loc>
     <priority>0.8</priority>
     <changefreq>monthly</changefreq>
   </url>
@@ -349,7 +351,9 @@ def sitemap():
 
 @app.get("/robots.txt", include_in_schema=False)
 def robots():
-    content = """User-agent: *
+    from services.url_service import public_base_url
+    base = public_base_url()
+    content = f"""User-agent: *
 Allow: /
 Allow: /register
 Allow: /login
@@ -365,7 +369,7 @@ Disallow: /billing
 Disallow: /queue
 Disallow: /admin
 
-Sitemap: https://www.medtrack.life/sitemap.xml"""
+Sitemap: {base}/sitemap.xml"""
     return PlainTextResponse(content=content)
 
 

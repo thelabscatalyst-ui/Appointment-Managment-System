@@ -80,14 +80,22 @@ def clean_tables():
     db = TestSessionLocal()
     try:
         # Delete in dependency order to avoid FK violations
+        # Feedback, Prescription and PrescriptionItem were missing from this
+        # list, so those rows survived into the next test. Any assertion that
+        # counted prescriptions saw every earlier test's leftovers, which both
+        # produces flaky failures and hides real ones.
         from database.models import (
+            Feedback, PrescriptionItem, Prescription,
             BillItem, Bill, NotificationLog, Visit,
             Appointment, PatientNote, NoteFile, PatientDocument,
             PinnedPatient, BlockedDate, BlockedTime, DoctorSchedule,
             Subscription, Expense, RecurringExpense, PriceCatalog,
             Patient, ClinicDoctor, ClinicDoctorInvite, EmailVerification, PasswordReset, Clinic, Doctor,
         )
+        # Children before parents — SQLite enforces no FKs here, but Postgres
+        # would, and this list is the closest thing to a schema teardown order.
         for model in [
+            Feedback, PrescriptionItem, Prescription,
             BillItem, Bill, NotificationLog, Visit,
             Appointment, PatientNote, NoteFile, PatientDocument,
             PinnedPatient, BlockedDate, BlockedTime, DoctorSchedule,
