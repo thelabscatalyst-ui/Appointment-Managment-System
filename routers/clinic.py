@@ -512,6 +512,15 @@ def switch_clinic(
     # Same open-redirect guard the logout route uses: only site-relative paths.
     safe_next = next if next.startswith("/") and not next.startswith("//") else "/dashboard"
 
+    # Never return to a page that exists only because the PREVIOUS clinic
+    # failed. The switcher posts next = the current path, so switching away
+    # from the paywall sent the doctor straight back to it — and /plan-lapsed
+    # renders 200 for anyone, so the screen did not change and the toggle
+    # looked broken. The context had in fact changed; only the landing page
+    # was wrong.
+    if safe_next.split("?", 1)[0] in ("/plan-lapsed", "/workspace-loading"):
+        safe_next = "/dashboard"
+
     if not get_membership(db, doctor.id, clinic_id):
         return RedirectResponse(url=safe_next, status_code=303)
 

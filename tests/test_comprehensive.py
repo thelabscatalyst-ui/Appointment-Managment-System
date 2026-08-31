@@ -4301,3 +4301,63 @@ class TestLoginNextTarget:
                 continue
             break
         assert seen[-1][1] == 200, f"login chain never reached a page: {seen}"
+
+
+class TestSwitchingAwayFromADeadEnd:
+    """Switching must land somewhere that reflects the NEW clinic.
+
+    The switcher posts next = the current path. On /plan-lapsed that sends the
+    doctor straight back to the paywall after switching to a clinic that works
+    — and /plan-lapsed renders 200 for anyone, so nothing on screen changes and
+    the toggle looks broken. Seen repeatedly in production:
+
+        POST /clinic/switch -> 303
+        GET  /plan-lapsed   -> 200
+    """
+
+    @staticmethod
+    def _stranded(client, email, slug):
+        doc_id, own_id, host_id = _dual_clinic_doctor(
+            client, email, slug=slug,
+            own_clinic="Dead Practice", host_clinic="Live Clinic")
+        db = TestSession()
+        try:
+            d = db.query(Doctor).filter(Doctor.email == email).first()
+            past = datetime.utcnow() - timedelta(days=1)
+            d.trial_ends_at = past
+            d.plan_expires_at = past
+            for c in db.query(Clinic).filter(Clinic.owner_doctor_id == d.id).all():
+                c.plan_expires_at = past
+                c.plan_grace_until = None
+            db.commit()
+        finally:
+            db.close()
+        auth_cookie(client, email)
+        _switch_to(client, own_id)      # sit on the dead clinic
+        return doc_id, own_id, host_id
+
+    def test_switch_from_the_paywall_does_not_return_to_it(self, client):
+        _, own_id, host_id = self._stranded(
+            client, "deadend-back@test.com", "deadend-back-host")
+
+        r = client.post("/clinic/switch",
+                        data={"clinic_id": host_id, "next": "/plan-lapsed"},
+                        follow_redirects=False)
+        dest = r.headers.get("location", "")
+        assert dest != "/plan-lapsed", (
+            "switching to the working clinic sent the doctor back to the "
+            "paywall; it renders 200, so the toggle appears to do nothing")
+
+        follow = client.get(dest, follow_redirects=False)
+        assert follow.status_code == 200, f"{dest} -> {follow.status_code}"
+        assert "Live Clinic" in follow.text
+
+    def test_switch_from_the_paywall_actually_changes_context(self, client):
+        _, own_id, host_id = self._stranded(
+            client, "deadend-ctx@test.com", "deadend-ctx-host")
+
+        client.post("/clinic/switch",
+                    data={"clinic_id": host_id, "next": "/plan-lapsed"},
+                    follow_redirects=False)
+        body = client.get("/dashboard").text
+        assert "Live Clinic" in body, "the switch did not take effect"
