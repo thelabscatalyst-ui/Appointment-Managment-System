@@ -169,3 +169,79 @@ class TestPricesAreSingleSourced:
         for path in ("/login", "/pricing"):
             assert "₹1,234" in client.get(path, follow_redirects=True).text, (
                 f"{path} did not follow the price change")
+
+
+class TestGatewayFailuresAreHandledWell:
+    """Production ran with an invalid Razorpay key pair, and the first signal
+    was a doctor unable to pay.
+
+    Two defects that made it worse than it needed to be:
+      * Razorpay's own wording ("Authentication failed") went straight to the
+        doctor, who reasonably read it as THEIR login failing.
+      * /billing/create-order returned 200 OK on failure, so nothing upstream
+        could distinguish a broken gateway from a working one.
+    """
+
+    def _force(self, monkeypatch, exc_text):
+        """Make the gateway raise the way a bad key pair does."""
+        import services.payment_service as ps
+
+        class _Boom:
+            class order:
+                @staticmethod
+                def create(*a, **k):
+                    raise Exception(exc_text)
+
+        monkeypatch.setattr(ps, "_razorpay_client", lambda: _Boom())
+
+    def test_auth_failure_does_not_blame_the_doctor(self, monkeypatch):
+        from services.payment_service import create_order
+        self._force(monkeypatch, "Authentication failed")
+        r = create_order("solo")
+        assert "Authentication failed" not in r["error"], (
+            "the gateway's wording reached the doctor — it reads as though "
+            "their own login failed")
+        assert "temporarily unavailable" in r["error"].lower()
+        assert r["reason"] == "gateway_auth"
+
+    def test_the_doctor_is_told_nothing_was_charged(self, monkeypatch):
+        """The first question anyone asks after a failed payment."""
+        from services.payment_service import create_order
+        for text in ("Authentication failed", "Gateway timeout"):
+            self._force(monkeypatch, text)
+            assert "charged" in create_order("solo")["error"].lower()
+
+    def test_generic_failures_are_also_wrapped(self, monkeypatch):
+        from services.payment_service import create_order
+        self._force(monkeypatch, "connection reset by peer")
+        r = create_order("clinic")
+        assert "connection reset" not in r["error"]
+        assert r["reason"] == "gateway_error"
+
+    def test_endpoint_returns_502_for_a_broken_gateway(self, client, doc, monkeypatch):
+        """200 OK on failure hid a dead payment gateway from every monitor."""
+        self._force(monkeypatch, "Authentication failed")
+        r = client.post("/billing/create-order?plan=solo", follow_redirects=False)
+        assert r.status_code == 502, (
+            f"a failed order returned {r.status_code}; a broken gateway must "
+            f"not look like success")
+        assert "error" in r.json()
+
+    def test_endpoint_returns_400_for_a_bad_plan(self, client, doc):
+        r = client.post("/billing/create-order?plan=duo", follow_redirects=False)
+        assert r.status_code == 400
+        assert "order_id" not in r.json()
+
+    def test_success_still_returns_200(self, client, doc, monkeypatch):
+        import services.payment_service as ps
+
+        class _Ok:
+            class order:
+                @staticmethod
+                def create(*a, **k):
+                    return {"id": "order_test123", "amount": 99900, "currency": "INR"}
+
+        monkeypatch.setattr(ps, "_razorpay_client", lambda: _Ok())
+        r = client.post("/billing/create-order?plan=solo", follow_redirects=False)
+        assert r.status_code == 200
+        assert r.json()["order_id"] == "order_test123"

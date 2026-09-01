@@ -1266,7 +1266,16 @@ def billing_create_order(
     from fastapi.responses import JSONResponse
     from services.payment_service import create_order
     result = create_order(plan)
-    return JSONResponse(result)
+    if "error" not in result:
+        return JSONResponse(result)
+
+    # A failed order was returning 200 OK, so nothing upstream — monitoring,
+    # Railway's log level, a proxy — could tell a broken payment gateway from a
+    # working one. The body is unchanged (the checkout JS reads data.error),
+    # only the status now tells the truth.
+    reason = result.get("reason")
+    status = 400 if reason is None else (502 if reason.startswith("gateway") else 400)
+    return JSONResponse(result, status_code=status)
 
 
 @router.post("/billing/verify", response_class=HTMLResponse)

@@ -129,8 +129,29 @@ def create_order(plan: str) -> dict:
             "plan":     plan,
         }
     except Exception as exc:
-        logger.error(f"Razorpay order creation failed: {exc}")
-        return {"error": str(exc)}
+        # Never hand the gateway's own wording to a doctor. Razorpay says
+        # "Authentication failed" when OUR API keys are wrong, which reads to a
+        # customer as though THEIR login failed — that is exactly how the first
+        # real report of this arrived. The operator needs the true reason; the
+        # doctor needs to know it is not their fault and not their problem to
+        # solve.
+        detail = str(exc)
+        logger.error(
+            "Razorpay order creation failed (plan=%s): %s%s",
+            plan, detail,
+            "  <-- RAZORPAY_KEY_ID/RAZORPAY_KEY_SECRET are wrong for this "
+            "environment; check them with scripts/diagnose_payments.py"
+            if "authentication" in detail.lower() else "",
+        )
+        if "authentication" in detail.lower():
+            return {
+                "error": ("Payments are temporarily unavailable. Nothing was "
+                          "charged — please contact us and we'll sort it out."),
+                "reason": "gateway_auth",   # for logs/monitoring, not the doctor
+            }
+        return {"error": ("Could not start the payment. Nothing was charged — "
+                          "please try again in a moment."),
+                "reason": "gateway_error"}
 
 
 def verify_signature(payment_id: str, order_id: str, signature: str) -> bool:
