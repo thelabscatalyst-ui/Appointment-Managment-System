@@ -834,7 +834,15 @@
         var res = await fetch('/billing/create-order?plan=' + plan, { method: 'POST' });
         var data = await res.json();
         if (data.error) {
-          showPayToast('Could not start payment · ' + data.error, true);
+          // The server sends a complete, doctor-ready sentence. Prefixing it
+          // produced "Could not start payment · Payments are temporarily
+          // unavailable…" — the same thing said twice. Only fall back to a
+          // preamble if the server gave us something terse.
+          showPayToast(
+            (data.error && data.error.length > 40)
+              ? data.error
+              : 'Could not start payment · ' + (data.error || 'please try again.'),
+            true);
           btn.disabled = false; btn.textContent = origText; return;
         }
         var options = {

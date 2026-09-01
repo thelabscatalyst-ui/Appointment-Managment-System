@@ -245,3 +245,65 @@ class TestGatewayFailuresAreHandledWell:
         r = client.post("/billing/create-order?plan=solo", follow_redirects=False)
         assert r.status_code == 200
         assert r.json()["order_id"] == "order_test123"
+
+
+class TestLiveKeysAreBlockedOutsideProduction:
+    """Live Razorpay keys live in .env for local development, so any code path
+    reaching the gateway from a dev machine creates real orders on the real
+    account. That happened three times while this file was being written.
+
+    Orders are payment intents, so no money moved — but "no money moved" is
+    luck, not a control. The control is refusing to talk to a live gateway from
+    a non-production environment.
+    """
+
+    def _keys(self, monkeypatch, key_id, environment):
+        from config import settings
+        monkeypatch.setattr(settings, "RAZORPAY_KEY_ID", key_id)
+        monkeypatch.setattr(settings, "RAZORPAY_KEY_SECRET", "secret")
+        monkeypatch.setattr(settings, "ENVIRONMENT", environment)
+
+    def test_live_keys_blocked_in_development(self, monkeypatch):
+        from services.payment_service import live_keys_blocked
+        monkeypatch.delenv("ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD", raising=False)
+        self._keys(monkeypatch, "rzp_live_abc123", "development")
+        assert live_keys_blocked() is True
+
+    def test_live_keys_allowed_in_production(self, monkeypatch):
+        from services.payment_service import live_keys_blocked
+        self._keys(monkeypatch, "rzp_live_abc123", "production")
+        assert live_keys_blocked() is False
+
+    def test_test_keys_are_never_blocked(self, monkeypatch):
+        from services.payment_service import live_keys_blocked
+        self._keys(monkeypatch, "rzp_test_abc123", "development")
+        assert live_keys_blocked() is False
+
+    def test_explicit_opt_in_unblocks(self, monkeypatch):
+        """A deliberate end-to-end check must still be possible."""
+        from services.payment_service import live_keys_blocked
+        self._keys(monkeypatch, "rzp_live_abc123", "development")
+        monkeypatch.setenv("ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD", "1")
+        assert live_keys_blocked() is False
+
+    def test_blocked_keys_never_reach_the_gateway(self, monkeypatch):
+        """The whole point: no client is built, so no HTTP call happens."""
+        import services.payment_service as ps
+
+        monkeypatch.delenv("ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD", raising=False)
+        self._keys(monkeypatch, "rzp_live_abc123", "development")
+
+        called = []
+        monkeypatch.setattr("razorpay.Client",
+                            lambda *a, **k: called.append(1) or object())
+        r = ps.create_order("solo")
+        assert called == [], "a live gateway client was constructed anyway"
+        assert r["reason"] == "live_keys_blocked"
+
+    def test_the_message_does_not_claim_keys_are_missing(self, monkeypatch):
+        """Saying "not configured" for present-but-blocked keys sent someone
+        hunting for keys that were there all along."""
+        import services.payment_service as ps
+        monkeypatch.delenv("ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD", raising=False)
+        self._keys(monkeypatch, "rzp_live_abc123", "development")
+        assert "not configured" not in ps.create_order("solo")["error"].lower()

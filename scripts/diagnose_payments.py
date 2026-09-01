@@ -53,8 +53,17 @@ def main() -> int:
     if mode == "unknown" and kid:
         problems.append("KEY_ID does not look like rzp_test_… or rzp_live_…")
     if mode == "live" and settings.ENVIRONMENT.lower() != "production":
-        problems.append("LIVE keys in a non-production environment — real "
-                        "orders can be created from a dev machine")
+        from services.payment_service import live_keys_blocked
+        if live_keys_blocked():
+            problems.append(
+                f"LIVE keys with ENVIRONMENT={settings.ENVIRONMENT} — checkout "
+                "is BLOCKED here on purpose, so this environment cannot create "
+                "real orders. The auth check below still runs (it is read-only).")
+        else:
+            problems.append(
+                "LIVE keys outside production with the block overridden "
+                "(ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD=1) — real orders CAN be "
+                "created from this machine")
 
     for p in problems:
         print(f"  [WARN] {p}")

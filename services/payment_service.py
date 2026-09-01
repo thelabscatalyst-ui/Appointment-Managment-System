@@ -79,8 +79,42 @@ PLAN_AMOUNTS["basic"]    = 29900
 PLAN_AMOUNTS["pro"]      = 49900
 
 
+def live_keys_blocked() -> bool:
+    """True when LIVE keys are configured somewhere they must not be used.
+
+    Live Razorpay credentials sit in .env for local development, so any code
+    path that reaches the gateway from a dev machine creates real orders on the
+    real account. That happened three times while working on this file — twice
+    from a smoke test, once because a dev server silently reused a cached
+    launch config and ignored the overridden keys.
+
+    Orders are payment intents, so no money moved. But "no money moved" is not
+    a control, it is luck: the same path with one more parameter takes a
+    payment. The control is refusing to talk to a live gateway from a
+    non-production environment at all.
+
+    Escape hatch for a deliberate end-to-end check against live keys:
+        ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD=1
+    """
+    import os
+
+    key = settings.RAZORPAY_KEY_ID or ""
+    if not key.startswith("rzp_live"):
+        return False
+    if settings.ENVIRONMENT.lower() == "production":
+        return False
+    return os.environ.get("ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD", "") != "1"
+
+
 def _razorpay_client():
     if not settings.RAZORPAY_KEY_ID or not settings.RAZORPAY_KEY_SECRET:
+        return None
+    if live_keys_blocked():
+        logger.error(
+            "REFUSING to use LIVE Razorpay keys with ENVIRONMENT=%s. "
+            "Set ENVIRONMENT=production, or use rzp_test_ keys locally. "
+            "Override with ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD=1 if you really "
+            "mean to hit the live gateway.", settings.ENVIRONMENT)
         return None
     try:
         import razorpay
@@ -113,7 +147,15 @@ def create_order(plan: str) -> dict:
 
     client = _razorpay_client()
     if not client:
-        return {"error": "Payment gateway not configured. Add Razorpay keys to .env"}
+        # Two very different causes, and saying "not configured" for both sent
+        # someone hunting for missing keys that were present all along.
+        if live_keys_blocked():
+            return {"error": ("Live payment keys are blocked outside production. "
+                              "Use rzp_test_ keys locally, or set "
+                              "ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD=1 deliberately."),
+                    "reason": "live_keys_blocked"}
+        return {"error": "Payment gateway not configured. Add Razorpay keys to .env",
+                "reason": "not_configured"}
 
     try:
         order = client.order.create({
