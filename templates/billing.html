@@ -188,6 +188,16 @@ html.light .pc-btn--primary:hover { color: #fff; }
   <div class="alert alert-error" style="margin-bottom:20px;font-size:13px;">
     Payment verification failed. If you were charged, please contact support.
   </div>
+  {% elif success == 'pending' %}
+  {# The payment went through but the plan could not be confirmed against the
+     order — so nothing was activated, on purpose. Without this branch the
+     doctor paid and was returned to a page that said nothing at all. #}
+  <div class="alert alert-error" style="margin-bottom:20px;font-size:13px;">
+    <strong>Payment received — activation pending.</strong>
+    Your payment went through, but we could not confirm which plan it was for,
+    so we have not activated anything yet rather than guess. Nothing further is
+    owed. Please contact us and we'll switch it on straight away.
+  </div>
   {% endif %}
 
   {% if is_expired %}

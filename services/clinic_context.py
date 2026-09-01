@@ -234,6 +234,13 @@ def resolve_active_clinic(request, doctor, db: Session, memberships=None):
     # navbar middleware has already loaded exactly this list.
     if memberships is None:
         memberships = active_memberships(db, doctor.id)
+    else:
+        # The prefetch is an optimisation, not a trust boundary. Every decision
+        # below is keyed off this list, so a caller passing someone else's
+        # memberships would hand this doctor that person's clinics. Cheap to
+        # verify, and impossible to get wrong by accident afterwards.
+        if any(m.doctor_id != doctor.id for m in memberships):
+            memberships = active_memberships(db, doctor.id)
     if not memberships:
         return None, None
 

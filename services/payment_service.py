@@ -212,6 +212,62 @@ def verify_signature(payment_id: str, order_id: str, signature: str) -> bool:
         return False
 
 
+def verified_plan_for_order(order_id: str) -> tuple[str | None, str]:
+    """The plan Razorpay actually charged for, read back from the order.
+
+    The checkout signature is an HMAC over "order_id|payment_id" — it proves a
+    real payment happened against that order, and says NOTHING about which plan
+    or how much. /billing/verify used to take the plan from a hidden form field
+    instead, so a doctor could pay for Solo (₹999) and post plan=enterprise to
+    be granted unlimited doctor seats.
+
+    create_order records the plan in the order's `notes`, so the authoritative
+    value can be fetched back. The amount is checked too: matching notes but a
+    mismatched amount means the order was not one of ours.
+
+    Returns (plan, reason). plan is None whenever the grant must not proceed.
+    """
+    client = _razorpay_client()
+    if not client:
+        return None, "gateway_unavailable"
+
+    try:
+        order = client.order.fetch(order_id)
+    except Exception as exc:
+        logger.error("Could not fetch order %s to confirm the plan: %s", order_id, exc)
+        return None, "fetch_failed"
+
+    notes = (order or {}).get("notes") or {}
+    plan = (notes.get("plan") or "").strip()
+
+    if plan not in PLAN_CONFIG:
+        logger.error("Order %s carries plan %r, which is not on sale — refusing "
+                     "to grant.", order_id, plan)
+        return None, "unknown_plan"
+
+    expected = PLAN_CONFIG[plan]["amount"]
+    actual = order.get("amount")
+    if actual != expected:
+        logger.error("Order %s is for %s paise but plan %r costs %s — refusing "
+                     "to grant.", order_id, actual, plan, expected)
+        return None, "amount_mismatch"
+
+    return plan, "ok"
+
+
+def seats_for_plan(plan: str) -> int | None:
+    """Seat allowance for a plan. None means unlimited.
+
+    Deliberately NOT PLAN_CONFIG.get(plan, {}).get("seats"): that returns None
+    for a plan that is not in the catalogue at all, and None reads as
+    "unlimited" downstream. Retiring Duo and Hospital from PLAN_CONFIG turned
+    them into unlimited-seat grants exactly that way.
+    """
+    if plan not in PLAN_CONFIG:
+        raise KeyError(f"{plan!r} is not a sellable plan")
+    return PLAN_CONFIG[plan]["seats"]
+
+
 def price_display() -> dict:
     """Formatted prices for templates.
 

@@ -114,9 +114,15 @@ async def security_headers(request: Request, call_next):
     """Add security headers to every response."""
     # Every router builds its own Jinja2Templates, so a template global would
     # reach only one of them. request.state reaches all of them.
-    request.state.asset_v = settings.ASSET_VERSION
-    from services.payment_service import price_display
-    request.state.price = price_display()
+    #
+    # Skipped for static assets: they render no template, and a logged-in
+    # browser fetches a lot of them. The other middleware already skips the
+    # same paths for the same reason.
+    _p = request.url.path
+    if not (_p.startswith("/static/") or _p.startswith("/uploads/")):
+        request.state.asset_v = settings.ASSET_VERSION
+        from services.payment_service import price_display
+        request.state.price = price_display()
     response = await call_next(request)
     response.headers["X-Content-Type-Options"]  = "nosniff"
     response.headers["X-Frame-Options"]          = "DENY"

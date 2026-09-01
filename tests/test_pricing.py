@@ -307,3 +307,115 @@ class TestLiveKeysAreBlockedOutsideProduction:
         monkeypatch.delenv("ALLOW_LIVE_PAYMENTS_OUTSIDE_PROD", raising=False)
         self._keys(monkeypatch, "rzp_live_abc123", "development")
         assert "not configured" not in ps.create_order("solo")["error"].lower()
+
+
+class TestPlanCannotBeEscalatedAtVerify:
+    """The checkout signature is an HMAC over "order_id|payment_id" only.
+
+    It proves a real payment happened against that order. It says nothing about
+    which plan or how much — so /billing/verify must read the plan back from
+    the order Razorpay actually charged, never from the form.
+
+    Taking it from the form meant a doctor could pay ₹999 for Solo and post
+    plan=enterprise to be granted unlimited doctor seats. Retiring Duo and
+    Hospital from PLAN_CONFIG made it worse: PLAN_CONFIG.get(plan, {}).get(
+    "seats") returned None for them, and None reads as unlimited downstream.
+    """
+
+    def test_seats_never_default_to_unlimited(self):
+        """The specific mechanism that turned a retired tier into unlimited."""
+        from services.payment_service import seats_for_plan
+        assert seats_for_plan("solo") == 1
+        assert seats_for_plan("clinic") == 5
+        assert seats_for_plan("enterprise") is None      # genuinely unlimited
+        for retired in ("hospital", "duo", "basic", "pro", "bogus"):
+            with pytest.raises(KeyError):
+                seats_for_plan(retired)
+
+    def _order(self, monkeypatch, notes_plan, amount):
+        import services.payment_service as ps
+
+        class _Client:
+            class order:
+                @staticmethod
+                def fetch(order_id):
+                    return {"id": order_id, "amount": amount,
+                            "notes": {"plan": notes_plan, "product": "Med Track"}}
+
+        monkeypatch.setattr(ps, "_razorpay_client", lambda: _Client())
+
+    def test_plan_comes_from_the_order(self, monkeypatch):
+        from services.payment_service import verified_plan_for_order, PLAN_CONFIG
+        self._order(monkeypatch, "solo", PLAN_CONFIG["solo"]["amount"])
+        plan, reason = verified_plan_for_order("order_x")
+        assert (plan, reason) == ("solo", "ok")
+
+    def test_amount_must_match_the_plan(self, monkeypatch):
+        """Matching notes with the wrong amount means it is not our order."""
+        from services.payment_service import verified_plan_for_order
+        self._order(monkeypatch, "enterprise", 99900)   # enterprise at solo's price
+        plan, reason = verified_plan_for_order("order_x")
+        assert plan is None and reason == "amount_mismatch"
+
+    def test_a_retired_tier_in_the_order_is_refused(self, monkeypatch):
+        from services.payment_service import verified_plan_for_order
+        self._order(monkeypatch, "hospital", 249900)
+        plan, reason = verified_plan_for_order("order_x")
+        assert plan is None and reason == "unknown_plan"
+
+    def test_unreachable_gateway_fails_closed(self, monkeypatch):
+        """Never grant a tier we could not confirm."""
+        import services.payment_service as ps
+        from services.payment_service import verified_plan_for_order
+
+        class _Client:
+            class order:
+                @staticmethod
+                def fetch(order_id):
+                    raise Exception("network down")
+
+        monkeypatch.setattr(ps, "_razorpay_client", lambda: _Client())
+        plan, reason = verified_plan_for_order("order_x")
+        assert plan is None and reason == "fetch_failed"
+
+    def test_verify_endpoint_ignores_a_forged_plan_field(self, client, doc, monkeypatch):
+        """The exploit, end to end: pay for Solo, claim Enterprise."""
+        import services.payment_service as ps
+        from services.payment_service import PLAN_CONFIG
+        from tests.conftest import TestSessionLocal
+        from database.models import Doctor
+
+        self._order(monkeypatch, "solo", PLAN_CONFIG["solo"]["amount"])
+        # billing_verify imports verify_signature inside the function body, so
+        # patching the module is enough — no route-level patch needed.
+        monkeypatch.setattr(ps, "verify_signature", lambda *a, **k: True)
+
+        r = client.post("/billing/verify", data={
+            "razorpay_payment_id": "pay_x",
+            "razorpay_order_id": "order_x",
+            "razorpay_signature": "sig",
+            "plan": "enterprise",          # <- the forgery
+        }, follow_redirects=False)
+        assert r.status_code in (302, 303)
+
+        db = TestSessionLocal()
+        try:
+            d = db.query(Doctor).filter(Doctor.id == doc["id"]).first()
+            assert d.plan_seats == 1, (
+                f"paid for Solo but was granted {d.plan_seats} seats — the "
+                f"forged plan field was honoured")
+            assert d.plan_type.value == "solo", d.plan_type
+        finally:
+            db.close()
+
+
+class TestPendingActivationIsVisible:
+    def test_pending_tells_the_doctor_what_happened(self, client, doc):
+        """A payment that could not be confirmed used to redirect to a page
+        that rendered nothing at all — paid, and silence."""
+        # Collapse whitespace: the sentence wraps across lines in the
+        # template, so a raw substring check fails on the newline.
+        body = " ".join(client.get("/billing?success=pending").text.lower().split())
+        assert "activation pending" in body
+        assert "nothing further is owed" in body
+        assert "could not confirm which plan" in body

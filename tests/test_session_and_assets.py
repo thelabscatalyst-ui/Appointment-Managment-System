@@ -210,3 +210,28 @@ class TestAssetVersionIsSingleSourced:
             if client_cookies:
                 for k, v in client_cookies.items():
                     client.cookies.set(k, v)
+
+
+class TestMiddlewareDoesNotWorkOnStaticAssets:
+    """A logged-in browser sends its cookie with every stylesheet and script.
+    Both middlewares skip that work; this keeps them honest."""
+
+    def test_static_requests_skip_the_per_request_setup(self, client, doc):
+        import main
+        calls = []
+        real = None
+        import services.payment_service as ps
+        real = ps.price_display
+
+        def counting():
+            calls.append(1)
+            return real()
+
+        ps.price_display = counting
+        try:
+            client.get(f"/static/css/main.css?v={settings.ASSET_VERSION}")
+            assert calls == [], "price_display ran for a static asset"
+            client.get("/dashboard")
+            assert calls, "price_display did not run for a real page"
+        finally:
+            ps.price_display = real

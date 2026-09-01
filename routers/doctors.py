@@ -1,4 +1,5 @@
 import calendar as cal_module
+import logging
 from datetime import date, datetime, time as dtime
 from fastapi import APIRouter, Request, Depends, Form, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -25,6 +26,7 @@ from services.auth_service import (
 
 router = APIRouter(tags=["doctors"])
 templates = Jinja2Templates(directory="templates")
+logger = logging.getLogger(__name__)
 
 DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
@@ -1288,17 +1290,42 @@ def billing_verify(
     db: Session    = Depends(get_db),
 ):
     from datetime import datetime as dt, timedelta
-    from services.payment_service import verify_signature, PLAN_AMOUNTS, PLAN_CONFIG
+    from services.payment_service import (verify_signature, PLAN_AMOUNTS,
+                                          PLAN_CONFIG, verified_plan_for_order,
+                                          seats_for_plan)
     from database.models import Subscription, PlanType
 
     if not verify_signature(razorpay_payment_id, razorpay_order_id, razorpay_signature):
         return RedirectResponse(url="/billing?success=fail", status_code=303)
 
+    # The signature proves a real payment against this order id. It says
+    # nothing about WHICH plan or how much — so the plan must come from the
+    # order Razorpay actually charged, never from the form.
+    #
+    # Taking it from the form meant a doctor could pay ₹999 for Solo and post
+    # plan=enterprise to be granted unlimited doctor seats.
+    claimed_plan = plan
+    plan, reason = verified_plan_for_order(razorpay_order_id)
+    if plan is None:
+        # Fail closed. The payment is captured at Razorpay either way, so a
+        # human can activate it; silently granting an unverified tier cannot
+        # be undone once seats are handed out.
+        logger.error(
+            "Refusing to activate order %s for doctor %s: %s (browser claimed "
+            "plan=%r)", razorpay_order_id, doctor.id, reason, claimed_plan)
+        return RedirectResponse(url="/billing?success=pending", status_code=303)
+
+    if claimed_plan != plan:
+        # Not necessarily an attack — a stale tab could do it — but it is
+        # exactly what tampering looks like, so it is worth seeing.
+        logger.warning(
+            "Order %s: browser claimed plan=%r, Razorpay says %r. Using %r.",
+            razorpay_order_id, claimed_plan, plan, plan)
+
     now      = dt.utcnow()
     end_date = now + timedelta(days=30)
 
-    cfg = PLAN_CONFIG.get(plan, {})
-    seats = cfg.get("seats")  # None = unlimited
+    seats = seats_for_plan(plan)   # None = unlimited, and only for a real tier
 
     # Map plan string → PlanType enum (fall back to solo for unknown/legacy)
     plan_type_map = {
@@ -1314,7 +1341,9 @@ def billing_verify(
     sub = Subscription(
         doctor_id  = doctor.id,
         plan_name  = plan,
-        amount     = PLAN_AMOUNTS.get(plan, 0),
+        # PLAN_CONFIG, not PLAN_AMOUNTS: the latter carries retired tiers for
+        # historical rows and would record a price nobody was charged.
+        amount     = PLAN_CONFIG[plan]["amount"],
         payment_id = razorpay_payment_id,
         start_date = now.date(),
         end_date   = end_date.date(),
