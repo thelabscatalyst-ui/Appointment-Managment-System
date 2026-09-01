@@ -86,7 +86,7 @@
     <div style="background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;text-align:left;">
       <div style="font-size:0.75rem;font-weight:600;letter-spacing:0.08em;color:var(--muted);text-transform:uppercase;margin-bottom:12px;">Renew your plan</div>
       <p style="font-size:0.875rem;color:var(--text);line-height:1.5;margin:0 0 16px;">
-        Plans start at <strong>₹599/month</strong>. Renew now to restore access for your entire team instantly.
+        Plans start at <strong>₹{{ request.state.price.solo }}/month</strong>. Renew now to restore access for your entire team instantly.
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <a href="/pricing" class="btn btn-primary btn-sm">View Plans &amp; Pricing</a>

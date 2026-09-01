@@ -35,6 +35,21 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 from config import settings as _test_settings           # noqa: E402
 _test_settings.RESEND_API_KEY = ""
 
+# ── Razorpay: hard-off for the entire suite ─────────────────────────────────
+# Same failure mode as the email key above, and it bit for the same reason:
+# config.py loads .env for tests too, and .env holds LIVE keys (rzp_live_…).
+# test_create_order_without_credentials_does_not_500 posts to
+# /billing/create-order, so every full suite run was creating a real order on
+# the production Razorpay account. Orders are only payment intents — no money
+# moves and nothing is charged — but they accumulate as junk in the dashboard
+# and the suite has no business touching a live payment gateway at all.
+#
+# Blanking the keys makes _razorpay_client() return None, so create_order
+# short-circuits to "Payment gateway not configured" before any network call.
+# That is also exactly the branch the test means to assert.
+_test_settings.RAZORPAY_KEY_ID = ""
+_test_settings.RAZORPAY_KEY_SECRET = ""
+
 from database.connection import Base, get_db            # noqa: E402
 
 test_engine = create_engine(

@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Pricing · Med Track</title>
-  <meta name="description" content="Simple, honest pricing for Indian clinics. Starts at ₹599/month." />
+  <meta name="description" content="Simple, honest pricing for Indian clinics. Starts at ₹{{ request.state.price.solo }}/month." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -667,8 +667,8 @@
       <div class="pc">
         <div class="pc-seats">1 Doctor</div>
         <div class="pc-name">Solo</div>
-        <div class="pc-price">₹599<span>/month</span></div>
-        <div class="pc-per">₹599 per doctor</div>
+        <div class="pc-price">₹{{ request.state.price.solo }}<span>/month</span></div>
+        <div class="pc-per">₹{{ request.state.price.solo_per_doctor }} per doctor</div>
         <div class="pc-divider"></div>
         <ul class="pc-features">
           <li>Walk-in queue &amp; tokens</li>
@@ -719,8 +719,8 @@
       <div class="pc">
         <div class="pc-seats">Up to 5 Doctors</div>
         <div class="pc-name">Clinic</div>
-        <div class="pc-price">₹1,599<span>/month</span></div>
-        <div class="pc-per">₹320 per doctor</div>
+        <div class="pc-price">₹{{ request.state.price.clinic }}<span>/month</span></div>
+        <div class="pc-per">₹{{ request.state.price.clinic_per_doctor }} per doctor</div>
         <div class="pc-divider"></div>
         <ul class="pc-features">
           <li>Everything in Solo</li>
@@ -756,7 +756,7 @@
             {% if razorpay_configured %}
             <button type="button" class="pc-btn pc-btn--primary"
               onclick="startPayment('clinic', {{ plans['clinic']['amount'] }}, this)">
-              {% if plan_status == "active" %}Upgrade · ₹1,599/mo
+              {% if plan_status == "active" %}Upgrade · ₹{{ request.state.price.clinic }}/mo
               {% elif plan_status == "expired" %}Renew Now →
               {% else %}Upgrade to Clinic →{% endif %}
             </button>
@@ -774,9 +774,9 @@
       <div class="pc">
         <div class="pc-seats">6+ Doctors</div>
         <div class="pc-name">Enterprise</div>
-        <div class="pc-price" style="font-size:24px;padding-top:6px;">Custom<span style="font-size:13px;">
-            pricing</span></div>
-        <div class="pc-per">Tailored to your setup</div>
+        <div class="pc-price" style="font-size:24px;padding-top:6px;">₹{{ request.state.price.ent_base }}<span style="font-size:13px;">
+            + ₹{{ request.state.price.ent_extra }}/doctor</span></div>
+        <div class="pc-per">Base covers {{ request.state.price.ent_included }} doctors · ₹{{ request.state.price.ent_extra }} for each one after</div>
         <div class="pc-divider"></div>
         <ul class="pc-features">
           <li>Everything in Clinic</li>

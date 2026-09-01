@@ -253,8 +253,8 @@ html.light .pc-btn--primary:hover { color: #fff; }
     <div class="pc {% if plan_ok and current_plan_key == 'solo' %}pc--current{% endif %}">
       <div class="pc-seats">1 Doctor</div>
       <div class="pc-name">Solo</div>
-      <div class="pc-price">₹599<span>/month</span></div>
-      <div class="pc-per">₹599 per doctor</div>
+      <div class="pc-price">₹{{ request.state.price.solo }}<span>/month</span></div>
+      <div class="pc-per">₹{{ request.state.price.solo_per_doctor }} per doctor</div>
       <div class="pc-divider"></div>
       <ul class="pc-features">
         <li>Unlimited appointments</li>
@@ -279,7 +279,7 @@ html.light .pc-btn--primary:hover { color: #fff; }
       {% else %}
         <button type="button" class="pc-btn pc-btn--primary"
                 onclick="startPayment('solo', {{ plan_config['solo']['amount'] }}, this)">
-          {% if is_expired %}Subscribe · ₹599/mo{% else %}Upgrade Now →{% endif %}
+          {% if is_expired %}Subscribe · ₹{{ request.state.price.solo }}/mo{% else %}Upgrade Now →{% endif %}
         </button>
       {% endif %}
     </div>
@@ -288,8 +288,8 @@ html.light .pc-btn--primary:hover { color: #fff; }
     <div class="pc {% if plan_ok and current_plan_key == 'clinic' %}pc--current{% endif %}">
       <div class="pc-seats">Up to 5 Doctors</div>
       <div class="pc-name">Clinic</div>
-      <div class="pc-price">₹1,599<span>/month</span></div>
-      <div class="pc-per">₹320 per doctor</div>
+      <div class="pc-price">₹{{ request.state.price.clinic }}<span>/month</span></div>
+      <div class="pc-per">₹{{ request.state.price.clinic_per_doctor }} per doctor</div>
       <div class="pc-divider"></div>
       <ul class="pc-features">
         <li>Everything in Solo</li>
@@ -314,8 +314,8 @@ html.light .pc-btn--primary:hover { color: #fff; }
       {% else %}
         <button type="button" class="pc-btn pc-btn--primary"
                 onclick="startPayment('clinic', {{ plan_config['clinic']['amount'] }}, this)">
-          {% if plan_ok %}Upgrade · ₹1,599/mo
-          {% elif is_expired %}Subscribe · ₹1,599/mo
+          {% if plan_ok %}Upgrade · ₹{{ request.state.price.clinic }}/mo
+          {% elif is_expired %}Subscribe · ₹{{ request.state.price.clinic }}/mo
           {% else %}Upgrade to Clinic →{% endif %}
         </button>
       {% endif %}
